@@ -30,10 +30,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import uz.faceguard.app.R
-import uz.faceguard.app.core.ui.AppPhoneField
 import uz.faceguard.app.core.ui.AppLoadingButton
+import uz.faceguard.app.core.ui.AppPhoneField
 import uz.faceguard.app.core.ui.AppTextField
 import uz.faceguard.app.core.util.Validation
+
+/** Temporary in-memory state holder for registration flow */
+object RegisterDraft {
+    var fullName: String = ""
+    var phoneNumber: String = ""
+
+    fun clear() {
+        fullName = ""
+        phoneNumber = ""
+    }
+}
 
 data class RegisterUiState(
     val fullName: String = "",

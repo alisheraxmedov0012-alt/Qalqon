@@ -1,6 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="app_name">Qalqon</string>
+    <string name="accessibility_service_description">Qalqon protection service</string>
     <string name="splash_tagline">Face-based protection for children</string>
     <string name="welcome_title">Welcome to Qalqon</string>
     <string name="welcome_subtitle">Create a parent account or log in to keep children safe inside protected apps</string>
@@ -54,7 +55,11 @@
     <string name="settings_recovery_delay">Recovery delay</string>
     <string name="settings_recovery_delay_value">%1$s seconds delay</string>
     <string name="settings_unknown_policy">Unknown user policy</string>
-    <string name="error_invalid_name">Please enter your full name</string><string name="error_invalid_phone">Invalid phone number</string><string name="error_duplicate_phone">This phone number is already registered</string><string name="error_invalid_credentials">Phone number or PIN is incorrect</string><string name="settings_logout">Log out</string>
+    <string name="error_invalid_name">Please enter your full name</string>
+    <string name="error_invalid_phone">Invalid phone number</string>
+    <string name="error_duplicate_phone">This phone number is already registered</string>
+    <string name="error_invalid_credentials">Phone number or PIN is incorrect</string>
+    <string name="settings_logout">Log out</string>
     <string name="state_loading">Loading...</string>
     <string name="btn_edit">Edit</string>
     <string name="parent_create">Create profile</string>
@@ -107,15 +112,15 @@
     <string name="recognition_status_label">Status</string>
     <string name="recognition_no_face">No face found</string>
     <string name="recognition_idle">Look at the camera</string>
-    <string name="recognition_unknown">Unknown face (%s)</string>
-    <string name="recognition_parent">Parent recognized (%s)</string>
-    <string name="recognition_child">Child recognized: %s (%s)</string>
+    <string name="recognition_unknown">Unknown face (%1$s)</string>
+    <string name="recognition_parent">Parent recognized (%1$s)</string>
+    <string name="recognition_child">Child recognized: %1$s (%2$s)</string>
     <string name="recognition_permission_title">Camera permission</string>
     <string name="recognition_permission_message">Camera is needed for recognition</string>
 
-    <string name="home_protected_count">Protected apps: %d</string>
+    <string name="home_protected_count">Protected apps: %1$d</string>
     <string name="home_foreground_title">Current app</string>
-    <string name="home_foreground_current">Current app: %s</string>
+    <string name="home_foreground_current">Current app: %1$s</string>
     <string name="home_foreground_unknown">unknown</string>
     <string name="home_usage_access_hint">Usage stats access is needed</string>
     <string name="home_usage_access_grant">Grant access</string>
@@ -127,7 +132,7 @@
     <string name="protection_state_soft">Soft block</string>
     <string name="protection_state_hard">Hard block</string>
     <string name="protection_state_recovering">Recovering</string>
-    <string name="protection_decision_label">Decision: %s</string>
+    <string name="protection_decision_label">Decision: %1$s</string>
     <string name="protection_overlay_message">This app is protected. Ask your parent for help.</string>
     <string name="protection_emergency_title">Emergency unlock</string>
     <string name="protection_emergency_pin_label">PIN</string>
@@ -137,19 +142,19 @@
     <string name="home_protection_debug">Check protection</string>
 
     <string name="protection_scan_debug_title">Scan status</string>
-    <string name="protection_scan_mode">Mode: %s</string>
-    <string name="protection_scan_state">Camera: %s</string>
+    <string name="protection_scan_mode">Mode: %1$s</string>
+    <string name="protection_scan_state">Camera: %1$s</string>
     <string name="protection_scan_on">active</string>
     <string name="protection_scan_off">off</string>
-    <string name="protection_scan_cooldown">Cooldown: %d s</string>
-    <string name="protection_scan_trigger">Last trigger: %s</string>
+    <string name="protection_scan_cooldown">Cooldown: %1$d s</string>
+    <string name="protection_scan_trigger">Last trigger: %1$s</string>
     <string name="scan_mode_battery_saver">Battery saver</string>
     <string name="scan_mode_balanced">Balanced</string>
     <string name="scan_mode_strict">Strict</string>
 
-    <string name="protection_result_label">Result: %s</string>
-    <string name="protection_confidence_label">Confidence: %.2f</string>
-    <string name="protection_fallback_label">Policy: %s</string>
+    <string name="protection_result_label">Result: %1$s</string>
+    <string name="protection_confidence_label">Confidence: %1$.2f</string>
+    <string name="protection_fallback_label">Policy: %1$s</string>
     <string name="protection_result_obstructed">Camera possibly obstructed</string>
     <string name="protection_result_unstable">Unstable recognition</string>
 
@@ -181,7 +186,7 @@
     <string name="help_about_body">Qalqon helps parents keep children safe. It recognizes who is using the device and closes protected apps for children.</string>
     <string name="help_steps_title">Getting started</string>
     <string name="help_steps_body">1. Create an account. 2. Set up the parent profile and enroll your face. 3. Add a child and enroll their face. 4. Choose protected apps. 5. Turn protection on.</string>
-    <string name="help_version">%s — MVP demo build</string>
+    <string name="help_version">%1$s — MVP demo build</string>
     <string name="activity_title">Activity log</string>
     <string name="activity_empty">No events yet</string>
     <string name="activity_clear">Clear log</string>
@@ -195,7 +200,7 @@
     <string name="settings_tab_data">Data</string>
     <string name="data_section_faces">Face data</string>
     <string name="data_delete_parent_face">Delete parent face</string>
-    <string name="data_delete_child_face">Delete face of %s</string>
+    <string name="data_delete_child_face">Delete face of %1$s</string>
     <string name="data_no_children">No children added yet</string>
     <string name="data_no_faces">No enrolled faces</string>
     <string name="data_section_reset">Full reset</string>

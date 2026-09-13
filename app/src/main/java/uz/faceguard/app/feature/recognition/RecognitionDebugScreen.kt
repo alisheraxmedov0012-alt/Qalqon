@@ -35,6 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionState
+import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.Locale
@@ -87,7 +88,6 @@ class RecognitionDebugViewModel @Inject constructor(
     private val _ui = MutableStateFlow(Ui())
     val ui: StateFlow<Ui> = _ui
 
-
     fun onFrame(frame: FrameEvent) {
         viewModelScope.launch {
             val account = accountRepository.getCurrentAccount() ?: return@launch
@@ -112,8 +112,8 @@ fun RecognitionDebugScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    DisposableEffect(cameraPermission.hasPermission) {
-        if (cameraPermission.hasPermission) {
+    DisposableEffect(cameraPermission.status.isGranted) {
+        if (cameraPermission.status.isGranted) {
             val owned = FaceCaptureController(context)
             owned.setLifecycleOwner(lifecycleOwner)
             viewModel.setController(owned)
@@ -140,7 +140,7 @@ fun RecognitionDebugScreen(
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            if (!cameraPermission.hasPermission) {
+            if (!cameraPermission.status.isGranted) {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(stringResource(R.string.recognition_permission_title), style = MaterialTheme.typography.titleMedium)
@@ -170,11 +170,12 @@ fun RecognitionDebugScreen(
                             stringResource(R.string.recognition_status_label),
                             style = MaterialTheme.typography.titleSmall,
                         )
-                        val status = when (ui.lastResult) {
+                        val lastResult = ui.lastResult
+                        val status = when (lastResult) {
                             is RecognitionResult.NoFace -> stringResource(R.string.recognition_no_face)
-                            is RecognitionResult.Unknown -> stringResource(R.string.recognition_unknown, confidence(ui.lastResult.confidence))
-                            is RecognitionResult.ParentRecognized -> stringResource(R.string.recognition_parent, confidence(ui.lastResult.confidence))
-                            is RecognitionResult.ChildRecognized -> stringResource(R.string.recognition_child, ui.lastResult.childName, confidence(ui.lastResult.confidence))
+                            is RecognitionResult.Unknown -> stringResource(R.string.recognition_unknown, confidence(lastResult.confidence))
+                            is RecognitionResult.ParentRecognized -> stringResource(R.string.recognition_parent, confidence(lastResult.confidence))
+                            is RecognitionResult.ChildRecognized -> stringResource(R.string.recognition_child, lastResult.childName, confidence(lastResult.confidence))
                             // obstruction/instability are engine-level signals; show as unknown here
                             else -> stringResource(R.string.recognition_unknown, "")
                         }

@@ -1,5 +1,6 @@
 package uz.faceguard.app.feature.enrollment
 
+import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,7 +34,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import androidx.camera.view.PreviewView
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionState
 import com.google.accompanist.permissions.isGranted
@@ -51,7 +51,6 @@ import uz.faceguard.app.core.embed.PrivateStorageEmbeddable
 import uz.faceguard.app.core.pipeline.EnrollmentSteps
 import uz.faceguard.app.core.pipeline.FaceCaptureController
 import uz.faceguard.app.core.pipeline.FrameEvent
-import uz.faceguard.app.domain.model.EnrollmentStatus
 import uz.faceguard.app.core.recognition.Recognizer
 import uz.faceguard.app.domain.repository.AccountRepository
 import uz.faceguard.app.domain.repository.ChildProfileRepository
@@ -88,14 +87,17 @@ class FaceEnrollmentViewModel @Inject constructor(
     val ui: StateFlow<Ui> = _ui
 
     private val frames = mutableListOf<FrameEvent>()
+    
     var controller: FaceCaptureController? = null
+        private set
+
     fun setController(value: FaceCaptureController) { controller = value }
 
     private var embeddable: FaceEmbeddable = PrivateStorageEmbeddable()
     fun setEmbeddable(value: FaceEmbeddable) { embeddable = value }
 
     /** Starts preview + analysis and routes accepted frames into [onFrame]. */
-    fun startCamera(previewView: androidx.camera.view.PreviewView) {
+    fun startCamera(previewView: PreviewView) {
         controller?.start(previewView, object : FaceCaptureController.Callback {
             override fun onFaceFrame(frame: FrameEvent) = onFrame(frame)
         })

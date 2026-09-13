@@ -35,7 +35,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -52,9 +56,9 @@ import uz.faceguard.app.core.recognition.RecognitionResult
 import uz.faceguard.app.core.recognition.Recognizer
 import uz.faceguard.app.core.scan.ScanScheduler
 import uz.faceguard.app.domain.model.BlockPolicy
-import uz.faceguard.app.domain.model.ScanMode
 import uz.faceguard.app.domain.model.ChildProfile
 import uz.faceguard.app.domain.model.ParentProfile
+import uz.faceguard.app.domain.model.ScanMode
 import uz.faceguard.app.domain.model.UserAccount
 import uz.faceguard.app.domain.repository.AccountRepository
 import uz.faceguard.app.domain.repository.ActivityLogRepository
@@ -62,10 +66,6 @@ import uz.faceguard.app.domain.repository.ChildProfileRepository
 import uz.faceguard.app.domain.repository.ParentProfileRepository
 import uz.faceguard.app.domain.repository.ProtectedAppsRepository
 import uz.faceguard.app.domain.repository.SettingsRepository
-import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.isGranted
-import com.google.accompanist.permissions.rememberPermissionState
-import dagger.hilt.android.qualifiers.ApplicationContext
 
 @HiltViewModel
 class ProtectionDebugViewModel @Inject constructor(
@@ -248,10 +248,12 @@ fun ProtectionDebugScreen(
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Spacer(Modifier.height(4.dp))
+
+                    val lastResult = ui.lastResult
                     Text(
-                        stringResource(R.string.protection_result_label, when (ui.lastResult) {
+                        stringResource(R.string.protection_result_label, when (lastResult) {
                             is RecognitionResult.ParentRecognized -> stringResource(R.string.recognition_parent, "")
-                            is RecognitionResult.ChildRecognized -> stringResource(R.string.recognition_child, ui.lastResult.childName, "")
+                            is RecognitionResult.ChildRecognized -> stringResource(R.string.recognition_child, lastResult.childName, "")
                             is RecognitionResult.Unknown -> stringResource(R.string.recognition_unknown, "")
                             is RecognitionResult.CameraPossiblyObstructed -> stringResource(R.string.protection_result_obstructed)
                             is RecognitionResult.UnstableRecognition -> stringResource(R.string.protection_result_unstable)
@@ -260,10 +262,12 @@ fun ProtectionDebugScreen(
                         }),
                         style = MaterialTheme.typography.bodySmall,
                     )
-                    if (ui.lastConfidence != null) {
+
+                    val confidence = ui.lastConfidence
+                    if (confidence != null) {
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            stringResource(R.string.protection_confidence_label, ui.lastConfidence),
+                            stringResource(R.string.protection_confidence_label, confidence),
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -342,4 +346,3 @@ fun ProtectionDebugScreen(
         }
     }
 }
-

@@ -97,8 +97,8 @@ class Recognizer(
             templateAcc += stored[i] * stored[i]
         }
         val denom = kotlin.math.sqrt(self) * kotlin.math.sqrt(templateAcc)
-        if (denom <= 1e-6f) return 0.5
-        return (dot / denom).coerceIn(0f, 1f).toDouble()
+        if (denom <= 1e-6) return 0.5
+        return (dot / denom).coerceIn(0.0, 1.0)
     }
 
     private fun templateEmbeddingDecode(ref: String, seedName: String? = null): FloatArray {

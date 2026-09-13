@@ -1,6 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="app_name">Qalqon</string>
+    <string name="accessibility_service_description">Служба защиты Qalqon</string>
     <string name="splash_tagline">Защита детей по распознаванию лица</string>
     <string name="welcome_title">Добро пожаловать в Qalqon</string>
     <string name="welcome_subtitle">Создайте родительский аккаунт или войдите, чтобы защитить детей в выбранных приложениях</string>
@@ -54,7 +55,11 @@
     <string name="settings_recovery_delay">Задержка восстановления</string>
     <string name="settings_recovery_delay_value">%1$s сек. задержки</string>
     <string name="settings_unknown_policy">Политика неизвестного пользователя</string>
-    <string name="error_invalid_name">Пожалуйста, введите полное имя</string><string name="error_invalid_phone">Неверный номер телефона</string><string name="error_duplicate_phone">Этот номер телефона уже зарегистрирован</string><string name="error_invalid_credentials">Неверный номер телефона или PIN-код</string><string name="settings_logout">Выйти</string>
+    <string name="error_invalid_name">Пожалуйста, введите полное имя</string>
+    <string name="error_invalid_phone">Неверный номер телефона</string>
+    <string name="error_duplicate_phone">Этот номер телефона уже зарегистрирован</string>
+    <string name="error_invalid_credentials">Неверный номер телефона или PIN-код</string>
+    <string name="settings_logout">Выйти</string>
     <string name="state_loading">Загрузка...</string>
     <string name="btn_edit">Изменить</string>
     <string name="parent_create">Создать профиль</string>
@@ -107,15 +112,15 @@
     <string name="recognition_status_label">Состояние</string>
     <string name="recognition_no_face">Лицо не найдено</string>
     <string name="recognition_idle">Смотрите в камеру</string>
-    <string name="recognition_unknown">Неизвестное лицо (%s)</string>
-    <string name="recognition_parent">Родитель распознан (%s)</string>
-    <string name="recognition_child">Ребёнок распознан: %s (%s)</string>
+    <string name="recognition_unknown">Неизвестное лицо (%1$s)</string>
+    <string name="recognition_parent">Родитель распознан (%1$s)</string>
+    <string name="recognition_child">Ребёнок распознан: %1$s (%2$s)</string>
     <string name="recognition_permission_title">Разрешение камеры</string>
     <string name="recognition_permission_message">Для распознавания нужна камера</string>
 
-    <string name="home_protected_count">Защищённых приложений: %d</string>
+    <string name="home_protected_count">Защищённых приложений: %1$d</string>
     <string name="home_foreground_title">Текущее приложение</string>
-    <string name="home_foreground_current">Текущее приложение: %s</string>
+    <string name="home_foreground_current">Текущее приложение: %1$s</string>
     <string name="home_foreground_unknown">неизвестно</string>
     <string name="home_usage_access_hint">Нужен доступ к статистике использования</string>
     <string name="home_usage_access_grant">Предоставить доступ</string>
@@ -127,7 +132,7 @@
     <string name="protection_state_soft">Мягкая блокировка</string>
     <string name="protection_state_hard">Жёсткая блокировка</string>
     <string name="protection_state_recovering">Восстановление</string>
-    <string name="protection_decision_label">Решение: %s</string>
+    <string name="protection_decision_label">Решение: %1$s</string>
     <string name="protection_overlay_message">Это приложение защищено. Попросите помощи у родителя.</string>
     <string name="protection_emergency_title">Аварийная разблокировка</string>
     <string name="protection_emergency_pin_label">PIN</string>
@@ -137,19 +142,19 @@
     <string name="home_protection_debug">Проверка защиты</string>
 
     <string name="protection_scan_debug_title">Состояние сканирования</string>
-    <string name="protection_scan_mode">Режим: %s</string>
-    <string name="protection_scan_state">Камера: %s</string>
+    <string name="protection_scan_mode">Режим: %1$s</string>
+    <string name="protection_scan_state">Камера: %1$s</string>
     <string name="protection_scan_on">активна</string>
     <string name="protection_scan_off">выключена</string>
-    <string name="protection_scan_cooldown">Ожидание: %d с</string>
-    <string name="protection_scan_trigger">Последний триггер: %s</string>
+    <string name="protection_scan_cooldown">Ожидание: %1$d с</string>
+    <string name="protection_scan_trigger">Последний триггер: %1$s</string>
     <string name="scan_mode_battery_saver">Экономия батареи</string>
     <string name="scan_mode_balanced">Баланс</string>
     <string name="scan_mode_strict">Строгий</string>
 
-    <string name="protection_result_label">Результат: %s</string>
-    <string name="protection_confidence_label">Уверенность: %.2f</string>
-    <string name="protection_fallback_label">Политика: %s</string>
+    <string name="protection_result_label">Результат: %1$s</string>
+    <string name="protection_confidence_label">Уверенность: %1$.2f</string>
+    <string name="protection_fallback_label">Политика: %1$s</string>
     <string name="protection_result_obstructed">Камера, возможно, закрыта</string>
     <string name="protection_result_unstable">Нестабильное распознавание</string>
 
@@ -181,7 +186,7 @@
     <string name="help_about_body">Qalqon помогает родителям обеспечить безопасность детей. Он распознаёт, кто пользуется устройством, и закрывает защищённые приложения для детей.</string>
     <string name="help_steps_title">С чего начать</string>
     <string name="help_steps_body">1. Создайте аккаунт. 2. Заполните профиль родителя и добавьте своё лицо. 3. Добавьте ребёнка и его лицо. 4. Выберите защищаемые приложения. 5. Включите защиту.</string>
-    <string name="help_version">%s — демо-версия MVP</string>
+    <string name="help_version">%1$s — демо-версия MVP</string>
     <string name="activity_title">Журнал активности</string>
     <string name="activity_empty">Пока нет событий</string>
     <string name="activity_clear">Очистить журнал</string>
@@ -195,7 +200,7 @@
     <string name="settings_tab_data">Данные</string>
     <string name="data_section_faces">Данные лиц</string>
     <string name="data_delete_parent_face">Удалить лицо родителя</string>
-    <string name="data_delete_child_face">Удалить лицо: %s</string>
+    <string name="data_delete_child_face">Удалить лицо: %1$s</string>
     <string name="data_no_children">Дети ещё не добавлены</string>
     <string name="data_no_faces">Нет добавленных лиц</string>
     <string name="data_section_reset">Полный сброс</string>

@@ -13,8 +13,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Face
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
@@ -203,6 +203,7 @@ fun ChildProfilesScreen(
                             items(ui.children, key = { it.id }) { child ->
                                 ChildCard(
                                     child = child,
+                                    onEnrollFace = { onEnrollChild(child.id) },
                                     onEdit = { viewModel.openEditDialog(child) },
                                     onDelete = { viewModel.requestDelete(child) },
                                 )

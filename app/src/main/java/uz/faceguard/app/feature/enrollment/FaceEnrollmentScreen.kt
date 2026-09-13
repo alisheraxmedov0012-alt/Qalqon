@@ -23,7 +23,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -33,21 +32,21 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewModelScope
 import androidx.camera.view.PreviewView
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionState
-import com.google.accompanist.permissions.isPermanentlyDenied
+import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import com.google.accompanist.permissions.shouldShowRationale
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import androidx.lifecycle.viewModelScope
 import uz.faceguard.app.R
 import uz.faceguard.app.core.embed.FaceEmbeddable
-import uz.faceguard.app.core.embed.PrivateStorageEmbeddable
 import uz.faceguard.app.core.embed.PrivateStorageEmbeddable
 import uz.faceguard.app.core.pipeline.EnrollmentSteps
 import uz.faceguard.app.core.pipeline.FaceCaptureController
@@ -143,8 +142,6 @@ class FaceEnrollmentViewModel @Inject constructor(
         internal set
     var subjectId: Long = -1L
         internal set
-
-
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
@@ -160,8 +157,8 @@ fun FaceEnrollmentScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    DisposableEffect(cameraPermission.hasPermission) {
-        if (cameraPermission.hasPermission) {
+    DisposableEffect(cameraPermission.status.isGranted) {
+        if (cameraPermission.status.isGranted) {
             viewModel.subject = subject
             viewModel.subjectId = childId
             val owned = FaceCaptureController(context)
@@ -182,14 +179,14 @@ fun FaceEnrollmentScreen(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 private fun ScreenHeader(
     subjectLabel: String,
     ui: FaceEnrollmentViewModel.Ui,
     viewModel: FaceEnrollmentViewModel,
     onBack: () -> Unit,
-    permission: com.google.accompanist.permissions.PermissionState,
+    permission: PermissionState,
 ) {
     Scaffold(
         topBar = {
@@ -214,7 +211,7 @@ private fun ScreenHeader(
                 stringResource(if (subjectLabel == SUBJECT_PARENT) R.string.enroll_parent_hint else R.string.enroll_child_hint),
                 style = MaterialTheme.typography.bodyMedium,
             )
-            if (!permission.hasPermission) {
+            if (!permission.status.isGranted) {
                 PermissionCard(permission)
             } else {
                 PreviewCard(viewModel, ui)
@@ -224,6 +221,7 @@ private fun ScreenHeader(
     }
 }
 
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 private fun PermissionCard(permission: PermissionState) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -235,7 +233,7 @@ private fun PermissionCard(permission: PermissionState) {
             OutlinedButton(onClick = { permission.launchPermissionRequest() }, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.permission_grant))
             }
-            if (permission.status.isPermanentlyDenied) {
+            if (!permission.status.isGranted && !permission.status.shouldShowRationale) {
                 Spacer(Modifier.height(4.dp))
                 Text(
                     stringResource(R.string.permission_denied),

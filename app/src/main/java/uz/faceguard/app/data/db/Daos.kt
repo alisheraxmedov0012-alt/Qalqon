@@ -89,8 +89,14 @@ interface ProtectedAppDao {
     @Query("SELECT * FROM protected_apps ORDER BY appDisplayName ASC")
     fun observeAll(): Flow<List<ProtectedAppEntity>>
 
+    @Query("SELECT * FROM protected_apps")
+    suspend fun getAll(): List<ProtectedAppEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(items: List<ProtectedAppEntity>)
+
+    @Query("DELETE FROM protected_apps WHERE packageName NOT IN (:packageNames)")
+    suspend fun deleteNotIn(packageNames: List<String>)
 
     @Query("UPDATE protected_apps SET isProtected = :isProtected, updatedAt = :updatedAt WHERE packageName = :packageName")
     suspend fun setProtection(packageName: String, isProtected: Boolean, updatedAt: Long)

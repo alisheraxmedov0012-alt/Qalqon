@@ -111,3 +111,9 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   protection screen starts headless camera with permission flow; dead
   FaceEmbeddingPipeline removed; app renamed to Qalqon (package stays
   uz.faceguard.app); README restructured with product doc + dev summary.
+
+- 2026-09-12 analysis snapshot: repository is currently single-module (`:app`) with layered package architecture (`core/data/domain/feature/navigation/sync`) inside the app module. Gradle stack: AGP 8.7.2, Kotlin 2.0.21, KSP, Hilt, Compose BOM 2024.12.01, Room 2.6.1, CameraX 1.4.1, ML Kit face-detection 16.1.7, Accompanist permissions 0.36.0; compile/target SDK 35, min SDK 26, Java/Kotlin target 17.
+
+- 2026-09-12 UX cleanup: Home screen is parent-first by default (4 primary actions: parent profile, child profiles, protected apps shortcut, settings). Activity/privacy/help moved under collapsible additional section; debug tools isolated under collapsible developer section. Settings screen now accepts `initialTab` so Home can deep-link directly to Protected Apps tab.
+
+- 2026-09-12 Protected apps reliability: `ProtectedAppsRepositoryImpl.refreshFromDevice()` now merges discovered launchable apps with existing Room rows (preserving `isProtected`) instead of rewriting them, removes only stale uninstalled rows, runs the PackageManager query on `Dispatchers.IO`, filters out disabled/system/internal packages and the Qalqon package itself. Settings apps tab auto-refreshes on open and shows loading/refreshing + selected count in Uzbek; Home shows the real protected count.

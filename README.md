@@ -13,6 +13,22 @@ fallback policy. All face processing happens on-device.
 - **Default locale:** Uzbek (Latin). English and Russian mirrors ship in
   `values-en` / `values-ru`; no user-facing string is hardcoded.
 
+### Parent-facing UX update (MVP cleanup)
+
+Home is simplified for normal parents: only 4 main actions are shown by
+default (Parent profile, Child profiles, Protected apps, Settings).
+Activity/privacy/help are moved under an optional "Additional" section,
+and debug tools are isolated under a separate "Developer" section.
+
+### Protected app selection reliability
+
+Refresh no longer resets protection choices. `refreshFromDevice()` merges the
+launchable apps discovered on the device with existing Room rows, preserving
+each app's saved `isProtected` flag, then removes only stale rows that are no
+longer installed. The list also filters out disabled packages, the Qalqon app
+itself, and obvious system/internal utilities so parents only see relevant,
+user-facing apps.
+
 ## What currently works
 
 - Splash → welcome → register (full name, phone, PIN) / login with

@@ -83,8 +83,13 @@
     <string name="settings_low_battery">Низкий заряд</string>
     <string name="settings_low_battery_toggle">Отключать при низком заряде</string>
     <string name="papps_title">Защищённые приложения</string>
-    <string name="papps_subtitle">Приложения, выбранные родителем для защиты</string>
-    <string name="papps_empty">Нет защищённых приложений</string>
+    <string name="papps_subtitle">Выберите приложения, которые должны оставаться закрытыми для ребёнка</string>
+    <string name="papps_empty">Подходящие приложения пока не найдены</string>
+    <string name="papps_empty_hint">Нажмите «Обновить приложения», чтобы увидеть установленные на устройстве приложения.</string>
+    <string name="papps_loading">Загрузка списка приложений...</string>
+    <string name="papps_refreshing">Обновление...</string>
+    <string name="papps_selected_count">Защищено: %1$d</string>
+    <string name="papps_marked">Выбрано</string>
     <string name="home_scan_mode_label">Режим сканирования</string>
     <string name="home_unknown_policy_label">Политика для неизвестного пользователя</string>
 
@@ -210,4 +215,18 @@
     <string name="data_reset_confirm_body">Все данные будут удалены безвозвратно. Это действие нельзя отменить.</string>
     <string name="data_reset_confirm_yes">Да, удалить</string>
     <string name="data_reset_confirm_no">Отмена</string>
+
+    <string name="home_subtitle">Выберите основной раздел, чтобы продолжить настройку</string>
+    <string name="home_profile_title">Ваш профиль</string>
+    <string name="home_profile_name">Имя: %1$s</string>
+    <string name="home_profile_phone">Телефон: %1$s</string>
+    <string name="home_profile_protection">Статус: %1$s</string>
+    <string name="home_main_actions_title">Основные разделы</string>
+    <string name="home_menu_protected_apps">Защищённые приложения</string>
+    <string name="home_setup_progress">Выполнено: %1$d/%2$d шагов</string>
+    <string name="home_additional_title">Дополнительные разделы</string>
+    <string name="home_section_show">Показать</string>
+    <string name="home_section_hide">Скрыть</string>
+    <string name="home_developer_title">Раздел разработчика</string>
+    <string name="home_developer_hint">Этот раздел нужен только для тестирования и диагностики.</string>
 </resources>

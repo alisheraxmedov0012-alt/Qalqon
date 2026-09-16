@@ -83,8 +83,13 @@
     <string name="settings_low_battery">Low battery</string>
     <string name="settings_low_battery_toggle">Disable on low battery</string>
     <string name="papps_title">Protected apps</string>
-    <string name="papps_subtitle">Apps selected by the parent for protection</string>
-    <string name="papps_empty">No protected apps yet</string>
+    <string name="papps_subtitle">Choose the apps that should stay locked for your child</string>
+    <string name="papps_empty">No suitable apps found yet</string>
+    <string name="papps_empty_hint">Tap "Refresh apps" to view the apps installed on this device.</string>
+    <string name="papps_loading">Loading app list...</string>
+    <string name="papps_refreshing">Refreshing...</string>
+    <string name="papps_selected_count">Protected count: %1$d</string>
+    <string name="papps_marked">Selected</string>
     <string name="home_scan_mode_label">Scan mode</string>
     <string name="home_unknown_policy_label">Unknown user policy</string>
 
@@ -210,4 +215,18 @@
     <string name="data_reset_confirm_body">All data will be permanently deleted. This cannot be undone.</string>
     <string name="data_reset_confirm_yes">Yes, delete</string>
     <string name="data_reset_confirm_no">Cancel</string>
+
+    <string name="home_subtitle">Choose a main section to continue setup</string>
+    <string name="home_profile_title">Your profile</string>
+    <string name="home_profile_name">Name: %1$s</string>
+    <string name="home_profile_phone">Phone: %1$s</string>
+    <string name="home_profile_protection">Status: %1$s</string>
+    <string name="home_main_actions_title">Main sections</string>
+    <string name="home_menu_protected_apps">Protected apps</string>
+    <string name="home_setup_progress">Completed: %1$d/%2$d steps</string>
+    <string name="home_additional_title">Additional sections</string>
+    <string name="home_section_show">Show</string>
+    <string name="home_section_hide">Hide</string>
+    <string name="home_developer_title">Developer section</string>
+    <string name="home_developer_hint">This area is for testing and diagnostics only.</string>
 </resources>

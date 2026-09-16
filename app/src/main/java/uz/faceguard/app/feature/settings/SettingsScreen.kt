@@ -83,6 +83,9 @@ class SettingsViewModel @Inject constructor(
     val protectedApps: StateFlow<List<ProtectedApp>> = protectedAppsRepository.protectedApps
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    private val _appsRefreshing = MutableStateFlow(false)
+    val appsRefreshing: StateFlow<Boolean> = _appsRefreshing
+
     private val _logoutState = MutableStateFlow<UiState>(UiState.Idle)
     val logoutState: StateFlow<UiState> = _logoutState
 
@@ -107,7 +110,17 @@ class SettingsViewModel @Inject constructor(
     fun toggleProtectedApp(packageName: String, isProtected: Boolean) =
         viewModelScope.launch { protectedAppsRepository.toggleProtection(packageName, isProtected) }
 
-    fun refreshProtectedApps() = viewModelScope.launch { protectedAppsRepository.refreshFromDevice() }
+    fun refreshProtectedApps() {
+        if (_appsRefreshing.value) return
+        viewModelScope.launch {
+            _appsRefreshing.value = true
+            try {
+                protectedAppsRepository.refreshFromDevice()
+            } finally {
+                _appsRefreshing.value = false
+            }
+        }
+    }
 
     private val _children = MutableStateFlow<List<ChildProfile>>(emptyList())
     val children: StateFlow<List<ChildProfile>> = _children
@@ -116,6 +129,7 @@ class SettingsViewModel @Inject constructor(
     val resetDone: StateFlow<Boolean> = _resetDone
 
     init {
+        refreshProtectedApps()
         viewModelScope.launch {
             val account = accountRepository.getCurrentAccount() ?: return@launch
             childRepository.observeChildren(account.id).collect { _children.value = it }
@@ -152,10 +166,12 @@ class SettingsViewModel @Inject constructor(
 fun SettingsScreen(
     onBack: () -> Unit,
     onLoggedOut: () -> Unit,
+    initialTab: Int = 0,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val protectedApps by viewModel.protectedApps.collectAsStateWithLifecycle()
+    val appsRefreshing by viewModel.appsRefreshing.collectAsStateWithLifecycle()
     val logoutState by viewModel.logoutState.collectAsStateWithLifecycle()
     val children by viewModel.children.collectAsStateWithLifecycle()
     val resetDone by viewModel.resetDone.collectAsStateWithLifecycle()
@@ -167,9 +183,11 @@ fun SettingsScreen(
         viewModel = viewModel,
         settings = settings,
         protectedApps = protectedApps,
+        appsRefreshing = appsRefreshing,
         children = children,
         logoutState = logoutState,
         onBack = onBack,
+        initialTab = initialTab,
     )
 }
 
@@ -179,11 +197,13 @@ private fun SettingsContent(
     viewModel: SettingsViewModel,
     settings: AppSettings,
     protectedApps: List<ProtectedApp>,
+    appsRefreshing: Boolean,
     children: List<ChildProfile>,
     logoutState: UiState,
     onBack: () -> Unit,
+    initialTab: Int,
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedTab by remember(initialTab) { mutableIntStateOf(initialTab.coerceIn(0, 2)) }
 
     Scaffold(
         topBar = {
@@ -228,6 +248,7 @@ private fun SettingsContent(
                 0 -> RulesTab(viewModel, settings, logoutState)
                 1 -> AppsTab(
                     apps = protectedApps,
+                    isRefreshing = appsRefreshing,
                     onToggle = viewModel::toggleProtectedApp,
                     onRefresh = viewModel::refreshProtectedApps,
                 )
@@ -312,19 +333,44 @@ private fun RulesTab(
 @Composable
 private fun AppsTab(
     apps: List<ProtectedApp>,
+    isRefreshing: Boolean,
     onToggle: (String, Boolean) -> Unit,
     onRefresh: () -> Unit,
 ) {
+    val protectedCount = apps.count { it.isProtected }
+
     Text(stringResource(R.string.papps_subtitle), style = MaterialTheme.typography.bodyMedium)
-    androidx.compose.material3.OutlinedButton(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.papps_refresh))
+    Text(
+        stringResource(R.string.papps_selected_count, protectedCount),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+
+    OutlinedButton(
+        onClick = onRefresh,
+        enabled = !isRefreshing,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(stringResource(if (isRefreshing) R.string.papps_refreshing else R.string.papps_refresh))
     }
+
     if (apps.isEmpty()) {
         SettingSection(stringResource(R.string.papps_title)) {
-            Text(stringResource(R.string.papps_empty))
+            Text(
+                stringResource(if (isRefreshing) R.string.papps_loading else R.string.papps_empty),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (!isRefreshing) {
+                Text(
+                    stringResource(R.string.papps_empty_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         return
     }
+
     apps.forEach { app ->
         Row(
             modifier = Modifier
@@ -336,9 +382,17 @@ private fun AppsTab(
                 checked = app.isProtected,
                 onCheckedChange = { onToggle(app.packageName, it) },
             )
-            Column {
-                Text(app.appDisplayName, style = MaterialTheme.typography.bodyLarge)
-                Text(app.packageName, style = MaterialTheme.typography.bodySmall)
+            Text(
+                app.appDisplayName,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f),
+            )
+            if (app.isProtected) {
+                Text(
+                    stringResource(R.string.papps_marked),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
         }
     }

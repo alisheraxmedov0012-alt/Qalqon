@@ -34,6 +34,7 @@ object Routes {
     const val PARENT_PROFILE = "parent_profile"
     const val CHILD_PROFILES = "child_profiles"
     const val SETTINGS = "settings"
+    const val SETTINGS_APPS = "settings_apps"
     const val RECOGNITION_DEBUG = "recognition_debug"
     const val PROTECTION_DEBUG = "protection_debug"
     const val PRIVACY = "privacy"
@@ -89,6 +90,7 @@ fun FaceGuardNavHost(navController: NavHostController) {
             HomeScreen(
                 onOpenParent = { navController.navigate(Routes.PARENT_PROFILE) },
                 onOpenChildren = { navController.navigate(Routes.CHILD_PROFILES) },
+                onOpenProtectedApps = { navController.navigate(Routes.SETTINGS_APPS) },
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                 onOpenRecognition = { navController.navigate(Routes.RECOGNITION_DEBUG) },
                 onOpenProtection = { navController.navigate(Routes.PROTECTION_DEBUG) },
@@ -150,6 +152,16 @@ fun FaceGuardNavHost(navController: NavHostController) {
                 onLoggedOut = {
                     navController.navigate(Routes.WELCOME) { popUpTo(0) { inclusive = true } }
                 },
+                initialTab = 0,
+            )
+        }
+        composable(Routes.SETTINGS_APPS) {
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onLoggedOut = {
+                    navController.navigate(Routes.WELCOME) { popUpTo(0) { inclusive = true } }
+                },
+                initialTab = 1,
             )
         }
     }

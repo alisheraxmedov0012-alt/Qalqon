@@ -13,12 +13,40 @@ fallback policy. All face processing happens on-device.
 - **Default locale:** Uzbek (Latin). English and Russian mirrors ship in
   `values-en` / `values-ru`; no user-facing string is hardcoded.
 
-### Parent-facing UX update (MVP cleanup)
+### Parent-facing polish
 
-Home is simplified for normal parents: only 4 main actions are shown by
-default (Parent profile, Child profiles, Protected apps, Settings).
-Activity/privacy/help are moved under an optional "Additional" section,
-and debug tools are isolated under a separate "Developer" section.
+- Consistent card-based grouping via a shared `SectionCard`, with short
+  plain-language descriptions under each setting.
+- Home leads with the highest-value action (Protection status) and a 7-step
+  setup checklist that names the single next step and collapses once complete.
+- Parent and child profile screens share the same card pattern, label the phone
+  number, give face enrollment a clear primary action, and radio-select the
+  restriction level.
+- Protected apps tab groups the list in a card, shows the selected count in
+  color, adds a search field once the list is long, and lets the whole row
+  toggle protection.
+- Uzbek copy was de-jargoned (e.g. "Checking mode", "If a face is unfamiliar",
+  "If no face is visible", "Soft/Hard close").
+- Actionable empty states (e.g. "add a child and enroll their face") instead of
+  bare placeholder text.
+
+### MVP strengths (what feels ready)
+
+- **On-device face identity:** real MobileFaceNet TFLite embedding with a
+  geometry fallback, per-profile templates, parent-before-child matching.
+- **Coherent protection session:** a single `protectionEnabled` switch drives an
+  app-scoped runtime; unknown/no-face policies and the recovery delay apply live.
+- **Durable local state:** accounts, profiles, protected apps and the activity
+  log live in Room/DataStore; the app holds no network permission.
+- **Product-feeling flows:** guarded onboarding, a protection status screen with
+  a setup checklist, and clear Uzbek guidance.
+
+### Still limited (see "Known limitations (MVP)" below)
+
+- System-wide blocking needs a foreground service + AccessibilityService.
+- Matching is not spoof-resistant (no liveness check).
+- The child "restriction level" is stored and shown but not yet enforced by the
+  protection engine.
 
 ### Protected app selection reliability
 

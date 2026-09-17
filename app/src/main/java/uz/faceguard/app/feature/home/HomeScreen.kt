@@ -270,32 +270,49 @@ private fun SetupChecklistCard(ui: HomeUiState, settings: AppSettings) {
     )
     val completed = items.count { it.first }
     val total = items.size
+    val allDone = completed == total
+    val nextStep = items.firstOrNull { !it.first }?.second
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.setup_title), style = MaterialTheme.typography.titleMedium)
-            Text(
-                stringResource(R.string.home_setup_progress, completed, total),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            LinearProgressIndicator(
-                progress = { completed.toFloat() / total.toFloat() },
-                modifier = Modifier.fillMaxWidth(),
-            )
 
-            items.forEach { (done, labelRes) ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            if (allDone) {
+                Text(
+                    stringResource(R.string.setup_all_done),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            } else {
+                Text(
+                    stringResource(R.string.home_setup_progress, completed, total),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                LinearProgressIndicator(
+                    progress = { completed.toFloat() / total.toFloat() },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                nextStep?.let { label ->
                     Text(
-                        text = stringResource(if (done) R.string.setup_done_mark else R.string.setup_todo_mark),
-                        color = if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        stringResource(R.string.setup_next_step, stringResource(label)),
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    Text(
-                        text = stringResource(labelRes),
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(start = 8.dp),
-                    )
+                }
+
+                items.forEach { (done, labelRes) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = stringResource(if (done) R.string.setup_done_mark else R.string.setup_todo_mark),
+                            color = if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            text = stringResource(labelRes),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
                 }
             }
         }

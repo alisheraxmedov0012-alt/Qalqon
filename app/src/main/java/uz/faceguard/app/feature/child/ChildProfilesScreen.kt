@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -16,13 +17,15 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -32,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -176,30 +180,30 @@ fun ChildProfilesScreen(
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(onClick = viewModel::openAddDialog) {
-                    Text(stringResource(R.string.children_add))
+                if (ui.children.isNotEmpty()) {
+                    Button(onClick = viewModel::openAddDialog) {
+                        Text(stringResource(R.string.children_add))
+                    }
                 }
             }
+
             when (ui.state) {
                 is UiState.Loading ->
                     Text(stringResource(R.string.state_loading), style = MaterialTheme.typography.bodyLarge)
+
                 is UiState.Error ->
                     Text(
                         stringResource((ui.state as UiState.Error).messageRes),
                         color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyLarge,
                     )
+
                 is UiState.Success, is UiState.Idle -> {
+                    Spacer(Modifier.height(12.dp))
                     if (ui.children.isEmpty()) {
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(
-                                    stringResource(R.string.children_empty),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            }
-                        }
+                        EmptyChildrenCard(onAdd = viewModel::openAddDialog)
                     } else {
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             items(ui.children, key = { it.id }) { child ->
                                 ChildCard(
                                     child = child,
@@ -233,24 +237,25 @@ fun ChildProfilesScreen(
                         label = { Text(stringResource(R.string.children_name_hint)) },
                         singleLine = true,
                     )
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(12.dp))
                     Text(
                         stringResource(R.string.children_level_hint),
                         style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    LevelRow(
+                    LevelOption(
                         RestrictionLevel.LOW,
                         ui.dialog.level,
                         viewModel::onLevelChange,
                         R.string.level_low,
                     )
-                    LevelRow(
+                    LevelOption(
                         RestrictionLevel.MEDIUM,
                         ui.dialog.level,
                         viewModel::onLevelChange,
                         R.string.level_medium,
                     )
-                    LevelRow(
+                    LevelOption(
                         RestrictionLevel.HIGH,
                         ui.dialog.level,
                         viewModel::onLevelChange,
@@ -291,14 +296,45 @@ fun ChildProfilesScreen(
 }
 
 @Composable
-private fun LevelRow(
+private fun EmptyChildrenCard(onAdd: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(
+                Icons.Filled.Face,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(40.dp),
+            )
+            Text(stringResource(R.string.children_empty), style = MaterialTheme.typography.titleMedium)
+            Text(
+                stringResource(R.string.children_empty_hint),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(4.dp))
+            Button(onClick = onAdd, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.children_add))
+            }
+        }
+    }
+}
+
+@Composable
+private fun LevelOption(
     level: RestrictionLevel,
     selected: RestrictionLevel,
     onSelect: (RestrictionLevel) -> Unit,
     labelRes: Int,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(checked = selected == level, onCheckedChange = { onSelect(level) })
+        RadioButton(selected = selected == level, onClick = { onSelect(level) })
         Text(stringResource(labelRes))
     }
 }
@@ -311,40 +347,55 @@ private fun ChildCard(
     onDelete: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(child.childName, style = MaterialTheme.typography.titleMedium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    when (child.restrictionLevel) {
-                        RestrictionLevel.LOW -> stringResource(R.string.level_low)
-                        RestrictionLevel.MEDIUM -> stringResource(R.string.level_medium)
-                        RestrictionLevel.HIGH -> stringResource(R.string.level_high)
-                    },
-                    style = MaterialTheme.typography.bodySmall,
+                    child.childName,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
                 )
+                IconButton(onClick = onEdit) {
+                    Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.btn_edit))
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.btn_delete))
+                }
+            }
+            Text(
+                stringResource(
+                    R.string.children_level_label,
+                    stringResource(
+                        when (child.restrictionLevel) {
+                            RestrictionLevel.LOW -> R.string.level_low
+                            RestrictionLevel.MEDIUM -> R.string.level_medium
+                            RestrictionLevel.HIGH -> R.string.level_high
+                        },
+                    ),
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                stringResource(
+                    if (child.isFaceEnrolled) R.string.children_face_on
+                    else R.string.children_face_off,
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (child.isFaceEnrolled) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.error,
+            )
+            OutlinedButton(onClick = onEnrollFace, modifier = Modifier.fillMaxWidth()) {
                 Text(
                     stringResource(
-                        if (child.isFaceEnrolled) R.string.children_face_on
-                        else R.string.children_face_off,
+                        if (child.isFaceEnrolled) R.string.children_face_reenroll
+                        else R.string.btn_enroll_face,
                     ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (child.isFaceEnrolled) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.error,
                 )
-            }
-            IconButton(onClick = onEnrollFace) {
-                Icon(Icons.Filled.Face, contentDescription = stringResource(R.string.btn_enroll_face))
-            }
-            IconButton(onClick = onEdit) {
-                Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.btn_edit))
-            }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.btn_delete))
             }
         }
     }

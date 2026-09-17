@@ -1,5 +1,6 @@
 package uz.faceguard.app.feature.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,13 +13,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Slider
@@ -50,6 +51,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import uz.faceguard.app.R
 import uz.faceguard.app.core.ui.AppLoadingButton
+import uz.faceguard.app.core.ui.SectionCard
 import uz.faceguard.app.core.ui.UiState
 import uz.faceguard.app.domain.model.AppSettings
 import uz.faceguard.app.domain.model.BlockPolicy
@@ -269,14 +271,20 @@ private fun RulesTab(
     settings: AppSettings,
     logoutState: UiState,
 ) {
-    SettingSection(stringResource(R.string.settings_protection)) {
+    SectionCard(
+        title = stringResource(R.string.settings_protection),
+        subtitle = stringResource(R.string.settings_protection_hint),
+    ) {
         SettingSwitchRow(
             label = stringResource(R.string.settings_protection_toggle),
             checked = settings.protectionEnabled,
             onChange = viewModel::setProtectionEnabled,
         )
     }
-    SettingSection(stringResource(R.string.settings_scan_mode)) {
+    SectionCard(
+        title = stringResource(R.string.settings_scan_mode),
+        subtitle = stringResource(R.string.settings_scan_mode_hint),
+    ) {
         ChipRow(
             options = listOf(
                 ScanMode.BALANCED to stringResource(R.string.scan_balanced),
@@ -287,7 +295,10 @@ private fun RulesTab(
             onSelect = viewModel::setScanMode,
         )
     }
-    SettingSection(stringResource(R.string.settings_recovery_delay)) {
+    SectionCard(
+        title = stringResource(R.string.settings_recovery_delay),
+        subtitle = stringResource(R.string.settings_recovery_delay_hint),
+    ) {
         Column {
             Slider(
                 value = (settings.recoveryDelayMs / 1000f),
@@ -303,19 +314,28 @@ private fun RulesTab(
             )
         }
     }
-    SettingSection(stringResource(R.string.settings_unknown_policy)) {
+    SectionCard(
+        title = stringResource(R.string.settings_unknown_policy),
+        subtitle = stringResource(R.string.settings_unknown_policy_hint),
+    ) {
         PolicyChips(
             selected = settings.unknownUserPolicy,
             onSelect = viewModel::setUnknownPolicy,
         )
     }
-    SettingSection(stringResource(R.string.settings_no_face_policy)) {
+    SectionCard(
+        title = stringResource(R.string.settings_no_face_policy),
+        subtitle = stringResource(R.string.settings_no_face_policy_hint),
+    ) {
         PolicyChips(
             selected = settings.noFacePolicy,
             onSelect = viewModel::setNoFacePolicy,
         )
     }
-    SettingSection(stringResource(R.string.settings_low_battery)) {
+    SectionCard(
+        title = stringResource(R.string.settings_low_battery),
+        subtitle = stringResource(R.string.settings_low_battery_hint),
+    ) {
         SettingSwitchRow(
             label = stringResource(R.string.settings_low_battery_toggle),
             checked = settings.lowBatteryBehaviorEnabled,
@@ -338,12 +358,14 @@ private fun AppsTab(
     onRefresh: () -> Unit,
 ) {
     val protectedCount = apps.count { it.isProtected }
+    var query by remember { mutableStateOf("") }
 
     Text(stringResource(R.string.papps_subtitle), style = MaterialTheme.typography.bodyMedium)
     Text(
         stringResource(R.string.papps_selected_count, protectedCount),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.bodyMedium,
+        color = if (protectedCount > 0) MaterialTheme.colorScheme.primary
+        else MaterialTheme.colorScheme.onSurfaceVariant,
     )
 
     OutlinedButton(
@@ -355,7 +377,7 @@ private fun AppsTab(
     }
 
     if (apps.isEmpty()) {
-        SettingSection(stringResource(R.string.papps_title)) {
+        SectionCard(title = stringResource(R.string.papps_title)) {
             Text(
                 stringResource(if (isRefreshing) R.string.papps_loading else R.string.papps_empty),
                 style = MaterialTheme.typography.bodyMedium,
@@ -371,32 +393,58 @@ private fun AppsTab(
         return
     }
 
-    apps.forEach { app ->
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Checkbox(
-                checked = app.isProtected,
-                onCheckedChange = { onToggle(app.packageName, it) },
+    SectionCard(title = stringResource(R.string.papps_title)) {
+        if (apps.size > SEARCH_THRESHOLD) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                label = { Text(stringResource(R.string.papps_search_hint)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
             )
+        }
+        val visible = if (query.isBlank()) {
+            apps
+        } else {
+            apps.filter { it.appDisplayName.contains(query.trim(), ignoreCase = true) }
+        }
+        if (visible.isEmpty()) {
             Text(
-                app.appDisplayName,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f),
+                stringResource(R.string.papps_no_results),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (app.isProtected) {
-                Text(
-                    stringResource(R.string.papps_marked),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+        } else {
+            visible.forEach { app ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onToggle(app.packageName, !app.isProtected) },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(
+                        checked = app.isProtected,
+                        onCheckedChange = { onToggle(app.packageName, it) },
+                    )
+                    Text(
+                        app.appDisplayName,
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (app.isProtected) {
+                        Text(
+                            stringResource(R.string.papps_marked),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
             }
         }
     }
 }
+
+private const val SEARCH_THRESHOLD = 15
 
 @Composable
 private fun PolicyChips(selected: BlockPolicy, onSelect: (BlockPolicy) -> Unit) {
@@ -409,17 +457,6 @@ private fun PolicyChips(selected: BlockPolicy, onSelect: (BlockPolicy) -> Unit) 
         selected = selected,
         onSelect = onSelect,
     )
-}
-
-@Composable
-private fun SettingSection(title: String, content: @Composable () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
-            content()
-        }
-    }
 }
 
 @Composable
@@ -455,7 +492,7 @@ private fun DataTab(
 ) {
     var confirmReset by remember { mutableStateOf(false) }
 
-    SettingSection(stringResource(R.string.data_section_faces)) {
+    SectionCard(stringResource(R.string.data_section_faces)) {
         OutlinedButton(onClick = onDeleteParentFace, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.data_delete_parent_face))
         }
@@ -475,7 +512,7 @@ private fun DataTab(
             }
         }
     }
-    SettingSection(stringResource(R.string.data_section_reset)) {
+    SectionCard(stringResource(R.string.data_section_reset)) {
         Text(stringResource(R.string.data_reset_hint), style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.height(8.dp))
         OutlinedButton(onClick = { confirmReset = true }, modifier = Modifier.fillMaxWidth()) {

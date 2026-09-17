@@ -20,7 +20,7 @@ import uz.faceguard.app.feature.help.HelpScreen
 import uz.faceguard.app.feature.home.HomeScreen
 import uz.faceguard.app.feature.privacy.PrivacyScreen
 import uz.faceguard.app.feature.parent.ParentProfileScreen
-import uz.faceguard.app.feature.protection.ProtectionDebugScreen
+import uz.faceguard.app.feature.protection.ProtectionScreen
 import uz.faceguard.app.feature.recognition.RecognitionDebugScreen
 import uz.faceguard.app.feature.settings.SettingsScreen
 
@@ -36,7 +36,7 @@ object Routes {
     const val SETTINGS = "settings"
     const val SETTINGS_APPS = "settings_apps"
     const val RECOGNITION_DEBUG = "recognition_debug"
-    const val PROTECTION_DEBUG = "protection_debug"
+    const val PROTECTION = "protection"
     const val PRIVACY = "privacy"
     const val HELP = "help"
     const val ACTIVITY_LOG = "activity_log"
@@ -93,7 +93,7 @@ fun FaceGuardNavHost(navController: NavHostController) {
                 onOpenProtectedApps = { navController.navigate(Routes.SETTINGS_APPS) },
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                 onOpenRecognition = { navController.navigate(Routes.RECOGNITION_DEBUG) },
-                onOpenProtection = { navController.navigate(Routes.PROTECTION_DEBUG) },
+                onOpenProtection = { navController.navigate(Routes.PROTECTION) },
                 onOpenPrivacy = { navController.navigate(Routes.PRIVACY) },
                 onOpenHelp = { navController.navigate(Routes.HELP) },
                 onOpenActivity = { navController.navigate(Routes.ACTIVITY_LOG) },
@@ -134,8 +134,12 @@ fun FaceGuardNavHost(navController: NavHostController) {
         composable(Routes.RECOGNITION_DEBUG) {
             RecognitionDebugScreen(onBack = { navController.popBackStack() })
         }
-        composable(Routes.PROTECTION_DEBUG) {
-            ProtectionDebugScreen(onBack = { navController.popBackStack() })
+        composable(Routes.PROTECTION) {
+            ProtectionScreen(
+                onBack = { navController.popBackStack() },
+                onOpenParentProfile = { navController.navigate(Routes.PARENT_PROFILE) },
+                onOpenProtectedApps = { navController.navigate(Routes.SETTINGS_APPS) },
+            )
         }
         composable(Routes.PRIVACY) {
             PrivacyScreen(onBack = { navController.popBackStack() })

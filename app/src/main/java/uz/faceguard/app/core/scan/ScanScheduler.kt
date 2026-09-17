@@ -60,8 +60,13 @@ class ScanScheduler(
 
     fun detach() {
         scope = null
+        scanJob?.cancel()
+        scanJob = null
+        cooldownJob?.cancel()
+        cooldownJob = null
+        _cooldownRemaining.value = 0
+        _scanning.value = false
         unregisterScreenReceiver()
-        stopScan(ScanTrigger.STOPPED)
     }
 
     /** Called when the foreground monitor reports a protected app. */
@@ -138,8 +143,12 @@ class ScanScheduler(
             }
         }
         val filter = IntentFilter(Intent.ACTION_SCREEN_ON)
-        context.registerReceiver(receiver, filter)
-        screenReceiver = receiver
+        screenReceiver = try {
+            context.registerReceiver(receiver, filter)
+            receiver
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun unregisterScreenReceiver() {

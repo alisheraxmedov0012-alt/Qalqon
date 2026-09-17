@@ -47,21 +47,43 @@ user-facing apps.
   recovery delay, low-battery behavior, PIN change, emergency reset, reset tools
 - Privacy screen (local storage, backups, face data, no network), help/about
 - Activity log: recognition/block/unlock events, newest 100, clear action
-- Recognition debug + protection debug screens (live camera, decision
-  pipeline, emergency PIN unlock) gated behind `DebugFlags`
+- Parent-facing Protection screen (`feature/protection/ProtectionScreen.kt`)
+  with a master toggle, setup checklist, live status, emergency PIN unlock and
+  collapsible technical details; recognition diagnostics stay behind
+  `DebugFlags`
 - Usage-access + camera + overlay permission flows with Uzbek guidance
+
+## Protection behavior (real use vs. limits)
+
+- **`protectionEnabled` is the master switch.** Toggling it in Settings (or on
+  the Protection screen) starts/stops an app-scoped `ProtectionRuntime` that
+  owns the foreground monitor, the event-driven scan scheduler and the
+  `ProtectionEngine`. Turning it off tears everything down and clears any
+  overlay.
+- **Recognition is shared.** The runtime consumes the shared `Recognizer`
+  frame flow, so whichever camera is active feeds it. The Protection screen
+  binds an analyzer camera while it is open and protection is enabled; the
+  engine also treats frames older than 1.5 s as "no face", so a stopped camera
+  degrades cleanly.
+- **Policies are applied consistently.** Unknown faces and camera obstruction
+  follow the unknown-user policy; no-face follows the no-face policy; a
+  parent/child recognition blocks or unlocks immediately. When a recognized
+  face is lost while blocked, the configured recovery delay governs how long
+  the block is held before release. PIN emergency unlock is preserved.
+- **What is limited:** there is no foreground service or AccessibilityService
+  yet, so the session lives only as long as the Qalqon process. When Qalqon is
+  backgrounded the camera unbinds, the engine falls back to the no-face policy,
+  and a system kill ends the session. Overlay drawing also needs
+  `SYSTEM_ALERT_WINDOW`. Reliable system-wide blocking remains the next big
+  step (see Recommended next development order).
 
 ## Partially implemented
 
-- **Protection engine** runs only while the protection debug screen is open
-  (headless camera analyzer + foreground monitor + overlay/audio effects).
-  There is no background service yet, so protection does not apply once the
-  user leaves the screen.
+- **No foreground service yet.** Protection is app-scoped; it is not a
+  guaranteed background guard. See "Protection behavior" above.
 - **Overlay permission** (`SYSTEM_ALERT_WINDOW`) is declared and checked, but
   blocking other apps system-wide needs an AccessibilityService — see
   limitations.
-- **Unknown-user / no-face fallback policy** is implemented in the engine but
-  only exercised in the debug flow.
 
 ## Biometric capability (honest MVP status)
 
@@ -113,7 +135,8 @@ No `INTERNET` permission. The app cannot talk to a network.
 2. Add liveness/anti-spoof checks around the bundled MobileFaceNet model
    (the upstream repo also ships a `FaceAntiSpoofing.tflite` that could be
    reused)
-3. Foreground service so protection survives leaving the debug screen
+3. Foreground service so the protection session (and camera) survives leaving
+   the app
 4. Encrypted template storage + Room migrations
 5. Unit/UI tests once a build toolchain is available
 
@@ -601,10 +624,12 @@ sync; the app remains fully functional with sync disabled or absent.
   geometry fallback) against the stored per-profile template using cosine
   similarity. It is real and local, but there is no liveness/anti-spoof layer
   yet — see "Biometric capability" above.
-- **Accessibility-service blocking is not implemented.** Restrictions apply
-  only while the debug protection screen hosts the engine; a production app
-  needs an AccessibilityService (or Device Admin) to overlay other apps
-  reliably. The overlay permission path exists but is demo-scoped.
+- **Accessibility-service blocking is not implemented.** Protection runs as an
+  app-scoped session (`ProtectionRuntime`) driven by `protectionEnabled`; it
+  works while the Qalqon process is alive and the overlay permission is
+  granted. It is not a guaranteed background guard: a production app needs a
+  foreground service plus an AccessibilityService (or Device Admin) to overlay
+  other apps reliably while backgrounded.
 - **No real migrations.** Room uses `fallbackToDestructiveMigration`; a
   release build needs explicit migrations.
 - **No automated tests.** Validation is via Python source checks only (XML

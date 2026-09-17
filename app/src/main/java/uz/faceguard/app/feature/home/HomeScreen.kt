@@ -158,6 +158,7 @@ fun HomeScreen(
                     SetupChecklistCard(ui, settings)
 
                     MainActionsCard(
+                        onOpenProtection = onOpenProtection,
                         onOpenParent = onOpenParent,
                         onOpenChildren = onOpenChildren,
                         onOpenProtectedApps = onOpenProtectedApps,
@@ -178,7 +179,6 @@ fun HomeScreen(
                             expanded = showDeveloperTools,
                             onToggle = { showDeveloperTools = !showDeveloperTools },
                             onOpenRecognition = onOpenRecognition,
-                            onOpenProtection = onOpenProtection,
                         )
                     }
                 }
@@ -219,6 +219,7 @@ private fun ProfileSummaryCard(
 
 @Composable
 private fun MainActionsCard(
+    onOpenProtection: () -> Unit,
     onOpenParent: () -> Unit,
     onOpenChildren: () -> Unit,
     onOpenProtectedApps: () -> Unit,
@@ -231,6 +232,9 @@ private fun MainActionsCard(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(stringResource(R.string.home_main_actions_title), style = MaterialTheme.typography.titleMedium)
+            Button(onClick = onOpenProtection, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.protection_title))
+            }
             Button(onClick = onOpenParent, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.home_menu_parent))
             }
@@ -342,7 +346,6 @@ private fun DeveloperSection(
     expanded: Boolean,
     onToggle: () -> Unit,
     onOpenRecognition: () -> Unit,
-    onOpenProtection: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -368,9 +371,6 @@ private fun DeveloperSection(
                 )
                 OutlinedButton(onClick = onOpenRecognition, modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(R.string.home_recognition_debug))
-                }
-                OutlinedButton(onClick = onOpenProtection, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.home_protection_debug))
                 }
                 ForegroundDebugCard()
             }

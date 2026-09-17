@@ -24,6 +24,17 @@ class TfLiteMobileFaceNet(
 
     private val interpreter: Interpreter? = loadModel(context, modelAssetPath)
 
+    /** Model input is NHWC; batch may be larger than 1 (the bundled model uses 2). */
+    private val inputShape: IntArray = interpreter
+        ?.getInputTensor(0)
+        ?.shape()
+        ?.takeIf { it.size == 4 }
+        ?: intArrayOf(DEFAULT_BATCH, config.inputHeight, config.inputWidth, config.inputChannels)
+
+    private val batchSize: Int = inputShape[0].coerceAtLeast(1)
+    private val inputHeight: Int = inputShape[1].coerceAtLeast(1)
+    private val inputWidth: Int = inputShape[2].coerceAtLeast(1)
+
     private val outputSize: Int = interpreter
         ?.getOutputTensor(0)
         ?.shape()
@@ -38,36 +49,48 @@ class TfLiteMobileFaceNet(
     override fun embed(faceBitmap: Bitmap): FloatArray? {
         val model = interpreter ?: return null
         val input = prepareInput(faceBitmap) ?: return null
-        val output = Array(1) { FloatArray(outputSize) }
+        val output = Array(batchSize) { FloatArray(outputSize) }
         return try {
             model.run(input, output)
-            output[0]
+            l2Normalize(output.first())
+            output.first()
         } catch (_: Exception) {
             null
         }
     }
 
     private fun prepareInput(bitmap: Bitmap): ByteBuffer? {
-        val width = config.inputWidth
-        val height = config.inputHeight
-        val scaled = Bitmap.createScaledBitmap(bitmap, width, height, true)
+        if (inputWidth <= 0 || inputHeight <= 0) return null
+        val scaled = Bitmap.createScaledBitmap(bitmap, inputWidth, inputHeight, true)
         val buffer = ByteBuffer
-            .allocateDirect(width * height * config.inputChannels * java.lang.Float.BYTES)
+            .allocateDirect(batchSize * inputHeight * inputWidth * config.inputChannels * java.lang.Float.BYTES)
             .order(ByteOrder.nativeOrder())
 
-        val pixels = IntArray(width * height)
-        scaled.getPixels(pixels, 0, width, 0, 0, width, height)
-        for (pixel in pixels) {
-            val r = (pixel shr 16) and 0xFF
-            val g = (pixel shr 8) and 0xFF
-            val b = pixel and 0xFF
-            buffer.putFloat(r * config.normalizeScale + config.normalizeOffset)
-            buffer.putFloat(g * config.normalizeScale + config.normalizeOffset)
-            buffer.putFloat(b * config.normalizeScale + config.normalizeOffset)
+        val pixels = IntArray(inputWidth * inputHeight)
+        scaled.getPixels(pixels, 0, inputWidth, 0, 0, inputWidth, inputHeight)
+        // The bundled model expects a fixed batch of 2. Its batch slots are
+        // independent, so the same face fills both and slot 0 is read back.
+        repeat(batchSize) {
+            for (pixel in pixels) {
+                val r = (pixel shr 16) and 0xFF
+                val g = (pixel shr 8) and 0xFF
+                val b = pixel and 0xFF
+                buffer.putFloat(r * config.normalizeScale + config.normalizeOffset)
+                buffer.putFloat(g * config.normalizeScale + config.normalizeOffset)
+                buffer.putFloat(b * config.normalizeScale + config.normalizeOffset)
+            }
         }
         if (scaled !== bitmap) scaled.recycle()
         buffer.rewind()
         return buffer
+    }
+
+    private fun l2Normalize(values: FloatArray) {
+        var sum = 0.0
+        for (value in values) sum += value.toDouble() * value
+        val norm = kotlin.math.sqrt(sum).toFloat()
+        if (norm <= 1e-10f) return
+        for (i in values.indices) values[i] /= norm
     }
 
     private fun loadModel(context: Context, path: String): Interpreter? {
@@ -90,6 +113,7 @@ class TfLiteMobileFaceNet(
 
     private companion object {
         const val DEFAULT_ASSET_PATH = "models/mobile_face_net.tflite"
-        const val DEFAULT_EMBEDDING_SIZE = 512
+        const val DEFAULT_EMBEDDING_SIZE = 192
+        const val DEFAULT_BATCH = 1
     }
 }

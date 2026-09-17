@@ -73,11 +73,14 @@ user-facing apps.
   stores the resulting embedding in `faceTemplateRef`; recognition compares the
   live frame embedding against the stored templates with cosine similarity,
   with separate parent and child thresholds (parent evaluated first).
-- **The `.tflite` weights are not committed** (see
-  `app/src/main/assets/models/README.md`). Until a real MobileFaceNet build is
-  dropped in, `TfLiteMobileFaceNet.isReady()` is false and the app transparently
-  falls back to the geometry extractor (`FaceFeatureExtractor`, 19-dim ML Kit
-  landmarks + pose).
+- The trained MobileFaceNet weights are **bundled** at
+  `app/src/main/assets/models/mobile_face_net.tflite` (MIT-licensed; see that
+  folder's README for provenance, the verified tensor contract, and SHA-256).
+  Input is `[2,112,112,3]` NHWC normalized as `(pixel - 127.5) / 128`; output is
+  a 192-D embedding. If the model is missing or fails to load,
+  `TfLiteMobileFaceNet.isReady()` is false and the app transparently falls back
+  to the geometry extractor (`FaceFeatureExtractor`, 19-dim ML Kit landmarks +
+  pose).
 - Embeddings are real and local, but **not spoof-resistant** in this MVP: the
   pipeline does not yet add liveness/anti-spoof checks, and geometry fallback is
   weaker than a deep embedding. `core/embed` and `core/recognition` remain the
@@ -107,8 +110,9 @@ No `INTERNET` permission. The app cannot talk to a network.
 ## Recommended next development order
 
 1. AccessibilityService for system-wide protection (biggest product gap)
-2. Bundle a trained MobileFaceNet `.tflite` model (integration is ready; see
-   `app/src/main/assets/models/README.md`) and add liveness/anti-spoof checks
+2. Add liveness/anti-spoof checks around the bundled MobileFaceNet model
+   (the upstream repo also ships a `FaceAntiSpoofing.tflite` that could be
+   reused)
 3. Foreground service so protection survives leaving the debug screen
 4. Encrypted template storage + Room migrations
 5. Unit/UI tests once a build toolchain is available

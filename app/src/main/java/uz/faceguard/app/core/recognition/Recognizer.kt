@@ -7,7 +7,12 @@ import uz.faceguard.app.core.pipeline.FrameEvent
 import uz.faceguard.app.domain.model.ChildProfile
 import uz.faceguard.app.domain.model.ParentProfile
 
-data class Thresholds(val parent: Double = 0.82, val child: Double = 0.78) {
+/**
+ * Cosine-similarity acceptance thresholds on L2-normalized embeddings.
+ * Anchored to the bundled MobileFaceNet reference implementation (its L2
+ * distance of 0.8 maps to cosine ~0.68). Heuristic — tune on real devices.
+ */
+data class Thresholds(val parent: Double = 0.68, val child: Double = 0.62) {
     init { if (parent < 0.1 || child < 0.1) throw IllegalArgumentException("thresholds too low") }
 }
 

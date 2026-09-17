@@ -12,6 +12,7 @@ camera = "1.4.1"
 accompanist = "0.36.0"
 datastore = "1.1.1"
 hiltNavigation = "1.2.0"
+tensorflowLite = "2.16.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version = "1.15.0" }
@@ -38,6 +39,7 @@ camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "
 camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camera" }
 camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camera" }
 accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanist" }
+tensorflow-lite = { group = "org.tensorflow", name = "tensorflow-lite", version.ref = "tensorflowLite" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

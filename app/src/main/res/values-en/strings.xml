@@ -38,7 +38,7 @@
     <string name="parent_face_enrolled">Face enrolled</string>
     <string name="parent_face_not_enrolled">Face not enrolled yet</string>
     <string name="parent_face_placeholder">Enroll face</string>
-    <string name="parent_face_note">Face enrollment arrives in a later phase</string>
+    <string name="parent_face_note">Your face is stored only on this device and is used to tell you apart from your child</string>
     <string name="children_title">Child profiles</string>
     <string name="children_section">Children</string>
     <string name="children_add">Add child</string>

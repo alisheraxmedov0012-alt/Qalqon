@@ -47,6 +47,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uz.faceguard.app.R
+import uz.faceguard.app.core.embed.FaceEmbeddingModel
 import uz.faceguard.app.core.monitor.ForegroundAppMonitor
 import uz.faceguard.app.core.pipeline.FaceCaptureController
 import uz.faceguard.app.core.protection.OverlayControllerImpl
@@ -70,6 +71,7 @@ import uz.faceguard.app.domain.repository.SettingsRepository
 @HiltViewModel
 class ProtectionDebugViewModel @Inject constructor(
     private val recognizer: Recognizer,
+    private val embeddingModel: FaceEmbeddingModel,
     private val parentRepository: ParentProfileRepository,
     private val childRepository: ChildProfileRepository,
     private val protectedAppsRepository: ProtectedAppsRepository,
@@ -111,6 +113,7 @@ class ProtectionDebugViewModel @Inject constructor(
     fun setController(value: FaceCaptureController) {
         controller = value
         value.setRecognizer(recognizer)
+        value.setEmbeddingModel(embeddingModel)
     }
 
     /** Starts the headless analyzer once camera permission is granted. */

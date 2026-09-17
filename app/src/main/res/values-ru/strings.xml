@@ -38,7 +38,7 @@
     <string name="parent_face_enrolled">Лицо зарегистрировано</string>
     <string name="parent_face_not_enrolled">Лицо ещё не зарегистрировано</string>
     <string name="parent_face_placeholder">Зарегистрировать лицо</string>
-    <string name="parent_face_note">Регистрация лица появится на следующем этапе</string>
+    <string name="parent_face_note">Ваше лицо хранится только на этом устройстве и используется, чтобы отличать вас от ребёнка</string>
     <string name="children_title">Профили детей</string>
     <string name="children_section">Дети</string>
     <string name="children_add">Добавить ребёнка</string>

@@ -1,28 +1,37 @@
 package uz.faceguard.app.core.embed
 
-import java.io.File
 import uz.faceguard.app.core.pipeline.FrameEvent
 
 /**
- * MVP storage: keeps only accepted-frame timestamps in app-private memory.
- * TODO(real-embedding): swap `PrivateStorageEmbeddable` for an on-device
- * embedding model writing a secure template; the interface stays stable.
+ * Enrollment collects accepted face frames and turns them into a compact,
+ * on-device template reference. The reference is what later gets stored in
+ * `ParentProfile.faceTemplateRef` / `ChildProfile.faceTemplateRef`.
  */
 interface FaceEmbeddable {
-    /**
-     * Store accepted artifacts (today: timestamps). Returns a non-null
-     * template reference if success.
-     */
+    /** Returns an encoded template, or an empty string when not enough data. */
     suspend fun collect(faces: List<FrameEvent>): String
 }
 
-class PrivateStorageEmbeddable : FaceEmbeddable {
-    @Volatile var counter = 0
-    private val collected = mutableListOf<Long>()
-
+/**
+ * Averages the per-frame face vectors (AI embeddings when the model is
+ * present, otherwise geometry fallback vectors) into one stable template.
+ */
+class MeanFaceEmbeddingCollector : FaceEmbeddable {
     override suspend fun collect(faces: List<FrameEvent>): String {
-        faces.forEach { collected.add(it.timestamp) }
-        counter += faces.size
-        return "template-reference-${System.identityHashCode(this)}"
+        val vectors = faces.mapNotNull { it.features }.filter { it.isNotEmpty() }
+        if (vectors.isEmpty()) return ""
+
+        val dim = vectors.first().size
+        val mean = FloatArray(dim)
+        var count = 0
+        for (vector in vectors) {
+            if (vector.size != dim) continue
+            for (i in mean.indices) mean[i] += vector[i]
+            count++
+        }
+        if (count == 0) return ""
+
+        for (i in mean.indices) mean[i] /= count
+        return FaceEmbeddingCodec.encode(mean)
     }
 }

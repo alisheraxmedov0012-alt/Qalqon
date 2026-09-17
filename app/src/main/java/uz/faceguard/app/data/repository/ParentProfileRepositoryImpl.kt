@@ -35,9 +35,8 @@ class ParentProfileRepositoryImpl @Inject constructor(
         dao.clearFaceData(accountId, System.currentTimeMillis())
     }
 
-    override suspend fun setFaceEnrolled(accountId: Long, enrolled: Boolean) {
-        // flip the flag; done via upsert of the current row
-        dao.get(accountId)?.let { dao.upsert(it.copy(isFaceEnrolled = enrolled, updatedAt = System.currentTimeMillis())) }
+    override suspend fun saveFaceEnrollment(accountId: Long, templateRef: String) {
+        dao.saveFaceEnrollment(accountId, templateRef, EnrollmentStatus.ENROLLED.name, System.currentTimeMillis())
     }
 
     private fun ParentProfileEntity.toDomain() = ParentProfile(

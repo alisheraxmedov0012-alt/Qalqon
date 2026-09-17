@@ -47,7 +47,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uz.faceguard.app.R
 import uz.faceguard.app.core.embed.FaceEmbeddable
-import uz.faceguard.app.core.embed.PrivateStorageEmbeddable
+import uz.faceguard.app.core.embed.FaceEmbeddingModel
+import uz.faceguard.app.core.embed.MeanFaceEmbeddingCollector
 import uz.faceguard.app.core.pipeline.EnrollmentSteps
 import uz.faceguard.app.core.pipeline.FaceCaptureController
 import uz.faceguard.app.core.pipeline.FrameEvent
@@ -70,6 +71,7 @@ class FaceEnrollmentViewModel @Inject constructor(
     private val childRepository: ChildProfileRepository,
     private val accountRepository: AccountRepository,
     val recognizer: Recognizer,
+    val embeddingModel: FaceEmbeddingModel,
 ) : ViewModel() {
 
     enum class Phase { IDLE, CAPTURING, SAVED, FAILED, CANCELED }
@@ -93,7 +95,7 @@ class FaceEnrollmentViewModel @Inject constructor(
 
     fun setController(value: FaceCaptureController) { controller = value }
 
-    private var embeddable: FaceEmbeddable = PrivateStorageEmbeddable()
+    private var embeddable: FaceEmbeddable = MeanFaceEmbeddingCollector()
     fun setEmbeddable(value: FaceEmbeddable) { embeddable = value }
 
     /** Starts preview + analysis and routes accepted frames into [onFrame]. */
@@ -121,8 +123,8 @@ class FaceEnrollmentViewModel @Inject constructor(
                     // parent enrollment keys off the account id, not the nav arg
                     val accountId = accountRepository.getCurrentAccount()?.id
                     when (subject) {
-                        SUBJECT_PARENT -> accountId?.let { parentRepository.setFaceEnrolled(it, true) }
-                        SUBJECT_CHILD -> if (subjectId > 0) childRepository.setFaceEnrolled(subjectId, true)
+                        SUBJECT_PARENT -> accountId?.let { parentRepository.saveFaceEnrollment(it, template) }
+                        SUBJECT_CHILD -> if (subjectId > 0) accountId?.let { childRepository.saveFaceEnrollment(it, subjectId, template) }
                         else -> Unit
                     }
                     frames.clear()
@@ -166,8 +168,9 @@ fun FaceEnrollmentScreen(
             val owned = FaceCaptureController(context)
             owned.setLifecycleOwner(lifecycleOwner)
             owned.setRecognizer(viewModel.recognizer)
+            owned.setEmbeddingModel(viewModel.embeddingModel)
             viewModel.setController(owned)
-            viewModel.setEmbeddable(PrivateStorageEmbeddable())
+            viewModel.setEmbeddable(MeanFaceEmbeddingCollector())
         }
         onDispose { viewModel.controller?.stop() }
     }

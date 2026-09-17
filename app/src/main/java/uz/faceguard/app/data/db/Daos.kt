@@ -37,6 +37,11 @@ interface ParentProfileDao {
     @Query("UPDATE parent_profiles SET displayName = :displayName, updatedAt = :updatedAt WHERE accountId = :accountId")
     suspend fun update(accountId: Long, displayName: String, updatedAt: Long)
 
+    @Query(
+        "UPDATE parent_profiles SET isFaceEnrolled = 1, faceTemplateRef = :templateRef, enrollmentStatus = :status, enrollmentVersion = enrollmentVersion + 1, lastEnrollmentAt = :updatedAt, updatedAt = :updatedAt WHERE accountId = :accountId",
+    )
+    suspend fun saveFaceEnrollment(accountId: Long, templateRef: String, status: String, updatedAt: Long)
+
     /** Clears face enrollment metadata without touching the profile itself. */
     @Query("UPDATE parent_profiles SET isFaceEnrolled = 0, faceTemplateRef = NULL, enrollmentStatus = 'NONE', enrollmentVersion = enrollmentVersion + 1, lastEnrollmentAt = NULL, updatedAt = :updatedAt WHERE accountId = :accountId")
     suspend fun clearFaceData(accountId: Long, updatedAt: Long)
@@ -57,9 +62,9 @@ interface ChildProfileDao {
     suspend fun delete(id: Long, accountId: Long)
 
     @Query(
-        "UPDATE child_profiles SET isFaceEnrolled = :enrolled, enrollmentStatus = :status, enrollmentVersion = enrollmentVersion + 1, lastEnrollmentAt = :updatedAt, updatedAt = :updatedAt WHERE id = :id",
+        "UPDATE child_profiles SET isFaceEnrolled = 1, faceTemplateRef = :templateRef, enrollmentStatus = :status, enrollmentVersion = enrollmentVersion + 1, lastEnrollmentAt = :updatedAt, updatedAt = :updatedAt WHERE id = :id AND accountId = :accountId",
     )
-    suspend fun setFaceEnrolled(id: Long, enrolled: Boolean, status: String, updatedAt: Long)
+    suspend fun saveFaceEnrollment(id: Long, accountId: Long, templateRef: String, status: String, updatedAt: Long)
 
     @Query("SELECT * FROM child_profiles WHERE accountId = :accountId ORDER BY createdAt ASC")
     fun observeAll(accountId: Long): Flow<List<ChildProfileEntity>>

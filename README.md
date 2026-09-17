@@ -37,6 +37,10 @@ user-facing apps.
 - Child profiles: add / edit / delete with restriction level + enrollment status
 - Face enrollment flow (4 guided steps, camera preview, progress) for both
   parent and children; status chips update everywhere
+- Enrollment now persists a real on-device face template (TFLite MobileFaceNet
+  embedding when the model is bundled, otherwise ML Kit landmark/pose geometry
+  fallback), stored per parent/child in `faceTemplateRef` and used by the
+  recognizer — no more timestamp-only or hash-based placeholder
 - Protected apps catalog: real installed apps (PackageManager), toggle
   protection, count on home
 - Settings: block policy (allow/soft/hard), scan mode, camera threshold,
@@ -59,12 +63,25 @@ user-facing apps.
 - **Unknown-user / no-face fallback policy** is implemented in the engine but
   only exercised in the debug flow.
 
-## Placeholder only (clearly marked in code)
+## Biometric capability (honest MVP status)
 
-- **Face embedding/matching is synthetic** (`TODO(real-embedding)`): the
-  recognizer scores a deterministic timestamp-seeded pseudo-embedding. The
-  full pipeline works end-to-end, but matching is not biometrically accurate.
-  Swap points: `core/embed/FaceEmbeddable`, `core/recognition/Recognizer`.
+- **TFLite MobileFaceNet is integrated** via `core/embed/TfLiteMobileFaceNet`
+  and `FaceEmbeddingModel`. The model is loaded from
+  `assets/models/mobile_face_net.tflite` and runs fully on-device. The output
+  embedding size (commonly 128/192/512) is read from the model's output tensor.
+- Enrollment crops the detected face, resizes it to the model's input, and
+  stores the resulting embedding in `faceTemplateRef`; recognition compares the
+  live frame embedding against the stored templates with cosine similarity,
+  with separate parent and child thresholds (parent evaluated first).
+- **The `.tflite` weights are not committed** (see
+  `app/src/main/assets/models/README.md`). Until a real MobileFaceNet build is
+  dropped in, `TfLiteMobileFaceNet.isReady()` is false and the app transparently
+  falls back to the geometry extractor (`FaceFeatureExtractor`, 19-dim ML Kit
+  landmarks + pose).
+- Embeddings are real and local, but **not spoof-resistant** in this MVP: the
+  pipeline does not yet add liveness/anti-spoof checks, and geometry fallback is
+  weaker than a deep embedding. `core/embed` and `core/recognition` remain the
+  seams for a production model.
 - `sync/` gateways are no-ops (see Phase 14 notes below).
 
 ## Required Android permissions
@@ -90,16 +107,18 @@ No `INTERNET` permission. The app cannot talk to a network.
 ## Recommended next development order
 
 1. AccessibilityService for system-wide protection (biggest product gap)
-2. Real on-device embedding model behind `FaceEmbeddable`/`Recognizer`
+2. Bundle a trained MobileFaceNet `.tflite` model (integration is ready; see
+   `app/src/main/assets/models/README.md`) and add liveness/anti-spoof checks
 3. Foreground service so protection survives leaving the debug screen
 4. Encrypted template storage + Room migrations
 5. Unit/UI tests once a build toolchain is available
 
 ## Privacy notes
 
-Face frames never leave the device and are never persisted — only a
-template reference (currently synthetic) and enrollment flags are stored.
-PINs are salted and hashed; the raw PIN is never stored. `allowBackup=false`.
+Face frames never leave the device and are never persisted — only a compact
+embedding (TFLite MobileFaceNet output, or a 19-float geometry fallback) and
+enrollment flags are stored. PINs are salted and hashed; the raw PIN is never
+stored. `allowBackup=false`.
 
 ## Offline-first notes
 
@@ -126,8 +145,9 @@ silently writing to a nonexistent account id, enrollment frame gating
 (IDLE phase deadlock), missing `SYSTEM_ALERT_WINDOW` permission, dead
 `FaceEmbeddingPipeline`, branding renamed to Qalqon.
 
-**Still risky:** synthetic matching (not biometric), overlay blocking is
-demo-scoped, UsageStats lag on OEM devices, no tests.
+**Still risky:** matching is real on-device geometry but not biometric-grade
+(no deep embedding, not spoof-resistant), overlay blocking is demo-scoped,
+UsageStats lag on OEM devices, no tests.
 
 **Needs manual testing:** full enrollment flow on a real device, camera
 permission denial paths, overlay display with/without permission, protection
@@ -572,10 +592,11 @@ sync; the app remains fully functional with sync disabled or absent.
 
 ## Known limitations (MVP)
 
-- **Synthetic face matching.** The recognizer compares a frame-derived
-  pseudo-embedding against a hash-seeded template; it demonstrates the full
-  pipeline (capture → recognize → protect) but is not biometrically accurate.
-  Marked with `TODO(real-embedding)`.
+- **Face matching is real but not spoof-resistant.** The recognizer compares a
+  frame-derived embedding (TFLite MobileFaceNet when bundled, otherwise ML Kit
+  geometry fallback) against the stored per-profile template using cosine
+  similarity. It is real and local, but there is no liveness/anti-spoof layer
+  yet — see "Biometric capability" above.
 - **Accessibility-service blocking is not implemented.** Restrictions apply
   only while the debug protection screen hosts the engine; a production app
   needs an AccessibilityService (or Device Admin) to overlay other apps

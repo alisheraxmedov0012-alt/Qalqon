@@ -36,7 +36,9 @@ interface ParentProfileRepository {
     /** one profile per account; returns existing if present. */
     suspend fun createIfMissing(accountId: Long, displayName: String): ParentProfile
     suspend fun updateDisplayName(accountId: Long, displayName: String)
-    suspend fun setFaceEnrolled(accountId: Long, enrolled: Boolean)
+
+    /** Persists an enrolled on-device template and marks the profile enrolled. */
+    suspend fun saveFaceEnrollment(accountId: Long, templateRef: String)
 
     /** Clears face enrollment metadata; the profile itself stays. */
     suspend fun deleteFaceData(accountId: Long)
@@ -51,7 +53,9 @@ interface ChildProfileRepository {
     suspend fun addChild(accountId: Long, childName: String, level: RestrictionLevel): Long
     suspend fun updateChild(accountId: Long, childId: Long, childName: String, level: RestrictionLevel)
     suspend fun deleteChild(accountId: Long, childId: Long)
-    suspend fun setFaceEnrolled(childId: Long, enrolled: Boolean)
+
+    /** Persists an enrolled on-device template and marks the child enrolled. */
+    suspend fun saveFaceEnrollment(accountId: Long, childId: Long, templateRef: String)
 
     /** Clears face enrollment metadata; the child profile itself stays. */
     suspend fun deleteFaceData(accountId: Long, childId: Long)

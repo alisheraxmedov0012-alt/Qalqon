@@ -42,7 +42,7 @@
     <string name="parent_face_enrolled">Yuz ro\'yxatdan o\'tgan</string>
     <string name="parent_face_not_enrolled">Yuz hali ro\'yxatdan o\'tmagan</string>
     <string name="parent_face_placeholder">Yuzni ro\'yxatga olish</string>
-    <string name="parent_face_note">Yuzni ro\'yxatga olish keyingi bosqichda qo\'shiladi</string>
+    <string name="parent_face_note">Yuzingiz faqat telefonda saqlanadi va sizni boladan ajratish uchun ishlatiladi</string>
     <string name="children_title">Bolalar profillari</string>
     <string name="children_section">Bolalar</string>
     <string name="children_add">Bola qo\'shish</string>

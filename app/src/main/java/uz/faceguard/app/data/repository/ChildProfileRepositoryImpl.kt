@@ -39,8 +39,8 @@ class ChildProfileRepositoryImpl @Inject constructor(
         dao.clearFaceData(childId, accountId, System.currentTimeMillis())
     }
 
-    override suspend fun setFaceEnrolled(childId: Long, enrolled: Boolean) =
-        dao.setFaceEnrolled(childId, enrolled, EnrollmentStatus.ENROLLED.name, System.currentTimeMillis())
+    override suspend fun saveFaceEnrollment(accountId: Long, childId: Long, templateRef: String) =
+        dao.saveFaceEnrollment(childId, accountId, templateRef, EnrollmentStatus.ENROLLED.name, System.currentTimeMillis())
 
     private fun ChildProfileEntity.toDomain() = ChildProfile(
         id = id,

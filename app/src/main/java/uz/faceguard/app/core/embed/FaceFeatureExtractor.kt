@@ -14,13 +14,13 @@ object FaceFeatureExtractor {
     const val DIM = 19
 
     private val LANDMARK_TYPES = intArrayOf(
-        FaceLandmark.TYPE_LEFT_EYE,
-        FaceLandmark.TYPE_RIGHT_EYE,
-        FaceLandmark.TYPE_NOSE_BASE,
-        FaceLandmark.TYPE_MOUTH_LEFT,
-        FaceLandmark.TYPE_MOUTH_RIGHT,
-        FaceLandmark.TYPE_LEFT_CHEEK,
-        FaceLandmark.TYPE_RIGHT_CHEEK,
+        FaceLandmark.LEFT_EYE,
+        FaceLandmark.RIGHT_EYE,
+        FaceLandmark.NOSE_BASE,
+        FaceLandmark.MOUTH_LEFT,
+        FaceLandmark.MOUTH_RIGHT,
+        FaceLandmark.LEFT_CHEEK,
+        FaceLandmark.RIGHT_CHEEK,
     )
 
     fun extract(face: Face, imageWidth: Int, imageHeight: Int): FloatArray? {

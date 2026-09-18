@@ -214,19 +214,19 @@
     <string name="data_reset_confirm_yes">Ha, o\'chirish</string>
     <string name="data_reset_confirm_no">Bekor qilish</string>
 
-    <string name="home_subtitle">Asosiy bo'limlardan birini tanlab sozlashni davom ettiring</string>
+    <string name="home_subtitle">Asosiy bo\'limlardan birini tanlab sozlashni davom ettiring</string>
     <string name="home_profile_title">Sizning profilingiz</string>
     <string name="home_profile_name">Ism: %1$s</string>
     <string name="home_profile_phone">Telefon: %1$s</string>
     <string name="home_profile_protection">Holat: %1$s</string>
-    <string name="home_main_actions_title">Asosiy bo'limlar</string>
+    <string name="home_main_actions_title">Asosiy bo\'limlar</string>
     <string name="home_menu_protected_apps">Himoyalangan ilovalar</string>
     <string name="home_setup_progress">Bajarildi: %1$d/%2$d qadam</string>
-    <string name="home_additional_title">Qo'shimcha bo'limlar</string>
-    <string name="home_section_show">Ko'rsatish</string>
+    <string name="home_additional_title">Qo\'shimcha bo\'limlar</string>
+    <string name="home_section_show">Ko\'rsatish</string>
     <string name="home_section_hide">Yashirish</string>
-    <string name="home_developer_title">Dasturchi bo'limi</string>
-    <string name="home_developer_hint">Bu bo'lim sinov va diagnostika uchun. Oddiy foydalanishda kerak emas.</string>
+    <string name="home_developer_title">Dasturchi bo\'limi</string>
+    <string name="home_developer_hint">Bu bo\'lim sinov va diagnostika uchun. Oddiy foydalanishda kerak emas.</string>
     <string name="protection_title">Himoya holati</string>
     <string name="protection_toggle_label">Himoya</string>
     <string name="protection_toggle_on">Himoya yoqilgan</string>

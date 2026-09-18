@@ -12,10 +12,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -46,10 +46,8 @@ import uz.faceguard.app.core.debug.DebugFlags
 import uz.faceguard.app.core.monitor.ForegroundAppMonitor
 import uz.faceguard.app.core.ui.UiState
 import uz.faceguard.app.domain.model.AppSettings
-import uz.faceguard.app.domain.model.BlockPolicy
 import uz.faceguard.app.domain.model.ChildProfile
 import uz.faceguard.app.domain.model.ParentProfile
-import uz.faceguard.app.domain.model.ScanMode
 import uz.faceguard.app.domain.model.UserAccount
 import uz.faceguard.app.domain.repository.AccountRepository
 import uz.faceguard.app.domain.repository.ChildProfileRepository
@@ -106,15 +104,13 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun setProtectionEnabled(enabled: Boolean) {
-        viewModelScope.launch { settingsRepository.setProtectionEnabled(enabled) }
-    }
 }
 
 @Composable
 fun HomeScreen(
     onOpenParent: () -> Unit,
     onOpenChildren: () -> Unit,
+    onOpenProtectedApps: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenRecognition: () -> Unit,
     onOpenProtection: () -> Unit,
@@ -126,6 +122,9 @@ fun HomeScreen(
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
 
+    var showMore by remember { mutableStateOf(false) }
+    var showDeveloperTools by remember { mutableStateOf(false) }
+
     Scaffold { padding ->
         Column(
             modifier = Modifier
@@ -136,6 +135,11 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(stringResource(R.string.home_title), style = MaterialTheme.typography.headlineMedium)
+            Text(
+                stringResource(R.string.home_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
 
             when (ui.state) {
                 is UiState.Loading -> Text(stringResource(R.string.state_loading))
@@ -145,43 +149,37 @@ fun HomeScreen(
                 )
                 else -> {
                     ui.account?.let { account ->
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(account.fullName, style = MaterialTheme.typography.titleMedium)
-                                Text(account.phoneNumber, style = MaterialTheme.typography.bodyMedium)
-                            }
-                        }
+                        ProfileSummaryCard(
+                            account = account,
+                            protectionEnabled = settings.protectionEnabled,
+                        )
                     }
 
                     SetupChecklistCard(ui, settings)
-                    ProtectionCard(settings, ui.protectedCount, viewModel::setProtectionEnabled)
 
-                    Button(onClick = onOpenParent, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.home_menu_parent))
-                    }
-                    Button(onClick = onOpenChildren, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.home_menu_children))
-                    }
-                    Button(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.home_menu_settings))
-                    }
-                    OutlinedButton(onClick = onOpenActivity, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.home_menu_activity))
-                    }
-                    OutlinedButton(onClick = onOpenPrivacy, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.home_menu_privacy))
-                    }
-                    OutlinedButton(onClick = onOpenHelp, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.home_menu_help))
-                    }
+                    MainActionsCard(
+                        onOpenProtection = onOpenProtection,
+                        onOpenParent = onOpenParent,
+                        onOpenChildren = onOpenChildren,
+                        onOpenProtectedApps = onOpenProtectedApps,
+                        onOpenSettings = onOpenSettings,
+                        protectedCount = ui.protectedCount,
+                    )
+
+                    AdditionalSection(
+                        expanded = showMore,
+                        onToggle = { showMore = !showMore },
+                        onOpenActivity = onOpenActivity,
+                        onOpenPrivacy = onOpenPrivacy,
+                        onOpenHelp = onOpenHelp,
+                    )
+
                     if (DebugFlags.DEBUG_SCREENS_ENABLED) {
-                        OutlinedButton(onClick = onOpenRecognition, modifier = Modifier.fillMaxWidth()) {
-                            Text(stringResource(R.string.home_recognition_debug))
-                        }
-                        OutlinedButton(onClick = onOpenProtection, modifier = Modifier.fillMaxWidth()) {
-                            Text(stringResource(R.string.home_protection_debug))
-                        }
-                        ForegroundDebugCard()
+                        DeveloperSection(
+                            expanded = showDeveloperTools,
+                            onToggle = { showDeveloperTools = !showDeveloperTools },
+                            onOpenRecognition = onOpenRecognition,
+                        )
                     }
                 }
             }
@@ -189,7 +187,76 @@ fun HomeScreen(
     }
 }
 
-/** Seven-step readiness checklist; each row turns primary when done. */
+@Composable
+private fun ProfileSummaryCard(
+    account: UserAccount,
+    protectionEnabled: Boolean,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(stringResource(R.string.home_profile_title), style = MaterialTheme.typography.titleMedium)
+            Text(
+                stringResource(R.string.home_profile_name, account.fullName),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+                stringResource(R.string.home_profile_phone, account.phoneNumber),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                stringResource(
+                    R.string.home_profile_protection,
+                    stringResource(
+                        if (protectionEnabled) R.string.home_status_on else R.string.home_status_off,
+                    ),
+                ),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MainActionsCard(
+    onOpenProtection: () -> Unit,
+    onOpenParent: () -> Unit,
+    onOpenChildren: () -> Unit,
+    onOpenProtectedApps: () -> Unit,
+    onOpenSettings: () -> Unit,
+    protectedCount: Int,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(stringResource(R.string.home_main_actions_title), style = MaterialTheme.typography.titleMedium)
+            Button(onClick = onOpenProtection, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.protection_title))
+            }
+            Button(onClick = onOpenParent, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.home_menu_parent))
+            }
+            Button(onClick = onOpenChildren, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.home_menu_children))
+            }
+            Button(onClick = onOpenProtectedApps, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.home_menu_protected_apps))
+            }
+            Text(
+                stringResource(R.string.home_protected_count, protectedCount),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedButton(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.home_menu_settings))
+            }
+        }
+    }
+}
+
+/** Seven-step readiness checklist with a simple progress indicator. */
 @Composable
 private fun SetupChecklistCard(ui: HomeUiState, settings: AppSettings) {
     val items = listOf(
@@ -201,22 +268,51 @@ private fun SetupChecklistCard(ui: HomeUiState, settings: AppSettings) {
         (ui.protectedCount > 0) to R.string.setup_protected_apps,
         settings.protectionEnabled to R.string.setup_protection_enabled,
     )
+    val completed = items.count { it.first }
+    val total = items.size
+    val allDone = completed == total
+    val nextStep = items.firstOrNull { !it.first }?.second
+
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.setup_title), style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
-            items.forEach { (done, labelRes) ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
+
+            if (allDone) {
+                Text(
+                    stringResource(R.string.setup_all_done),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            } else {
+                Text(
+                    stringResource(R.string.home_setup_progress, completed, total),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                LinearProgressIndicator(
+                    progress = { completed.toFloat() / total.toFloat() },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                nextStep?.let { label ->
                     Text(
-                        text = stringResource(if (done) R.string.setup_done_mark else R.string.setup_todo_mark),
-                        color = if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                        stringResource(R.string.setup_next_step, stringResource(label)),
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    Text(
-                        text = stringResource(labelRes),
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(start = 8.dp),
-                    )
+                }
+
+                items.forEach { (done, labelRes) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = stringResource(if (done) R.string.setup_done_mark else R.string.setup_todo_mark),
+                            color = if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            text = stringResource(labelRes),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
                 }
             }
         }
@@ -224,52 +320,77 @@ private fun SetupChecklistCard(ui: HomeUiState, settings: AppSettings) {
 }
 
 @Composable
-private fun ProtectionCard(
-    settings: AppSettings,
-    protectedCount: Int,
-    onToggle: (Boolean) -> Unit,
+private fun AdditionalSection(
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onOpenActivity: () -> Unit,
+    onOpenPrivacy: () -> Unit,
+    onOpenHelp: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(stringResource(R.string.settings_protection), style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(4.dp))
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Switch(checked = settings.protectionEnabled, onCheckedChange = onToggle)
                 Text(
-                    stringResource(
-                        if (settings.protectionEnabled) R.string.home_status_on else R.string.home_status_off,
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(start = 8.dp),
+                    stringResource(R.string.home_additional_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.weight(1f),
                 )
+                OutlinedButton(onClick = onToggle) {
+                    Text(
+                        stringResource(
+                            if (expanded) R.string.home_section_hide else R.string.home_section_show,
+                        ),
+                    )
+                }
             }
-            Spacer(Modifier.height(4.dp))
-            Text(stringResource(R.string.home_scan_mode_label), style = MaterialTheme.typography.titleMedium)
-            Text(
-                stringResource(
-                    when (settings.scanMode) {
-                        ScanMode.BALANCED -> R.string.scan_balanced
-                        ScanMode.BATTERY_SAVER -> R.string.scan_battery_saver
-                        ScanMode.STRICT -> R.string.scan_strict
-                    },
-                ),
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Text(
-                stringResource(R.string.home_protected_count, protectedCount),
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Text(stringResource(R.string.home_unknown_policy_label), style = MaterialTheme.typography.titleMedium)
-            Text(
-                stringResource(
-                    when (settings.unknownUserPolicy) {
-                        BlockPolicy.ALLOW -> R.string.policy_allow
-                        BlockPolicy.SOFT_BLOCK -> R.string.policy_soft_block
-                        BlockPolicy.HARD_BLOCK -> R.string.policy_hard_block
-                    },
-                ),
-                style = MaterialTheme.typography.bodySmall,
-            )
+            if (expanded) {
+                OutlinedButton(onClick = onOpenActivity, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.home_menu_activity))
+                }
+                OutlinedButton(onClick = onOpenPrivacy, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.home_menu_privacy))
+                }
+                OutlinedButton(onClick = onOpenHelp, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.home_menu_help))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeveloperSection(
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onOpenRecognition: () -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.home_developer_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedButton(onClick = onToggle) {
+                    Text(
+                        stringResource(
+                            if (expanded) R.string.home_section_hide else R.string.home_section_show,
+                        ),
+                    )
+                }
+            }
+            if (expanded) {
+                Text(
+                    stringResource(R.string.home_developer_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(onClick = onOpenRecognition, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.home_recognition_debug))
+                }
+                ForegroundDebugCard()
+            }
         }
     }
 }
@@ -281,7 +402,6 @@ private fun ForegroundDebugCard() {
     var hasAccess by remember { mutableStateOf(monitor.hasUsageAccess()) }
     val foreground by monitor.current.collectAsStateWithLifecycle()
 
-    // scoped to the composable; cancelled automatically on dispose
     val scope = rememberCoroutineScope()
     DisposableEffect(Unit) {
         monitor.start(scope)

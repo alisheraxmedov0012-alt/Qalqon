@@ -6,5 +6,7 @@ import com.google.mlkit.vision.common.InputImage
 data class FrameEvent(
     val image: InputImage,
     val faceCount: Int = 1,
+    /** On-device geometry vector for the primary detected face, if extractable. */
+    val features: FloatArray? = null,
     val timestamp: Long = System.currentTimeMillis(),
 )

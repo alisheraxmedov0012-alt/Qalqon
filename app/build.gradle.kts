@@ -36,6 +36,10 @@ android {
     buildFeatures {
         compose = true
     }
+    androidResources {
+        // TFLite models must stay uncompressed so the Interpreter can mmap them.
+        noCompress += "tflite"
+    }
 }
 
 dependencies {
@@ -59,6 +63,7 @@ dependencies {
     implementation(libs.camera.lifecycle)
     implementation(libs.camera.view)
     implementation(libs.mlkit.face.detection)
+    implementation(libs.tensorflow.lite)
     implementation(libs.accompanist.permissions)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

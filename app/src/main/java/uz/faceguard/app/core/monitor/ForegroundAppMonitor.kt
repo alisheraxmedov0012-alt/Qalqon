@@ -28,6 +28,7 @@ class ForegroundAppMonitor(private val context: Context) {
     val current: StateFlow<String?> = _current
 
     private var job: Job? = null
+    private var lastFallbackAt = 0L
 
     fun hasUsageAccess(): Boolean {
         val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
@@ -60,8 +61,8 @@ class ForegroundAppMonitor(private val context: Context) {
         if (!hasUsageAccess()) return null
         val usage = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val end = System.currentTimeMillis()
-        val begin = end - 10_000L
-        val events = usage.queryEvents(begin, end)
+
+        val events = usage.queryEvents(end - EVENT_WINDOW_MS, end)
         val event = UsageEvents.Event()
         var last: String? = null
         while (events.hasNextEvent()) {
@@ -70,6 +71,22 @@ class ForegroundAppMonitor(private val context: Context) {
                 last = event.packageName
             }
         }
-        return last
+        if (last != null) return last
+
+        // An app can stay in the foreground longer than the event window, so
+        // fall back to the most recently used app (throttled to keep it cheap).
+        if (end - lastFallbackAt < FALLBACK_THROTTLE_MS) return null
+        lastFallbackAt = end
+        return usage
+            .queryUsageStats(UsageStatsManager.INTERVAL_DAILY, end - STATS_WINDOW_MS, end)
+            .filter { it.lastTimeUsed > 0 }
+            .maxByOrNull { it.lastTimeUsed }
+            ?.packageName
+    }
+
+    private companion object {
+        const val EVENT_WINDOW_MS = 5 * 60_000L
+        const val STATS_WINDOW_MS = 24 * 60 * 60_000L
+        const val FALLBACK_THROTTLE_MS = 10_000L
     }
 }

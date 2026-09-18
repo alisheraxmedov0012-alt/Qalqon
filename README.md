@@ -13,6 +13,50 @@ fallback policy. All face processing happens on-device.
 - **Default locale:** Uzbek (Latin). English and Russian mirrors ship in
   `values-en` / `values-ru`; no user-facing string is hardcoded.
 
+### Parent-facing polish
+
+- Consistent card-based grouping via a shared `SectionCard`, with short
+  plain-language descriptions under each setting.
+- Home leads with the highest-value action (Protection status) and a 7-step
+  setup checklist that names the single next step and collapses once complete.
+- Parent and child profile screens share the same card pattern, label the phone
+  number, give face enrollment a clear primary action, and radio-select the
+  restriction level.
+- Protected apps tab groups the list in a card, shows the selected count in
+  color, adds a search field once the list is long, and lets the whole row
+  toggle protection.
+- Uzbek copy was de-jargoned (e.g. "Checking mode", "If a face is unfamiliar",
+  "If no face is visible", "Soft/Hard close").
+- Actionable empty states (e.g. "add a child and enroll their face") instead of
+  bare placeholder text.
+
+### MVP strengths (what feels ready)
+
+- **On-device face identity:** real MobileFaceNet TFLite embedding with a
+  geometry fallback, per-profile templates, parent-before-child matching.
+- **Coherent protection session:** a single `protectionEnabled` switch drives an
+  app-scoped runtime; unknown/no-face policies and the recovery delay apply live.
+- **Durable local state:** accounts, profiles, protected apps and the activity
+  log live in Room/DataStore; the app holds no network permission.
+- **Product-feeling flows:** guarded onboarding, a protection status screen with
+  a setup checklist, and clear Uzbek guidance.
+
+### Still limited (see "Known limitations (MVP)" below)
+
+- System-wide blocking needs a foreground service + AccessibilityService.
+- Matching is not spoof-resistant (no liveness check).
+- The child "restriction level" is stored and shown but not yet enforced by the
+  protection engine.
+
+### Protected app selection reliability
+
+Refresh no longer resets protection choices. `refreshFromDevice()` merges the
+launchable apps discovered on the device with existing Room rows, preserving
+each app's saved `isProtected` flag, then removes only stale rows that are no
+longer installed. The list also filters out disabled packages, the Qalqon app
+itself, and obvious system/internal utilities so parents only see relevant,
+user-facing apps.
+
 ## What currently works
 
 - Splash → welcome → register (full name, phone, PIN) / login with
@@ -21,34 +65,76 @@ fallback policy. All face processing happens on-device.
 - Child profiles: add / edit / delete with restriction level + enrollment status
 - Face enrollment flow (4 guided steps, camera preview, progress) for both
   parent and children; status chips update everywhere
+- Enrollment now persists a real on-device face template (TFLite MobileFaceNet
+  embedding when the model is bundled, otherwise ML Kit landmark/pose geometry
+  fallback), stored per parent/child in `faceTemplateRef` and used by the
+  recognizer — no more timestamp-only or hash-based placeholder
 - Protected apps catalog: real installed apps (PackageManager), toggle
   protection, count on home
 - Settings: block policy (allow/soft/hard), scan mode, camera threshold,
   recovery delay, low-battery behavior, PIN change, emergency reset, reset tools
 - Privacy screen (local storage, backups, face data, no network), help/about
 - Activity log: recognition/block/unlock events, newest 100, clear action
-- Recognition debug + protection debug screens (live camera, decision
-  pipeline, emergency PIN unlock) gated behind `DebugFlags`
+- Parent-facing Protection screen (`feature/protection/ProtectionScreen.kt`)
+  with a master toggle, setup checklist, live status, emergency PIN unlock and
+  collapsible technical details; recognition diagnostics stay behind
+  `DebugFlags`
 - Usage-access + camera + overlay permission flows with Uzbek guidance
+
+## Protection behavior (real use vs. limits)
+
+- **`protectionEnabled` is the master switch.** Toggling it in Settings (or on
+  the Protection screen) starts/stops an app-scoped `ProtectionRuntime` that
+  owns the foreground monitor, the event-driven scan scheduler and the
+  `ProtectionEngine`. Turning it off tears everything down and clears any
+  overlay.
+- **Recognition is shared.** The runtime consumes the shared `Recognizer`
+  frame flow, so whichever camera is active feeds it. The Protection screen
+  binds an analyzer camera while it is open and protection is enabled; the
+  engine also treats frames older than 1.5 s as "no face", so a stopped camera
+  degrades cleanly.
+- **Policies are applied consistently.** Unknown faces and camera obstruction
+  follow the unknown-user policy; no-face follows the no-face policy; a
+  parent/child recognition blocks or unlocks immediately. When a recognized
+  face is lost while blocked, the configured recovery delay governs how long
+  the block is held before release. PIN emergency unlock is preserved.
+- **What is limited:** there is no foreground service or AccessibilityService
+  yet, so the session lives only as long as the Qalqon process. When Qalqon is
+  backgrounded the camera unbinds, the engine falls back to the no-face policy,
+  and a system kill ends the session. Overlay drawing also needs
+  `SYSTEM_ALERT_WINDOW`. Reliable system-wide blocking remains the next big
+  step (see Recommended next development order).
 
 ## Partially implemented
 
-- **Protection engine** runs only while the protection debug screen is open
-  (headless camera analyzer + foreground monitor + overlay/audio effects).
-  There is no background service yet, so protection does not apply once the
-  user leaves the screen.
+- **No foreground service yet.** Protection is app-scoped; it is not a
+  guaranteed background guard. See "Protection behavior" above.
 - **Overlay permission** (`SYSTEM_ALERT_WINDOW`) is declared and checked, but
   blocking other apps system-wide needs an AccessibilityService — see
   limitations.
-- **Unknown-user / no-face fallback policy** is implemented in the engine but
-  only exercised in the debug flow.
 
-## Placeholder only (clearly marked in code)
+## Biometric capability (honest MVP status)
 
-- **Face embedding/matching is synthetic** (`TODO(real-embedding)`): the
-  recognizer scores a deterministic timestamp-seeded pseudo-embedding. The
-  full pipeline works end-to-end, but matching is not biometrically accurate.
-  Swap points: `core/embed/FaceEmbeddable`, `core/recognition/Recognizer`.
+- **TFLite MobileFaceNet is integrated** via `core/embed/TfLiteMobileFaceNet`
+  and `FaceEmbeddingModel`. The model is loaded from
+  `assets/models/mobile_face_net.tflite` and runs fully on-device. The output
+  embedding size (commonly 128/192/512) is read from the model's output tensor.
+- Enrollment crops the detected face, resizes it to the model's input, and
+  stores the resulting embedding in `faceTemplateRef`; recognition compares the
+  live frame embedding against the stored templates with cosine similarity,
+  with separate parent and child thresholds (parent evaluated first).
+- The trained MobileFaceNet weights are **bundled** at
+  `app/src/main/assets/models/mobile_face_net.tflite` (MIT-licensed; see that
+  folder's README for provenance, the verified tensor contract, and SHA-256).
+  Input is `[2,112,112,3]` NHWC normalized as `(pixel - 127.5) / 128`; output is
+  a 192-D embedding. If the model is missing or fails to load,
+  `TfLiteMobileFaceNet.isReady()` is false and the app transparently falls back
+  to the geometry extractor (`FaceFeatureExtractor`, 19-dim ML Kit landmarks +
+  pose).
+- Embeddings are real and local, but **not spoof-resistant** in this MVP: the
+  pipeline does not yet add liveness/anti-spoof checks, and geometry fallback is
+  weaker than a deep embedding. `core/embed` and `core/recognition` remain the
+  seams for a production model.
 - `sync/` gateways are no-ops (see Phase 14 notes below).
 
 ## Required Android permissions
@@ -74,16 +160,20 @@ No `INTERNET` permission. The app cannot talk to a network.
 ## Recommended next development order
 
 1. AccessibilityService for system-wide protection (biggest product gap)
-2. Real on-device embedding model behind `FaceEmbeddable`/`Recognizer`
-3. Foreground service so protection survives leaving the debug screen
+2. Add liveness/anti-spoof checks around the bundled MobileFaceNet model
+   (the upstream repo also ships a `FaceAntiSpoofing.tflite` that could be
+   reused)
+3. Foreground service so the protection session (and camera) survives leaving
+   the app
 4. Encrypted template storage + Room migrations
 5. Unit/UI tests once a build toolchain is available
 
 ## Privacy notes
 
-Face frames never leave the device and are never persisted — only a
-template reference (currently synthetic) and enrollment flags are stored.
-PINs are salted and hashed; the raw PIN is never stored. `allowBackup=false`.
+Face frames never leave the device and are never persisted — only a compact
+embedding (TFLite MobileFaceNet output, or a 19-float geometry fallback) and
+enrollment flags are stored. PINs are salted and hashed; the raw PIN is never
+stored. `allowBackup=false`.
 
 ## Offline-first notes
 
@@ -110,8 +200,9 @@ silently writing to a nonexistent account id, enrollment frame gating
 (IDLE phase deadlock), missing `SYSTEM_ALERT_WINDOW` permission, dead
 `FaceEmbeddingPipeline`, branding renamed to Qalqon.
 
-**Still risky:** synthetic matching (not biometric), overlay blocking is
-demo-scoped, UsageStats lag on OEM devices, no tests.
+**Still risky:** matching is real on-device geometry but not biometric-grade
+(no deep embedding, not spoof-resistant), overlay blocking is demo-scoped,
+UsageStats lag on OEM devices, no tests.
 
 **Needs manual testing:** full enrollment flow on a real device, camera
 permission denial paths, overlay display with/without permission, protection
@@ -556,14 +647,17 @@ sync; the app remains fully functional with sync disabled or absent.
 
 ## Known limitations (MVP)
 
-- **Synthetic face matching.** The recognizer compares a frame-derived
-  pseudo-embedding against a hash-seeded template; it demonstrates the full
-  pipeline (capture → recognize → protect) but is not biometrically accurate.
-  Marked with `TODO(real-embedding)`.
-- **Accessibility-service blocking is not implemented.** Restrictions apply
-  only while the debug protection screen hosts the engine; a production app
-  needs an AccessibilityService (or Device Admin) to overlay other apps
-  reliably. The overlay permission path exists but is demo-scoped.
+- **Face matching is real but not spoof-resistant.** The recognizer compares a
+  frame-derived embedding (TFLite MobileFaceNet when bundled, otherwise ML Kit
+  geometry fallback) against the stored per-profile template using cosine
+  similarity. It is real and local, but there is no liveness/anti-spoof layer
+  yet — see "Biometric capability" above.
+- **Accessibility-service blocking is not implemented.** Protection runs as an
+  app-scoped session (`ProtectionRuntime`) driven by `protectionEnabled`; it
+  works while the Qalqon process is alive and the overlay permission is
+  granted. It is not a guaranteed background guard: a production app needs a
+  foreground service plus an AccessibilityService (or Device Admin) to overlay
+  other apps reliably while backgrounded.
 - **No real migrations.** Room uses `fallbackToDestructiveMigration`; a
   release build needs explicit migrations.
 - **No automated tests.** Validation is via Python source checks only (XML

@@ -2,22 +2,18 @@ package uz.faceguard.app.feature.parent
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Card
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -38,6 +34,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uz.faceguard.app.R
 import uz.faceguard.app.core.ui.AppLoadingButton
+import uz.faceguard.app.core.ui.AppTextField
+import uz.faceguard.app.core.ui.SectionCard
 import uz.faceguard.app.core.ui.UiState
 import uz.faceguard.app.domain.model.ParentProfile
 import uz.faceguard.app.domain.repository.AccountRepository
@@ -137,76 +135,69 @@ fun ParentProfileScreen(
             when (ui.uiState) {
                 is UiState.Loading ->
                     Text(stringResource(R.string.state_loading), style = MaterialTheme.typography.bodyLarge)
+
                 is UiState.Error ->
-                    Text(stringResource((ui.uiState as UiState.Error).messageRes), color = MaterialTheme.colorScheme.error)
+                    Text(
+                        stringResource((ui.uiState as UiState.Error).messageRes),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+
                 else -> {
-                    if (!ui.hasProfile) {
-                        EmptyCard(stringResource(R.string.parent_empty))
-                    }
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(16.dp)) {
+                    SectionCard(
+                        title = stringResource(R.string.parent_details_title),
+                        subtitle = stringResource(R.string.parent_details_subtitle),
+                    ) {
+                        AppTextField(
+                            value = ui.displayNameInput,
+                            onValueChange = viewModel::onDisplayNameChange,
+                            labelRes = R.string.parent_display_name_hint,
+                        )
+                        if (ui.accountPhone.isNotBlank()) {
                             Text(
-                                stringResource(if (ui.hasProfile) R.string.parent_edit_hint else R.string.parent_create_hint),
-                                style = MaterialTheme.typography.titleMedium,
+                                stringResource(R.string.parent_phone_label, ui.accountPhone),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            Spacer(Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = ui.displayNameInput,
-                                onValueChange = viewModel::onDisplayNameChange,
-                                label = { Text(stringResource(R.string.parent_display_name_hint)) },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
+                        }
+                        AppLoadingButton(
+                            labelRes = if (ui.hasProfile) R.string.btn_save else R.string.parent_create,
+                            loading = ui.uiState == UiState.Loading,
+                            onClick = viewModel::save,
+                        )
+                        if (ui.savedMessageVisible) {
+                            Text(
+                                stringResource(R.string.parent_saved),
+                                color = MaterialTheme.colorScheme.primary,
+                                style = MaterialTheme.typography.bodySmall,
                             )
-                            Spacer(Modifier.height(4.dp))
-                            Text(ui.accountPhone, style = MaterialTheme.typography.bodyMedium)
-                            Spacer(Modifier.height(8.dp))
-                            AppLoadingButton(
-                                labelRes = if (ui.hasProfile) R.string.btn_save else R.string.parent_create,
-                                loading = ui.uiState == UiState.Loading,
-                                onClick = viewModel::save,
-                            )
-                            if (ui.savedMessageVisible) {
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    stringResource(R.string.parent_saved),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                            }
                         }
                     }
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(16.dp)) {
+
+                    SectionCard(
+                        title = stringResource(R.string.parent_face_title),
+                        subtitle = stringResource(R.string.parent_face_note),
+                    ) {
+                        Text(
+                            stringResource(
+                                if (ui.faceEnrolled) R.string.parent_face_enrolled
+                                else R.string.parent_face_not_enrolled,
+                            ),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (ui.faceEnrolled) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.error,
+                        )
+                        Button(onClick = onEnroll, modifier = Modifier.fillMaxWidth()) {
                             Text(
                                 stringResource(
-                                    if (ui.faceEnrolled) R.string.parent_face_enrolled
-                                    else R.string.parent_face_not_enrolled,
+                                    if (ui.faceEnrolled) R.string.parent_face_reenroll
+                                    else R.string.parent_face_placeholder,
                                 ),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = if (ui.faceEnrolled) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.error,
-                            )
-                            Spacer(Modifier.height(8.dp))
-                                                        OutlinedButton(onClick = onEnroll) {
-                                Text(stringResource(R.string.parent_face_placeholder))
-                            }
-                            Text(
-                                stringResource(R.string.parent_face_note),
-                                style = MaterialTheme.typography.bodySmall,
                             )
                         }
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun EmptyCard(text: String) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(text, style = MaterialTheme.typography.bodyLarge)
         }
     }
 }

@@ -46,6 +46,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uz.faceguard.app.R
+import uz.faceguard.app.core.embed.FaceEmbeddingModel
 import uz.faceguard.app.core.pipeline.FaceCaptureController
 import uz.faceguard.app.core.pipeline.FrameEvent
 import uz.faceguard.app.core.recognition.RecognitionResult
@@ -60,6 +61,7 @@ import uz.faceguard.app.domain.repository.ParentProfileRepository
 @HiltViewModel
 class RecognitionDebugViewModel @Inject constructor(
     private val recognizer: Recognizer,
+    private val embeddingModel: FaceEmbeddingModel,
     private val parentRepository: ParentProfileRepository,
     private val childRepository: ChildProfileRepository,
     private val accountRepository: AccountRepository,
@@ -69,6 +71,7 @@ class RecognitionDebugViewModel @Inject constructor(
 
     fun setController(value: FaceCaptureController) {
         controller = value
+        value.setEmbeddingModel(embeddingModel)
     }
 
     /** Starts preview + analysis and routes face frames into [onFrame]. */

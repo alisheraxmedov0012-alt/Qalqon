@@ -1,6 +1,8 @@
 package uz.faceguard.app.core.pipeline
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.media.Image
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
@@ -10,26 +12,33 @@ import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetector
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import java.util.concurrent.Executors
+import uz.faceguard.app.core.embed.FaceEmbeddingModel
+import uz.faceguard.app.core.embed.FaceFeatureExtractor
+import uz.faceguard.app.core.embed.FaceImageUtils
 import uz.faceguard.app.core.recognition.Recognizer
 
 /**
- * Runs the front camera + on-device face detection. Only frames with at least
- * one detected face are handed over to the callback. The embedding seam
- * (`FaceEmbeddable`) plugs in later without changing this controller.
+ * Runs the front camera + on-device face detection. Detected faces are handed
+ * to the configured embedding model (TFLite MobileFaceNet) when available;
+ * otherwise the frame falls back to the geometry extractor.
  */
 class FaceCaptureController(
     private val context: Context,
 ) {
-    // lifecycleOwner stays via a private setter to avoid constructor-binding on AndroidView use
     private var lifecycleOwner: LifecycleOwner? = null
     fun setLifecycleOwner(value: LifecycleOwner) { lifecycleOwner = value }
 
     private var recognizer: Recognizer? = null
     fun setRecognizer(value: Recognizer) { recognizer = value }
+
+    private var embeddingModel: FaceEmbeddingModel? = null
+    fun setEmbeddingModel(value: FaceEmbeddingModel) { embeddingModel = value }
+
     interface Callback {
         fun onFaceFrame(frame: FrameEvent)
     }
@@ -89,22 +98,52 @@ class FaceCaptureController(
     private fun buildAnalysis(callback: Callback?): ImageAnalysis =
         ImageAnalysis.Builder()
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
             .build()
             .also {
                 it.setAnalyzer(analysisExecutor) @ExperimentalGetImage { proxy ->
                     val mediaImage = proxy.image ?: run { proxy.close(); return@setAnalyzer }
-                    val input = InputImage.fromMediaImage(mediaImage, proxy.imageInfo.rotationDegrees)
+                    val rotationDegrees = proxy.imageInfo.rotationDegrees
+                    val bitmap = mediaImageToBitmap(mediaImage) ?: run { proxy.close(); return@setAnalyzer }
+                    proxy.close()
+
+                    val upright = FaceImageUtils.rotate(bitmap, rotationDegrees)
+                    val input = InputImage.fromBitmap(upright, 0)
+
                     // Only frames with at least one detected face are passed on.
                     detector.process(input).addOnSuccessListener { faces ->
                         if (faces.isNotEmpty()) {
-                            val frame = FrameEvent(image = input, faceCount = faces.size)
+                            val features = extractEmbedding(upright, faces.first())
+                            val frame = FrameEvent(image = input, faceCount = faces.size, features = features)
                             recognizer?.publish(frame)
                             callback?.onFaceFrame(frame)
                         }
-                        proxy.close()
-                    }.addOnFailureListener { proxy.close() }
+                    }.addOnFailureListener { }
                 }
             }
+
+    /** TFLite embedding when ready; geometry vector as the offline fallback. */
+    private fun extractEmbedding(bitmap: Bitmap, face: Face): FloatArray? {
+        val model = embeddingModel
+        if (model != null && model.isReady()) {
+            val crop = FaceImageUtils.cropFace(bitmap, face.boundingBox) ?: return null
+            val embedding = model.embed(crop)
+            if (embedding != null && embedding.isNotEmpty()) return embedding
+        }
+        return FaceFeatureExtractor.extract(face, bitmap.width, bitmap.height)
+    }
+
+    private fun mediaImageToBitmap(image: Image): Bitmap? {
+        val plane = image.planes.firstOrNull() ?: return null
+        val buffer = plane.buffer
+        val pixelStride = plane.pixelStride
+        val rowStride = plane.rowStride
+        val rowPadding = rowStride - pixelStride * image.width
+        val paddedWidth = image.width + rowPadding / pixelStride
+        val padded = Bitmap.createBitmap(paddedWidth, image.height, Bitmap.Config.ARGB_8888)
+        padded.copyPixelsFromBuffer(buffer)
+        return if (paddedWidth == image.width) padded else Bitmap.createBitmap(padded, 0, 0, image.width, image.height)
+    }
 
     fun stop() {
         cameraProviderFuture.addListener(

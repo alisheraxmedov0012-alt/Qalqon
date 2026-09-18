@@ -20,6 +20,8 @@ import uz.faceguard.app.data.repository.ResetRepositoryImpl
 import uz.faceguard.app.data.repository.ChildProfileRepositoryImpl
 import uz.faceguard.app.data.repository.ParentProfileRepositoryImpl
 import uz.faceguard.app.data.repository.ProtectedAppsRepositoryImpl
+import uz.faceguard.app.core.embed.FaceEmbeddingModel
+import uz.faceguard.app.core.embed.TfLiteMobileFaceNet
 import uz.faceguard.app.core.recognition.Recognizer
 import uz.faceguard.app.data.repository.SettingsRepositoryImpl
 import uz.faceguard.app.domain.repository.AccountRepository
@@ -103,4 +105,9 @@ object AppModule {
     @Provides
     @Singleton
     fun provideRecognizer(): Recognizer = Recognizer()
+
+    @Provides
+    @Singleton
+    fun provideFaceEmbeddingModel(@ApplicationContext context: Context): FaceEmbeddingModel =
+        TfLiteMobileFaceNet(context)
 }

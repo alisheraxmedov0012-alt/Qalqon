@@ -1,5 +1,6 @@
 package uz.faceguard.app.feature.enrollment
 
+import android.widget.Toast
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -62,8 +64,10 @@ const val SUBJECT_CHILD = "bola"
 
 /**
  * Runs faces through `FaceCaptureController` and persists metadata once all
- * four steps have captured. `FaceEmbeddable` collects the
- * accepted frames (later the ML kit embedding output).
+ * four steps have captured. `FaceEmbeddable` collects the accepted frames.
+ *
+ * Failures anywhere in the capture/embedding pipeline are surfaced through
+ * [errorMessage] (shown as a Toast) instead of crashing the app.
  */
 @HiltViewModel
 class FaceEnrollmentViewModel @Inject constructor(
@@ -88,48 +92,104 @@ class FaceEnrollmentViewModel @Inject constructor(
     private val _ui = MutableStateFlow(Ui())
     val ui: StateFlow<Ui> = _ui
 
+    /** Last failure text, surfaced as a Toast; cleared by [consumeError]. */
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage
+
     private val frames = mutableListOf<FrameEvent>()
-    
+
     var controller: FaceCaptureController? = null
         private set
 
-    fun setController(value: FaceCaptureController) { controller = value }
+    private var startedPreview: PreviewView? = null
+
+    fun setController(value: FaceCaptureController) {
+        controller = value
+        value.setErrorListener { reportError(it) }
+    }
 
     private var embeddable: FaceEmbeddable = MeanFaceEmbeddingCollector()
     fun setEmbeddable(value: FaceEmbeddable) { embeddable = value }
 
-    /** Starts preview + analysis and routes accepted frames into [onFrame]. */
+    /** Bound by the screen from navigation args before capture starts. */
+    var subject: String = SUBJECT_PARENT
+        internal set
+    var subjectId: Long = -1L
+        internal set
+
+    fun bindSubject(subject: String, subjectId: Long) {
+        this.subject = subject
+        this.subjectId = subjectId
+    }
+
+    /**
+     * Starts preview + analysis. Guarded so a PreviewView never starts the
+     * camera twice, which otherwise re-binds CameraX on every recomposition.
+     */
     fun startCamera(previewView: PreviewView) {
-        controller?.start(previewView, object : FaceCaptureController.Callback {
-            override fun onFaceFrame(frame: FrameEvent) = onFrame(frame)
-        })
+        if (startedPreview === previewView) return
+        val owned = controller
+        if (owned == null) {
+            reportError(IllegalStateException("camera controller is not ready"))
+            return
+        }
+        startedPreview = previewView
+        try {
+            owned.start(previewView, object : FaceCaptureController.Callback {
+                override fun onFaceFrame(frame: FrameEvent) = onFrame(frame)
+            })
+        } catch (t: Throwable) {
+            reportError(t)
+        }
+    }
+
+    fun stopCamera() {
+        startedPreview = null
+        try {
+            controller?.stop()
+        } catch (t: Throwable) {
+            reportError(t)
+        }
     }
 
     fun onFrame(frame: FrameEvent) {
-        if (_ui.value.phase != Phase.CAPTURING) return
-        frames.add(frame)
-        val collected = frames.size
-        val needed = (_ui.value.stepIndex + 1).coerceAtLeast(1) * 3 /* arbitrary multiple */
-        if (collected >= needed) advance()
-        _ui.update { it.copy(collected = collected) }
+        try {
+            if (_ui.value.phase != Phase.CAPTURING) return
+            frames.add(frame)
+            val collected = frames.size
+            val needed = (_ui.value.stepIndex + 1).coerceAtLeast(1) * 3 /* arbitrary multiple */
+            if (collected >= needed) advance()
+            _ui.update { it.copy(collected = collected) }
+        } catch (t: Throwable) {
+            reportError(t)
+        }
     }
 
     fun advance() {
         val next = _ui.value.stepIndex + 1
         if (next >= EnrollmentSteps.size()) {
             viewModelScope.launch {
-                val template = embeddable.collect(frames)
-                if (template.isNotEmpty()) {
-                    // parent enrollment keys off the account id, not the nav arg
-                    val accountId = accountRepository.getCurrentAccount()?.id
-                    when (subject) {
-                        SUBJECT_PARENT -> accountId?.let { parentRepository.saveFaceEnrollment(it, template) }
-                        SUBJECT_CHILD -> if (subjectId > 0) accountId?.let { childRepository.saveFaceEnrollment(it, subjectId, template) }
-                        else -> Unit
+                try {
+                    val template = embeddable.collect(frames)
+                    if (template.isNotEmpty()) {
+                        // parent enrollment keys off the account id, not the nav arg
+                        val accountId = accountRepository.getCurrentAccount()?.id
+                        when (subject) {
+                            SUBJECT_PARENT -> accountId?.let { parentRepository.saveFaceEnrollment(it, template) }
+                            SUBJECT_CHILD -> if (subjectId > 0) {
+                                accountId?.let { childRepository.saveFaceEnrollment(it, subjectId, template) }
+                            }
+                            else -> Unit
+                        }
+                        frames.clear()
+                        _ui.update {
+                            it.copy(phase = Phase.SAVED, template = template, stepIndex = EnrollmentSteps.size())
+                        }
+                    } else {
+                        _ui.update { it.copy(phase = Phase.FAILED, errorRes = R.string.enroll_failure_message) }
                     }
-                    frames.clear()
-                    _ui.update { it.copy(phase = Phase.SAVED, template = template, stepIndex = EnrollmentSteps.size()) }
-                } else {
+                } catch (t: Throwable) {
+                    reportError(t)
                     _ui.update { it.copy(phase = Phase.FAILED, errorRes = R.string.enroll_failure_message) }
                 }
             }
@@ -138,14 +198,21 @@ class FaceEnrollmentViewModel @Inject constructor(
         }
     }
 
-    fun restart() = _ui.update { it.copy(phase = Phase.CAPTURING, stepIndex = 0, collected = 0, template = null, errorRes = null) }
+    fun restart() = _ui.update {
+        it.copy(phase = Phase.CAPTURING, stepIndex = 0, collected = 0, template = null, errorRes = null)
+    }
+
     fun cancel() = _ui.update { it.copy(phase = Phase.CANCELED) }
 
-    /** Bound by the screen from navigation args before capture starts. */
-    var subject: String = SUBJECT_PARENT
-        internal set
-    var subjectId: Long = -1L
-        internal set
+    fun consumeError() {
+        _errorMessage.value = null
+    }
+
+    /** Surfaces a failure to the UI instead of letting it reach the crash handler. */
+    fun reportError(error: Throwable) {
+        val detail = error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName
+        _errorMessage.value = detail
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
@@ -160,19 +227,29 @@ fun FaceEnrollmentScreen(
     val cameraPermission: PermissionState = rememberPermissionState(android.Manifest.permission.CAMERA)
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
+
+    LaunchedEffect(errorMessage) {
+        val detail = errorMessage ?: return@LaunchedEffect
+        Toast.makeText(context, context.getString(R.string.error_generic, detail), Toast.LENGTH_LONG).show()
+        viewModel.consumeError()
+    }
 
     DisposableEffect(cameraPermission.status.isGranted) {
         if (cameraPermission.status.isGranted) {
-            viewModel.subject = subject
-            viewModel.subjectId = childId
-            val owned = FaceCaptureController(context)
-            owned.setLifecycleOwner(lifecycleOwner)
-            owned.setRecognizer(viewModel.recognizer)
-            owned.setEmbeddingModel(viewModel.embeddingModel)
-            viewModel.setController(owned)
-            viewModel.setEmbeddable(MeanFaceEmbeddingCollector())
+            try {
+                viewModel.bindSubject(subject, childId)
+                val owned = FaceCaptureController(context)
+                owned.setLifecycleOwner(lifecycleOwner)
+                owned.setRecognizer(viewModel.recognizer)
+                owned.setEmbeddingModel(viewModel.embeddingModel)
+                viewModel.setController(owned)
+                viewModel.setEmbeddable(MeanFaceEmbeddingCollector())
+            } catch (t: Throwable) {
+                viewModel.reportError(t)
+            }
         }
-        onDispose { viewModel.controller?.stop() }
+        onDispose { viewModel.stopCamera() }
     }
 
     ScreenHeader(
@@ -213,7 +290,10 @@ private fun ScreenHeader(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                stringResource(if (subjectLabel == SUBJECT_PARENT) R.string.enroll_parent_hint else R.string.enroll_child_hint),
+                stringResource(
+                    if (subjectLabel == SUBJECT_PARENT) R.string.enroll_parent_hint
+                    else R.string.enroll_child_hint,
+                ),
                 style = MaterialTheme.typography.bodyMedium,
             )
             if (!permission.status.isGranted) {
@@ -263,7 +343,10 @@ private fun PreviewCard(viewModel: FaceEnrollmentViewModel, ui: FaceEnrollmentVi
         }
         Spacer(Modifier.height(4.dp))
         LinearProgressIndicator(
-            progress = { if (ui.phase == FaceEnrollmentViewModel.Phase.SAVED) 1f else (ui.stepIndex / EnrollmentSteps.size()).toFloat() },
+            progress = {
+                if (ui.phase == FaceEnrollmentViewModel.Phase.SAVED) 1f
+                else (ui.stepIndex.toFloat() / EnrollmentSteps.size().toFloat())
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(4.dp),
@@ -272,7 +355,7 @@ private fun PreviewCard(viewModel: FaceEnrollmentViewModel, ui: FaceEnrollmentVi
         Text(
             when (ui.phase) {
                 FaceEnrollmentViewModel.Phase.CAPTURING -> {
-                    val step = ui.stepIndex
+                    val step = ui.stepIndex.coerceIn(0, EnrollmentSteps.size() - 1)
                     stringResource(EnrollmentSteps.stepRes(step))
                 }
                 FaceEnrollmentViewModel.Phase.CANCELED -> stringResource(R.string.enroll_canceled_message)

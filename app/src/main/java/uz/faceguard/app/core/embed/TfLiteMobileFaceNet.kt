@@ -2,6 +2,7 @@ package uz.faceguard.app.core.embed
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.util.Log
 import org.tensorflow.lite.Interpreter
 import java.io.FileInputStream
 import java.nio.ByteBuffer
@@ -11,8 +12,9 @@ import java.nio.channels.FileChannel
 
 /**
  * Loads a MobileFaceNet `.tflite` model from assets and runs on-device
- * embedding inference. If the model is missing or fails to load, [isReady]
- * returns false and callers fall back to the geometry extractor.
+ * embedding inference. If the model is missing, corrupt, or the native TFLite
+ * runtime is unavailable, construction still succeeds: [isReady] returns false
+ * and callers fall back to the geometry extractor instead of crashing.
  *
  * Expected asset path: `assets/models/mobile_face_net.tflite`.
  */
@@ -22,22 +24,22 @@ class TfLiteMobileFaceNet(
     override val config: FaceEmbeddingConfig = FaceEmbeddingConfig(),
 ) : FaceEmbeddingModel {
 
+    /** Human-readable reason the model is unavailable, or null when it loaded. */
+    var loadError: String? = null
+        private set
+
     private val interpreter: Interpreter? = loadModel(context, modelAssetPath)
 
     /** Model input is NHWC; batch may be larger than 1 (the bundled model uses 2). */
-    private val inputShape: IntArray = interpreter
-        ?.getInputTensor(0)
-        ?.shape()
-        ?.takeIf { it.size == 4 }
+    private val inputShape: IntArray = interpreter?.let { readShape(it, input = true) }
         ?: intArrayOf(DEFAULT_BATCH, config.inputHeight, config.inputWidth, config.inputChannels)
 
-    private val batchSize: Int = inputShape[0].coerceAtLeast(1)
-    private val inputHeight: Int = inputShape[1].coerceAtLeast(1)
-    private val inputWidth: Int = inputShape[2].coerceAtLeast(1)
+    private val batchSize: Int = inputShape.getOrElse(0) { 1 }.coerceAtLeast(1)
+    private val inputHeight: Int = inputShape.getOrElse(1) { config.inputHeight }.coerceAtLeast(1)
+    private val inputWidth: Int = inputShape.getOrElse(2) { config.inputWidth }.coerceAtLeast(1)
 
     private val outputSize: Int = interpreter
-        ?.getOutputTensor(0)
-        ?.shape()
+        ?.let { readShape(it, input = false) }
         ?.lastOrNull()
         ?.takeIf { it > 0 }
         ?: DEFAULT_EMBEDDING_SIZE
@@ -48,15 +50,25 @@ class TfLiteMobileFaceNet(
 
     override fun embed(faceBitmap: Bitmap): FloatArray? {
         val model = interpreter ?: return null
-        val input = prepareInput(faceBitmap) ?: return null
-        val output = Array(batchSize) { FloatArray(outputSize) }
         return try {
+            val input = prepareInput(faceBitmap) ?: return null
+            val output = Array(batchSize) { FloatArray(outputSize) }
             model.run(input, output)
             l2Normalize(output.first())
             output.first()
-        } catch (_: Exception) {
+        } catch (t: Throwable) {
+            Log.w(TAG, "embedding inference failed", t)
+            loadError = describe(t)
             null
         }
+    }
+
+    private fun readShape(model: Interpreter, input: Boolean): IntArray? = try {
+        (if (input) model.getInputTensor(0) else model.getOutputTensor(0)).shape()
+    } catch (t: Throwable) {
+        Log.w(TAG, "tensor shape read failed", t)
+        loadError = describe(t)
+        null
     }
 
     private fun prepareInput(bitmap: Bitmap): ByteBuffer? {
@@ -106,12 +118,20 @@ class TfLiteMobileFaceNet(
                     Interpreter(buffer)
                 }
             }
-        } catch (_: Exception) {
+        } catch (t: Throwable) {
+            // Catches Errors too: a missing/corrupt native TFLite library must
+            // degrade to the geometry fallback, not crash the process.
+            Log.w(TAG, "MobileFaceNet model unavailable: $path", t)
+            loadError = describe(t)
             null
         }
     }
 
+    private fun describe(t: Throwable): String =
+        t.message?.takeIf { it.isNotBlank() } ?: t.javaClass.simpleName
+
     private companion object {
+        const val TAG = "TfLiteMobileFaceNet"
         const val DEFAULT_ASSET_PATH = "models/mobile_face_net.tflite"
         const val DEFAULT_EMBEDDING_SIZE = 192
         const val DEFAULT_BATCH = 1

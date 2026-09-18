@@ -1,5 +1,6 @@
 package uz.faceguard.app.feature.parent
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,8 +19,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -62,24 +65,33 @@ class ParentProfileViewModel @Inject constructor(
     private val _ui = MutableStateFlow(ParentProfileUiState(uiState = UiState.Loading))
     val ui: StateFlow<ParentProfileUiState> = _ui
 
+    /** Last failure text, surfaced as a Toast; cleared by [consumeError]. */
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage
+
     init {
         viewModelScope.launch {
-            val account = accountRepository.getCurrentAccount()
-            if (account == null) {
-                _ui.update { it.copy(uiState = UiState.Error(R.string.error_invalid_credentials)) }
-            } else {
-                _ui.update { it.copy(accountId = account.id, accountPhone = account.phoneNumber) }
-                parentProfileRepository.observe(account.id).collect { profile ->
-                    val current = _ui.value
-                    _ui.update {
-                        it.copy(
-                            uiState = UiState.Success,
-                            profile = profile,
-                            displayNameInput = current.displayNameInput.ifBlank { profile?.displayName ?: "" },
-                            faceEnrolled = profile?.isFaceEnrolled ?: false,
-                        )
+            try {
+                val account = accountRepository.getCurrentAccount()
+                if (account == null) {
+                    _ui.update { it.copy(uiState = UiState.Error(R.string.error_invalid_credentials)) }
+                } else {
+                    _ui.update { it.copy(accountId = account.id, accountPhone = account.phoneNumber) }
+                    parentProfileRepository.observe(account.id).collect { profile ->
+                        val current = _ui.value
+                        _ui.update {
+                            it.copy(
+                                uiState = UiState.Success,
+                                profile = profile,
+                                displayNameInput = current.displayNameInput.ifBlank { profile?.displayName ?: "" },
+                                faceEnrolled = profile?.isFaceEnrolled ?: false,
+                            )
+                        }
                     }
                 }
+            } catch (t: Throwable) {
+                reportError(t)
+                _ui.update { it.copy(uiState = UiState.Error(R.string.error_invalid_credentials)) }
             }
         }
     }
@@ -93,13 +105,27 @@ class ParentProfileViewModel @Inject constructor(
         val name = _ui.value.displayNameInput.trim()
         if (name.isEmpty()) return
         viewModelScope.launch {
-            if (_ui.value.profile == null) {
-                parentProfileRepository.createIfMissing(accountId, name)
-            } else {
-                parentProfileRepository.updateDisplayName(accountId, name)
+            try {
+                if (_ui.value.profile == null) {
+                    parentProfileRepository.createIfMissing(accountId, name)
+                } else {
+                    parentProfileRepository.updateDisplayName(accountId, name)
+                }
+                _ui.update { it.copy(savedMessageVisible = true) }
+            } catch (t: Throwable) {
+                reportError(t)
             }
-            _ui.update { it.copy(savedMessageVisible = true) }
         }
+    }
+
+    fun consumeError() {
+        _errorMessage.value = null
+    }
+
+    /** Surfaces a failure to the UI instead of letting it reach the crash handler. */
+    fun reportError(error: Throwable) {
+        val detail = error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName
+        _errorMessage.value = detail
     }
 }
 
@@ -111,6 +137,14 @@ fun ParentProfileScreen(
     viewModel: ParentProfileViewModel = hiltViewModel(),
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
+
+    LaunchedEffect(errorMessage) {
+        val detail = errorMessage ?: return@LaunchedEffect
+        Toast.makeText(context, context.getString(R.string.error_generic, detail), Toast.LENGTH_LONG).show()
+        viewModel.consumeError()
+    }
 
     Scaffold(
         topBar = {
@@ -187,7 +221,16 @@ fun ParentProfileScreen(
                             color = if (ui.faceEnrolled) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.error,
                         )
-                        Button(onClick = onEnroll, modifier = Modifier.fillMaxWidth()) {
+                        Button(
+                            onClick = {
+                                try {
+                                    onEnroll()
+                                } catch (t: Throwable) {
+                                    viewModel.reportError(t)
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
                             Text(
                                 stringResource(
                                     if (ui.faceEnrolled) R.string.parent_face_reenroll

@@ -68,6 +68,7 @@ class RecognitionDebugViewModel @Inject constructor(
 ) : ViewModel() {
 
     private var controller: FaceCaptureController? = null
+    private var startedPreview: PreviewView? = null
 
     fun setController(value: FaceCaptureController) {
         controller = value
@@ -76,9 +77,16 @@ class RecognitionDebugViewModel @Inject constructor(
 
     /** Starts preview + analysis and routes face frames into [onFrame]. */
     fun startCamera(previewView: PreviewView) {
-        controller?.start(previewView, object : FaceCaptureController.Callback {
-            override fun onFaceFrame(frame: FrameEvent) = onFrame(frame)
-        })
+        if (startedPreview === previewView) return
+        val owned = controller ?: return
+        startedPreview = previewView
+        try {
+            owned.start(previewView, object : FaceCaptureController.Callback {
+                override fun onFaceFrame(frame: FrameEvent) = onFrame(frame)
+            })
+        } catch (_: Throwable) {
+            // a camera failure must not take the diagnostics screen down
+        }
     } 
 
     data class Ui(
@@ -93,11 +101,15 @@ class RecognitionDebugViewModel @Inject constructor(
 
     fun onFrame(frame: FrameEvent) {
         viewModelScope.launch {
-            val account = accountRepository.getCurrentAccount() ?: return@launch
-            val parent = parentRepository.observe(account.id).first() ?: return@launch
-            val children = childRepository.observeChildren(account.id).first()
-            val result = recognizer.evaluate(frame, parent, children)
-            _ui.update { it.copy(account = account, parent = parent, children = children, lastResult = result) }
+            try {
+                val account = accountRepository.getCurrentAccount() ?: return@launch
+                val parent = parentRepository.observe(account.id).first() ?: return@launch
+                val children = childRepository.observeChildren(account.id).first()
+                val result = recognizer.evaluate(frame, parent, children)
+                _ui.update { it.copy(account = account, parent = parent, children = children, lastResult = result) }
+            } catch (_: Throwable) {
+                // diagnostics must never crash the app
+            }
         }
     }
 

@@ -269,4 +269,5 @@
     <string name="settings_unknown_policy_hint">Что делать, если Qalqon видит незнакомое лицо.</string>
     <string name="settings_no_face_policy_hint">Что делать, если камера не видит лицо.</string>
     <string name="settings_low_battery_hint">Замедляет проверку при низком заряде батареи.</string>
+    <string name="error_generic">Ошибка: %1$s</string>
 </resources>

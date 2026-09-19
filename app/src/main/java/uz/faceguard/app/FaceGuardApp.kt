@@ -1,6 +1,8 @@
 package uz.faceguard.app
 
 import android.app.Application
+import androidx.camera.camera2.Camera2Config
+import androidx.camera.core.CameraXConfig
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 import uz.faceguard.app.core.protection.ProtectionRuntime
@@ -12,10 +14,19 @@ import uz.faceguard.app.core.protection.ProtectionRuntime
  * here and is activated by the persisted `protectionEnabled` setting.
  */
 @HiltAndroidApp
-class FaceGuardApp : Application() {
+class FaceGuardApp : Application(), CameraXConfig.Provider {
 
     @Inject
     lateinit var protectionRuntime: ProtectionRuntime
+
+    /**
+     * CameraX requires a configured [CameraXConfig.Provider]; without one,
+     * `ProcessCameraProvider` throws "CameraX is not configured properly".
+     * [Camera2Config] comes from the `camera-camera2` dependency that backs the
+     * front-camera capture, and declaring it here makes the configuration
+     * explicit instead of relying on manifest meta-data merging.
+     */
+    override fun getCameraXConfig(): CameraXConfig = Camera2Config.defaultConfig()
 
     override fun onCreate() {
         super.onCreate()

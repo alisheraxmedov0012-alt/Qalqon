@@ -69,15 +69,24 @@ class RecognitionDebugViewModel @Inject constructor(
 
     private var controller: FaceCaptureController? = null
     private var startedPreview: PreviewView? = null
+    private var pendingPreview: PreviewView? = null
 
     fun setController(value: FaceCaptureController) {
         controller = value
         value.setEmbeddingModel(embeddingModel)
+        // AndroidView's update lambda runs before DisposableEffect, so the
+        // preview may arrive before the controller exists.
+        pendingPreview?.let { attach(it, force = true) }
     }
 
     /** Starts preview + analysis and routes face frames into [onFrame]. */
     fun startCamera(previewView: PreviewView) {
-        if (startedPreview === previewView) return
+        pendingPreview = previewView
+        attach(previewView, force = false)
+    }
+
+    private fun attach(previewView: PreviewView, force: Boolean) {
+        if (!force && startedPreview === previewView) return
         val owned = controller ?: return
         startedPreview = previewView
         try {

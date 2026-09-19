@@ -2,6 +2,7 @@ package uz.faceguard.app.core.pipeline
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Rect
 import android.media.Image
 import android.util.Log
 import androidx.camera.core.CameraSelector
@@ -139,20 +140,21 @@ class FaceCaptureController(
                         val input = InputImage.fromBitmap(upright, 0)
                         val faceDetector = detector ?: return@setAnalyzer
 
-                        // Only frames with at least one detected face are passed on.
+                        // Every analyzed frame is forwarded (even with no face)
+                        // so the UI can show live guidance.
                         faceDetector.process(input)
                             .addOnSuccessListener { faces ->
                                 try {
-                                    if (faces.isNotEmpty()) {
-                                        val features = extractEmbedding(upright, faces.first())
-                                        val frame = FrameEvent(
-                                            image = input,
-                                            faceCount = faces.size,
-                                            features = features,
-                                        )
-                                        recognizer?.publish(frame)
-                                        callback?.onFaceFrame(frame)
-                                    }
+                                    val primary = faces.firstOrNull()
+                                    val features = primary?.let { extractEmbedding(upright, it) }
+                                    val frame = FrameEvent(
+                                        image = input,
+                                        faceCount = faces.size,
+                                        features = features,
+                                        quality = buildQuality(faces, primary, upright),
+                                    )
+                                    recognizer?.publish(frame)
+                                    callback?.onFaceFrame(frame)
                                 } catch (t: Throwable) {
                                     reportError(t)
                                 }
@@ -181,6 +183,48 @@ class FaceCaptureController(
             reportError(t)
         }
         return runCatching { FaceFeatureExtractor.extract(face, bitmap.width, bitmap.height) }.getOrNull()
+    }
+
+    /** Live face metrics for enrollment guidance. */
+    private fun buildQuality(faces: List<Face>, primary: Face?, bitmap: Bitmap): FaceQuality {
+        if (primary == null) return FaceQuality(faceCount = 0)
+        val box = primary.boundingBox
+        val widthRatio = if (bitmap.width > 0) box.width().toFloat() / bitmap.width.toFloat() else 0f
+        return FaceQuality(
+            faceCount = faces.size,
+            headEulerAngleY = primary.headEulerAngleY,
+            headEulerAngleZ = primary.headEulerAngleZ,
+            faceWidthRatio = widthRatio,
+            brightness = averageLuminance(bitmap, box),
+        )
+    }
+
+    /** Average luminance (0..1) of the face region; sampled for speed. */
+    private fun averageLuminance(bitmap: Bitmap, box: Rect): Float {
+        val left = box.left.coerceIn(0, bitmap.width - 1)
+        val top = box.top.coerceIn(0, bitmap.height - 1)
+        val right = box.right.coerceIn(left + 1, bitmap.width)
+        val bottom = box.bottom.coerceIn(top + 1, bitmap.height)
+        val width = right - left
+        val height = bottom - top
+        if (width <= 0 || height <= 0) return 0f
+
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, left, top, width, height)
+
+        var sum = 0.0
+        var samples = 0
+        var i = 0
+        while (i < pixels.size) {
+            val pixel = pixels[i]
+            val r = (pixel shr 16) and 0xFF
+            val g = (pixel shr 8) and 0xFF
+            val b = pixel and 0xFF
+            sum += (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
+            samples++
+            i += LUMINANCE_STRIDE
+        }
+        return if (samples == 0) 0f else (sum / samples).toFloat()
     }
 
     private fun mediaImageToBitmap(image: Image): Bitmap? {
@@ -223,5 +267,6 @@ class FaceCaptureController(
     private companion object {
         const val TAG = "FaceCaptureController"
         const val ERROR_THROTTLE_MS = 3_000L
+        const val LUMINANCE_STRIDE = 8
     }
 }

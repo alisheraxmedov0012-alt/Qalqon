@@ -93,12 +93,7 @@
     <string name="enroll_title">Регистрация лица</string>
     <string name="enroll_parent_hint">Регистрация лица для профиля родителя</string>
     <string name="enroll_child_hint">Регистрация лица для профиля ребёнка</string>
-    <string name="enroll_step_front">Смотрите прямо</string>
-    <string name="enroll_step_left">Смотрите влево</string>
-    <string name="enroll_step_right">Смотрите вправо</string>
-    <string name="enroll_step_up">Смотрите немного вверх</string>
-    <string name="enroll_step_placeholder">Подготовка этапа регистрации</string>
-    <string name="enroll_success_message">Лицо зарегистрировано</string>
+    <string name="enroll_success_message">Лицо успешно зарегистрировано</string>
     <string name="enroll_canceled_message">Регистрация отменена</string>
     <string name="enroll_failure_message">Не удалось зарегистрировать лицо; попробуйте ещё раз</string>
     <string name="btn_enroll_face">Зарегистрировать лицо</string>
@@ -270,4 +265,10 @@
     <string name="settings_no_face_policy_hint">Что делать, если камера не видит лицо.</string>
     <string name="settings_low_battery_hint">Замедляет проверку при низком заряде батареи.</string>
     <string name="error_generic">Ошибка: %1$s</string>
+    <string name="enroll_hint_no_face">Посмотрите в камеру</string>
+    <string name="enroll_hint_look_straight">Смотрите прямо</string>
+    <string name="enroll_hint_too_far">Подойдите ближе</string>
+    <string name="enroll_hint_too_dark">Перейдите в более светлое место</string>
+    <string name="enroll_hint_hold">Отлично, не двигайтесь...</string>
+    <string name="enroll_done">Готово</string>
 </resources>

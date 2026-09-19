@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -43,6 +44,7 @@ import com.google.accompanist.permissions.rememberPermissionState
 import com.google.accompanist.permissions.shouldShowRationale
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlin.math.abs
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -51,8 +53,8 @@ import uz.faceguard.app.R
 import uz.faceguard.app.core.embed.FaceEmbeddable
 import uz.faceguard.app.core.embed.FaceEmbeddingModel
 import uz.faceguard.app.core.embed.MeanFaceEmbeddingCollector
-import uz.faceguard.app.core.pipeline.EnrollmentSteps
 import uz.faceguard.app.core.pipeline.FaceCaptureController
+import uz.faceguard.app.core.pipeline.FaceQuality
 import uz.faceguard.app.core.pipeline.FrameEvent
 import uz.faceguard.app.core.recognition.Recognizer
 import uz.faceguard.app.domain.repository.AccountRepository
@@ -63,11 +65,12 @@ const val SUBJECT_PARENT = "ota-ona"
 const val SUBJECT_CHILD = "bola"
 
 /**
- * Runs faces through `FaceCaptureController` and persists metadata once all
- * four steps have captured. `FaceEmbeddable` collects the accepted frames.
+ * Guided, real-time face enrollment.
  *
- * Failures anywhere in the capture/embedding pipeline are surfaced through
- * [errorMessage] (shown as a Toast) instead of crashing the app.
+ * Frames are evaluated as they arrive: the UI shows a live hint (no face, look
+ * straight, too far, too dark, hold still) and a template is stored **only**
+ * once the face is present, well lit, close enough and held straight for
+ * [HOLD_DURATION_MS]. Nothing is saved merely because the camera opened.
  */
 @HiltViewModel
 class FaceEnrollmentViewModel @Inject constructor(
@@ -80,11 +83,13 @@ class FaceEnrollmentViewModel @Inject constructor(
 
     enum class Phase { IDLE, CAPTURING, SAVED, FAILED, CANCELED }
 
+    /** What the user should do right now. */
+    enum class Guidance { NO_FACE, TOO_DARK, TOO_FAR, LOOK_STRAIGHT, HOLDING }
+
     data class Ui(
         val phase: Phase = Phase.CAPTURING,
-        val stepIndex: Int = 0,
-        val collected: Int = 0,
-        val required: Int = EnrollmentSteps.size(),
+        val hintRes: Int = R.string.enroll_hint_no_face,
+        val holdProgress: Float = 0f,
         val template: String? = null,
         val errorRes: Int? = null,
     )
@@ -96,7 +101,10 @@ class FaceEnrollmentViewModel @Inject constructor(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage
 
-    private val frames = mutableListOf<FrameEvent>()
+    /** Kept small: only the tail of the steady window feeds the template. */
+    private val holdFrames = ArrayDeque<FrameEvent>()
+    private var holdStartedAt = 0L
+    private var finishing = false
 
     var controller: FaceCaptureController? = null
         private set
@@ -162,52 +170,86 @@ class FaceEnrollmentViewModel @Inject constructor(
 
     fun onFrame(frame: FrameEvent) {
         try {
-            if (_ui.value.phase != Phase.CAPTURING) return
-            frames.add(frame)
-            val collected = frames.size
-            val needed = (_ui.value.stepIndex + 1).coerceAtLeast(1) * 3 /* arbitrary multiple */
-            if (collected >= needed) advance()
-            _ui.update { it.copy(collected = collected) }
+            if (_ui.value.phase != Phase.CAPTURING || finishing) return
+
+            val guidance = guidanceFor(frame.quality)
+            if (guidance != Guidance.HOLDING) {
+                resetHold()
+                _ui.update { it.copy(hintRes = hintResFor(guidance), holdProgress = 0f) }
+                return
+            }
+
+            if (holdStartedAt == 0L) holdStartedAt = frame.timestamp
+            if (frame.features != null) {
+                holdFrames.addLast(frame)
+                while (holdFrames.size > MAX_TEMPLATE_FRAMES) holdFrames.removeFirst()
+            }
+
+            val elapsed = frame.timestamp - holdStartedAt
+            if (elapsed >= HOLD_DURATION_MS) {
+                finishCapture()
+            } else {
+                _ui.update {
+                    it.copy(
+                        hintRes = hintResFor(Guidance.HOLDING),
+                        holdProgress = (elapsed.toFloat() / HOLD_DURATION_MS).coerceIn(0f, 1f),
+                    )
+                }
+            }
         } catch (t: Throwable) {
             reportError(t)
         }
     }
 
-    fun advance() {
-        val next = _ui.value.stepIndex + 1
-        if (next >= EnrollmentSteps.size()) {
-            viewModelScope.launch {
-                try {
-                    val template = embeddable.collect(frames)
-                    if (template.isNotEmpty()) {
-                        // parent enrollment keys off the account id, not the nav arg
-                        val accountId = accountRepository.getCurrentAccount()?.id
-                        when (subject) {
-                            SUBJECT_PARENT -> accountId?.let { parentRepository.saveFaceEnrollment(it, template) }
-                            SUBJECT_CHILD -> if (subjectId > 0) {
-                                accountId?.let { childRepository.saveFaceEnrollment(it, subjectId, template) }
-                            }
-                            else -> Unit
-                        }
-                        frames.clear()
-                        _ui.update {
-                            it.copy(phase = Phase.SAVED, template = template, stepIndex = EnrollmentSteps.size())
-                        }
-                    } else {
-                        _ui.update { it.copy(phase = Phase.FAILED, errorRes = R.string.enroll_failure_message) }
-                    }
-                } catch (t: Throwable) {
-                    reportError(t)
-                    _ui.update { it.copy(phase = Phase.FAILED, errorRes = R.string.enroll_failure_message) }
+    /** Stores the template — only reached after a steady, well-positioned hold. */
+    private fun finishCapture() {
+        if (finishing) return
+        finishing = true
+        _ui.update { it.copy(hintRes = hintResFor(Guidance.HOLDING), holdProgress = 1f) }
+
+        val captured = holdFrames.toList()
+        viewModelScope.launch {
+            try {
+                val template = embeddable.collect(captured)
+                if (template.isEmpty()) {
+                    // Not enough usable frames: keep guiding instead of saving.
+                    finishing = false
+                    resetHold()
+                    _ui.update { it.copy(hintRes = hintResFor(Guidance.NO_FACE), holdProgress = 0f) }
+                    return@launch
                 }
+
+                val accountId = accountRepository.getCurrentAccount()?.id
+                when (subject) {
+                    SUBJECT_PARENT -> accountId?.let { parentRepository.saveFaceEnrollment(it, template) }
+                    SUBJECT_CHILD -> if (subjectId > 0) {
+                        accountId?.let { childRepository.saveFaceEnrollment(it, subjectId, template) }
+                    }
+                    else -> Unit
+                }
+                resetHold()
+                _ui.update { it.copy(phase = Phase.SAVED, template = template, holdProgress = 1f) }
+            } catch (t: Throwable) {
+                finishing = false
+                resetHold()
+                reportError(t)
+                _ui.update { it.copy(phase = Phase.FAILED, errorRes = R.string.enroll_failure_message) }
             }
-        } else {
-            _ui.update { it.copy(stepIndex = next, collected = 0, phase = Phase.CAPTURING) }
         }
     }
 
-    fun restart() = _ui.update {
-        it.copy(phase = Phase.CAPTURING, stepIndex = 0, collected = 0, template = null, errorRes = null)
+    fun restart() {
+        finishing = false
+        resetHold()
+        _ui.update {
+            it.copy(
+                phase = Phase.CAPTURING,
+                hintRes = R.string.enroll_hint_no_face,
+                holdProgress = 0f,
+                template = null,
+                errorRes = null,
+            )
+        }
     }
 
     fun cancel() = _ui.update { it.copy(phase = Phase.CANCELED) }
@@ -220,6 +262,40 @@ class FaceEnrollmentViewModel @Inject constructor(
     fun reportError(error: Throwable) {
         val detail = error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName
         _errorMessage.value = detail
+    }
+
+    private fun resetHold() {
+        holdStartedAt = 0L
+        holdFrames.clear()
+    }
+
+    private fun guidanceFor(quality: FaceQuality?): Guidance {
+        if (quality == null || quality.faceCount == 0) return Guidance.NO_FACE
+        if (quality.brightness < MIN_BRIGHTNESS) return Guidance.TOO_DARK
+        if (quality.faceWidthRatio < MIN_FACE_WIDTH_RATIO) return Guidance.TOO_FAR
+        if (abs(quality.headEulerAngleY) > MAX_HEAD_EULER_Y ||
+            abs(quality.headEulerAngleZ) > MAX_HEAD_EULER_Z
+        ) {
+            return Guidance.LOOK_STRAIGHT
+        }
+        return Guidance.HOLDING
+    }
+
+    private fun hintResFor(guidance: Guidance): Int = when (guidance) {
+        Guidance.NO_FACE -> R.string.enroll_hint_no_face
+        Guidance.TOO_DARK -> R.string.enroll_hint_too_dark
+        Guidance.TOO_FAR -> R.string.enroll_hint_too_far
+        Guidance.LOOK_STRAIGHT -> R.string.enroll_hint_look_straight
+        Guidance.HOLDING -> R.string.enroll_hint_hold
+    }
+
+    private companion object {
+        const val HOLD_DURATION_MS = 1_000L
+        const val MAX_TEMPLATE_FRAMES = 3
+        const val MIN_FACE_WIDTH_RATIO = 0.22f
+        const val MAX_HEAD_EULER_Y = 12f
+        const val MAX_HEAD_EULER_Z = 12f
+        const val MIN_BRIGHTNESS = 0.22f
     }
 }
 
@@ -358,27 +434,20 @@ private fun PreviewCard(viewModel: FaceEnrollmentViewModel, ui: FaceEnrollmentVi
         }
         Spacer(Modifier.height(4.dp))
         LinearProgressIndicator(
-            progress = {
-                if (ui.phase == FaceEnrollmentViewModel.Phase.SAVED) 1f
-                else (ui.stepIndex.toFloat() / EnrollmentSteps.size().toFloat())
-            },
+            progress = { if (ui.phase == FaceEnrollmentViewModel.Phase.SAVED) 1f else ui.holdProgress },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(4.dp),
         )
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(8.dp))
         Text(
             when (ui.phase) {
-                FaceEnrollmentViewModel.Phase.CAPTURING -> {
-                    val step = ui.stepIndex.coerceIn(0, EnrollmentSteps.size() - 1)
-                    stringResource(EnrollmentSteps.stepRes(step))
-                }
+                FaceEnrollmentViewModel.Phase.SAVED -> stringResource(R.string.enroll_success_message)
                 FaceEnrollmentViewModel.Phase.CANCELED -> stringResource(R.string.enroll_canceled_message)
                 FaceEnrollmentViewModel.Phase.FAILED -> stringResource(R.string.enroll_failure_message)
-                FaceEnrollmentViewModel.Phase.SAVED -> stringResource(R.string.enroll_success_message)
-                else -> stringResource(R.string.enroll_step_placeholder)
+                else -> stringResource(ui.hintRes)
             },
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.titleLarge,
         )
     }
 }
@@ -389,7 +458,16 @@ private fun RemainingButtons(
     ui: FaceEnrollmentViewModel.Ui,
     onBack: () -> Unit,
 ) {
-    Row {
+    if (ui.phase == FaceEnrollmentViewModel.Phase.SAVED) {
+        Button(
+            onClick = onBack,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.enroll_done))
+        }
+        return
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton(
             onClick = { viewModel.restart() },
             modifier = Modifier.weight(1f),

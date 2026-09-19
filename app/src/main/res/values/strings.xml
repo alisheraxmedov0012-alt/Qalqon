@@ -94,12 +94,7 @@
     <string name="enroll_title">Yuzni ro\'yxatga olish</string>
     <string name="enroll_parent_hint">Ota-ona profili uchun yuzni ro\'yxatga oling</string>
     <string name="enroll_child_hint">Bola profili uchun yuzni ro\'yxatga oling</string>
-    <string name="enroll_step_front">To\'g\'riga qarang</string>
-    <string name="enroll_step_left">Chapga qarang</string>
-    <string name="enroll_step_right">O\'ngga qarang</string>
-    <string name="enroll_step_up">Biroz yuqoriga qarang</string>
-    <string name="enroll_step_placeholder">Yuzni tayyorgarlik bosqichi</string>
-    <string name="enroll_success_message">Yuz ro\'yxatdan o\'tdi</string>
+    <string name="enroll_success_message">Yuz muvaffaqiyatli ro\'yxatdan o\'tdi</string>
     <string name="enroll_canceled_message">Ro\'yxat bekor qilindi</string>
     <string name="enroll_failure_message">Yuzni urinib bo\'lmagan; yana urinib ko\'ring</string>
     <string name="btn_enroll_face">Yuzni ro\'yxatga olish</string>
@@ -271,4 +266,10 @@
     <string name="settings_no_face_policy_hint">Kamera yuzni ko\'rmasa nima qilishini tanlaydi.</string>
     <string name="settings_low_battery_hint">Batareya kam bo\'lganda tekshirishni sekinlashtiradi.</string>
     <string name="error_generic">Xatolik: %1$s</string>
+    <string name="enroll_hint_no_face">Yuzingizni kameraga qarating</string>
+    <string name="enroll_hint_look_straight">To\'g\'riga qarang</string>
+    <string name="enroll_hint_too_far">Yaqinroq keling</string>
+    <string name="enroll_hint_too_dark">Yorug\'roq joyga o\'ting</string>
+    <string name="enroll_hint_hold">Juda yaxshi, qimirlamay turing...</string>
+    <string name="enroll_done">Tayyor</string>
 </resources>

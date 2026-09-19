@@ -93,12 +93,7 @@
     <string name="enroll_title">Enroll face</string>
     <string name="enroll_parent_hint">Enroll a face for the parent profile</string>
     <string name="enroll_child_hint">Enroll a face for the child profile</string>
-    <string name="enroll_step_front">Look straight</string>
-    <string name="enroll_step_left">Look left</string>
-    <string name="enroll_step_right">Look right</string>
-    <string name="enroll_step_up">Look slightly up</string>
-    <string name="enroll_step_placeholder">Preparing the face enrollment step</string>
-    <string name="enroll_success_message">Face enrolled</string>
+    <string name="enroll_success_message">Face enrolled successfully</string>
     <string name="enroll_canceled_message">Enrollment canceled</string>
     <string name="enroll_failure_message">Face enrollment failed; try again</string>
     <string name="btn_enroll_face">Enroll face</string>
@@ -270,4 +265,10 @@
     <string name="settings_no_face_policy_hint">What Qalqon does when the camera sees no face.</string>
     <string name="settings_low_battery_hint">Slows checking down when the battery is low.</string>
     <string name="error_generic">Error: %1$s</string>
+    <string name="enroll_hint_no_face">Look at the camera</string>
+    <string name="enroll_hint_look_straight">Look straight</string>
+    <string name="enroll_hint_too_far">Come a bit closer</string>
+    <string name="enroll_hint_too_dark">Move to a brighter place</string>
+    <string name="enroll_hint_hold">Great, hold still...</string>
+    <string name="enroll_done">Done</string>
 </resources>

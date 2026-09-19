@@ -111,6 +111,11 @@ class RecognitionDebugViewModel @Inject constructor(
     fun onFrame(frame: FrameEvent) {
         viewModelScope.launch {
             try {
+                // No-face frames now arrive too; avoid a DB round-trip for them.
+                if (frame.features == null) {
+                    _ui.update { it.copy(lastResult = RecognitionResult.NoFace) }
+                    return@launch
+                }
                 val account = accountRepository.getCurrentAccount() ?: return@launch
                 val parent = parentRepository.observe(account.id).first() ?: return@launch
                 val children = childRepository.observeChildren(account.id).first()

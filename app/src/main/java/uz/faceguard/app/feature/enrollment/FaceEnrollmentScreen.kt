@@ -102,10 +102,15 @@ class FaceEnrollmentViewModel @Inject constructor(
         private set
 
     private var startedPreview: PreviewView? = null
+    private var pendingPreview: PreviewView? = null
 
     fun setController(value: FaceCaptureController) {
         controller = value
         value.setErrorListener { reportError(it) }
+        // Compose runs AndroidView's update lambda (which reports the preview)
+        // before DisposableEffect creates this controller, so the preview can
+        // arrive first. Attach it now that the controller exists.
+        pendingPreview?.let { attach(it, force = true) }
     }
 
     private var embeddable: FaceEmbeddable = MeanFaceEmbeddingCollector()
@@ -123,16 +128,18 @@ class FaceEnrollmentViewModel @Inject constructor(
     }
 
     /**
-     * Starts preview + analysis. Guarded so a PreviewView never starts the
-     * camera twice, which otherwise re-binds CameraX on every recomposition.
+     * Attaches the preview and starts the camera. Safe to call before the
+     * controller exists: the request is remembered and honoured by
+     * [setController], and a PreviewView never starts the camera twice.
      */
     fun startCamera(previewView: PreviewView) {
-        if (startedPreview === previewView) return
-        val owned = controller
-        if (owned == null) {
-            reportError(IllegalStateException("camera controller is not ready"))
-            return
-        }
+        pendingPreview = previewView
+        attach(previewView, force = false)
+    }
+
+    private fun attach(previewView: PreviewView, force: Boolean) {
+        if (!force && startedPreview === previewView) return
+        val owned = controller ?: return
         startedPreview = previewView
         try {
             owned.start(previewView, object : FaceCaptureController.Callback {
@@ -145,6 +152,7 @@ class FaceEnrollmentViewModel @Inject constructor(
 
     fun stopCamera() {
         startedPreview = null
+        pendingPreview = null
         try {
             controller?.stop()
         } catch (t: Throwable) {

@@ -335,7 +335,14 @@ private fun PreviewCard(viewModel: FaceEnrollmentViewModel, ui: FaceEnrollmentVi
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             AndroidView(
-                factory = { ctx -> PreviewView(ctx) },
+                factory = { ctx ->
+                    PreviewView(ctx).apply {
+                        // TextureView-based rendering composites correctly inside
+                        // Compose; the default SurfaceView mode shows up black.
+                        implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                        scaleType = PreviewView.ScaleType.FILL_CENTER
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(260.dp),

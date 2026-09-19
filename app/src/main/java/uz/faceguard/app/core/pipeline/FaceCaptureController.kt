@@ -73,12 +73,26 @@ class FaceCaptureController(
         cameraProviderFuture.addListener({
             try {
                 val provider = cameraProviderFuture.get()
+
+                // SurfaceView (PERFORMANCE) does not composite correctly inside
+                // Compose, especially under an elevated Card, and shows a black
+                // preview. TextureView (COMPATIBLE) renders reliably.
+                previewView.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                previewView.scaleType = PreviewView.ScaleType.FILL_CENTER
+
+                // Release any existing use cases before re-binding.
+                provider.unbindAll()
+
+                val owner = lifecycleOwner
+                if (owner == null) {
+                    reportError(IllegalStateException("LifecycleOwner is not attached"))
+                    return@addListener
+                }
+
                 val preview = Preview.Builder().build().also {
                     it.setSurfaceProvider(previewView.surfaceProvider)
                 }
                 val analysis = buildAnalysis(callback)
-                provider.unbindAll()
-                val owner = lifecycleOwner ?: return@addListener
                 provider.bindToLifecycle(owner, CameraSelector.DEFAULT_FRONT_CAMERA, preview, analysis)
             } catch (t: Throwable) {
                 reportError(t)
@@ -94,9 +108,13 @@ class FaceCaptureController(
         cameraProviderFuture.addListener({
             try {
                 val provider = cameraProviderFuture.get()
-                val analysis = buildAnalysis(null)
                 provider.unbindAll()
-                val owner = lifecycleOwner ?: return@addListener
+                val owner = lifecycleOwner
+                if (owner == null) {
+                    reportError(IllegalStateException("LifecycleOwner is not attached"))
+                    return@addListener
+                }
+                val analysis = buildAnalysis(null)
                 provider.bindToLifecycle(owner, CameraSelector.DEFAULT_FRONT_CAMERA, analysis)
             } catch (t: Throwable) {
                 reportError(t)

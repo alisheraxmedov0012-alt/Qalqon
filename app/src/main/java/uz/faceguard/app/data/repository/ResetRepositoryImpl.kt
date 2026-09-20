@@ -20,6 +20,7 @@ class ResetRepositoryImpl @Inject constructor(
 
     override suspend fun resetAll() {
         db.activityEventDao().deleteAll()
+        db.childAppPolicyDao().deleteAll()
         db.protectedAppDao().deleteAll()
         db.childProfileDao().deleteAll()
         db.parentProfileDao().deleteAll()

@@ -76,3 +76,31 @@ data class ActivityEventEntity(
     val detail: String? = null,
     val at: Long = System.currentTimeMillis(),
 )
+
+/**
+ * Child-scoped app policy (ALLOW / LIMIT / BLOCK).
+ *
+ * Added in DB v4 without touching any existing table, so v3 user data survives
+ * the upgrade. Column order matches the constructor order because Room builds
+ * `CREATE TABLE` from it (see MIGRATION_3_4).
+ */
+@Entity(
+    tableName = "child_app_policies",
+    primaryKeys = ["accountId", "childId", "packageName"],
+    indices = [Index(value = ["accountId", "childId"])],
+)
+data class ChildAppPolicyEntity(
+    val accountId: Long,
+    val childId: Long,
+    val packageName: String,
+    /** AppPolicyMode.name: ALLOW / LIMIT / BLOCK */
+    val mode: String,
+    /** ProtectionAction.name */
+    val action: String,
+    val dailyLimitMinutes: Int? = null,
+    val activationDelayMs: Long = 0L,
+    val recoveryDelayMs: Long = 0L,
+    val enabled: Boolean = true,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+)

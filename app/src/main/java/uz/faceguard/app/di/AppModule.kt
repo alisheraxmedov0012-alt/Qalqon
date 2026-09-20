@@ -9,13 +9,16 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 import uz.faceguard.app.data.db.ActivityEventDao
+import uz.faceguard.app.data.db.ChildAppPolicyDao
 import uz.faceguard.app.data.db.ChildProfileDao
 import uz.faceguard.app.data.db.FaceGuardDatabase
+import uz.faceguard.app.data.db.MIGRATION_3_4
 import uz.faceguard.app.data.db.ParentProfileDao
 import uz.faceguard.app.data.db.ProtectedAppDao
 import uz.faceguard.app.data.db.UserAccountDao
 import uz.faceguard.app.data.repository.AccountRepositoryImpl
 import uz.faceguard.app.data.repository.ActivityLogRepositoryImpl
+import uz.faceguard.app.data.repository.ChildAppPolicyRepositoryImpl
 import uz.faceguard.app.data.repository.ResetRepositoryImpl
 import uz.faceguard.app.data.repository.ChildProfileRepositoryImpl
 import uz.faceguard.app.data.repository.ParentProfileRepositoryImpl
@@ -28,6 +31,7 @@ import uz.faceguard.app.domain.repository.AccountRepository
 import uz.faceguard.app.domain.repository.ActivityLogRepository
 import uz.faceguard.app.domain.repository.ResetRepository
 import uz.faceguard.app.domain.repository.ChildProfileRepository
+import uz.faceguard.app.domain.policy.ChildAppPolicyRepository
 import uz.faceguard.app.domain.repository.ParentProfileRepository
 import uz.faceguard.app.domain.repository.ProtectedAppsRepository
 import uz.faceguard.app.domain.repository.SettingsRepository
@@ -47,7 +51,7 @@ object AppModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): FaceGuardDatabase =
         Room.databaseBuilder(context, FaceGuardDatabase::class.java, "faceguard.db")
-            .fallbackToDestructiveMigration() // MVP only; add real migrations before release.
+            .addMigrations(MIGRATION_3_4) // additive v3 -> v4; keeps existing user data
             .build()
 
     @Provides fun provideUserAccountDao(db: FaceGuardDatabase): UserAccountDao = db.userAccountDao()
@@ -55,6 +59,7 @@ object AppModule {
     @Provides fun provideChildProfileDao(db: FaceGuardDatabase): ChildProfileDao = db.childProfileDao()
     @Provides fun provideProtectedAppDao(db: FaceGuardDatabase): ProtectedAppDao = db.protectedAppDao()
     @Provides fun provideActivityEventDao(db: FaceGuardDatabase): ActivityEventDao = db.activityEventDao()
+    @Provides fun provideChildAppPolicyDao(db: FaceGuardDatabase): ChildAppPolicyDao = db.childAppPolicyDao()
 
     @Provides
     @Singleton
@@ -67,6 +72,12 @@ object AppModule {
     @Provides
     @Singleton
     fun provideChildProfileRepository(impl: ChildProfileRepositoryImpl): ChildProfileRepository = impl
+
+    @Provides
+    @Singleton
+    fun provideChildAppPolicyRepository(
+        impl: ChildAppPolicyRepositoryImpl,
+    ): ChildAppPolicyRepository = impl
 
     @Provides
     @Singleton

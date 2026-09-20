@@ -115,3 +115,41 @@ interface ProtectedAppDao {
     @Query("DELETE FROM protected_apps")
     suspend fun deleteAll()
 }
+
+/**
+ * Child-scoped app policies. Keeps Room entities out of the domain layer —
+ * mapping to `AppPolicy` happens in the repository implementation.
+ */
+@Dao
+interface ChildAppPolicyDao {
+
+    @Query(
+        "SELECT * FROM child_app_policies WHERE accountId = :accountId AND childId = :childId " +
+            "ORDER BY packageName ASC",
+    )
+    fun observePolicies(accountId: Long, childId: Long): Flow<List<ChildAppPolicyEntity>>
+
+    @Query(
+        "SELECT * FROM child_app_policies WHERE accountId = :accountId AND childId = :childId " +
+            "AND packageName = :packageName LIMIT 1",
+    )
+    suspend fun getPolicy(accountId: Long, childId: Long, packageName: String): ChildAppPolicyEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(policy: ChildAppPolicyEntity)
+
+    @Query(
+        "DELETE FROM child_app_policies WHERE accountId = :accountId AND childId = :childId " +
+            "AND packageName = :packageName",
+    )
+    suspend fun delete(accountId: Long, childId: Long, packageName: String)
+
+    @Query("DELETE FROM child_app_policies WHERE accountId = :accountId AND childId = :childId")
+    suspend fun deleteForChild(accountId: Long, childId: Long)
+
+    @Query("DELETE FROM child_app_policies WHERE accountId = :accountId AND packageName = :packageName")
+    suspend fun deleteForApp(accountId: Long, packageName: String)
+
+    @Query("DELETE FROM child_app_policies")
+    suspend fun deleteAll()
+}

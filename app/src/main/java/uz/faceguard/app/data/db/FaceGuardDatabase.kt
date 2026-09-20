@@ -10,8 +10,9 @@ import androidx.room.RoomDatabase
         ChildProfileEntity::class,
         ProtectedAppEntity::class,
         ActivityEventEntity::class,
+        ChildAppPolicyEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class FaceGuardDatabase : RoomDatabase() {
@@ -20,4 +21,5 @@ abstract class FaceGuardDatabase : RoomDatabase() {
     abstract fun childProfileDao(): ChildProfileDao
     abstract fun protectedAppDao(): ProtectedAppDao
     abstract fun activityEventDao(): ActivityEventDao
+    abstract fun childAppPolicyDao(): ChildAppPolicyDao
 }

@@ -11,14 +11,20 @@ import uz.faceguard.app.domain.policy.ProtectionAction
  */
 class ActivationDelayGate(private val clock: () -> Long = System::currentTimeMillis) {
 
+    /**
+     * Explicit armed flag: the clock may legitimately return 0 (tests use a
+     * zero-based clock), so a magic timestamp must not double as "not armed".
+     */
+    private var armed = false
     private var armedAt = 0L
     private var armedDelay = 0L
     private var pendingAction: ProtectionAction? = null
 
-    val isPending: Boolean get() = pendingAction != null
+    /** True while an action is counting down its steady window. */
+    val isPending: Boolean get() = armed && pendingAction != null
 
-    /** True when [action] is already active (no pending window). */
-    fun isActive(): Boolean = pendingAction == null && armedDelay == 0L && armedAt != 0L
+    /** True when an action is armed with no pending window (already applied). */
+    fun isActive(): Boolean = armed && pendingAction == null
 
     /**
      * Requests [action] with [delayMs]. Returns true when it may be applied
@@ -26,13 +32,15 @@ class ActivationDelayGate(private val clock: () -> Long = System::currentTimeMil
      */
     fun request(action: ProtectionAction, delayMs: Long): Boolean {
         if (delayMs <= 0L) {
+            armed = true
             armedAt = clock()
             armedDelay = 0L
             pendingAction = null
             return true
         }
         // Same action already counting down -> keep the original window.
-        if (pendingAction != action || armedAt == 0L) {
+        if (!armed || pendingAction != action) {
+            armed = true
             armedAt = clock()
             armedDelay = delayMs
             pendingAction = action
@@ -40,19 +48,21 @@ class ActivationDelayGate(private val clock: () -> Long = System::currentTimeMil
         return false
     }
 
-    /** Call while the same action still applies; returns the elapsed window. */
-    fun elapsedMs(): Long = if (armedAt == 0L) 0L else (clock() - armedAt).coerceAtLeast(0L)
+    /** Milliseconds elapsed since the current action was armed. */
+    fun elapsedMs(): Long = if (!armed) 0L else (clock() - armedAt).coerceAtLeast(0L)
 
     fun progress(): Float {
-        if (pendingAction == null || armedDelay <= 0L) return if (isActive()) 1f else 0f
+        if (!armed) return 0f
+        if (pendingAction == null || armedDelay <= 0L) return 1f
         return (elapsedMs().toFloat() / armedDelay.toFloat()).coerceIn(0f, 1f)
     }
 
     /** True when the pending window has elapsed and the action should apply. */
-    fun isReady(): Boolean = pendingAction != null && elapsedMs() >= armedDelay
+    fun isReady(): Boolean = armed && (pendingAction == null || elapsedMs() >= armedDelay)
 
     /** Cancels any pending or active action (e.g. parent override). */
     fun cancel() {
+        armed = false
         armedAt = 0L
         armedDelay = 0L
         pendingAction = null

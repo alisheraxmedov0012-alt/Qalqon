@@ -68,5 +68,16 @@ dependencies {
     implementation(libs.accompanist.permissions)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+    testImplementation(libs.junit)
     debugImplementation(libs.compose.ui.tooling)
+}
+
+// TEMPORARY verification bridge.
+// The repository CI workflow only runs `assembleDebug`, and adding a `test`
+// step requires a token with the `workflow` scope. Until that workflow gains
+// an explicit unit-test step, route the JVM unit tests through the debug
+// assembly so CI verifies both compilation and tests.
+// Remove this block once CI runs `./gradlew test` directly.
+tasks.matching { it.name == "assembleDebug" }.configureEach {
+    dependsOn("testDebugUnitTest")
 }

@@ -47,6 +47,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import uz.faceguard.app.R
@@ -79,8 +80,17 @@ class SettingsViewModel @Inject constructor(
     private val resetRepository: ResetRepository,
 ) : ViewModel() {
 
-    val settings: StateFlow<AppSettings> = settingsRepository.settings
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppSettings())
+    /**
+     * Null until the first persisted value is available, so the UI never shows
+     * default-looking values as if they were the real (possibly non-default)
+     * settings. A read failure flips [settingsLoadError] instead.
+     */
+    private val _settingsLoadError = MutableStateFlow(false)
+    val settingsLoadError: StateFlow<Boolean> = _settingsLoadError
+
+    val settings: StateFlow<AppSettings?> = settingsRepository.settings
+        .catch { _settingsLoadError.value = true }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     val protectedApps: StateFlow<List<ProtectedApp>> = protectedAppsRepository.protectedApps
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -172,6 +182,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val settingsLoadError by viewModel.settingsLoadError.collectAsStateWithLifecycle()
     val protectedApps by viewModel.protectedApps.collectAsStateWithLifecycle()
     val appsRefreshing by viewModel.appsRefreshing.collectAsStateWithLifecycle()
     val logoutState by viewModel.logoutState.collectAsStateWithLifecycle()
@@ -184,6 +195,7 @@ fun SettingsScreen(
     SettingsContent(
         viewModel = viewModel,
         settings = settings,
+        settingsLoadError = settingsLoadError,
         protectedApps = protectedApps,
         appsRefreshing = appsRefreshing,
         children = children,
@@ -197,7 +209,8 @@ fun SettingsScreen(
 @Composable
 private fun SettingsContent(
     viewModel: SettingsViewModel,
-    settings: AppSettings,
+    settings: AppSettings?,
+    settingsLoadError: Boolean,
     protectedApps: List<ProtectedApp>,
     appsRefreshing: Boolean,
     children: List<ChildProfile>,
@@ -247,7 +260,7 @@ private fun SettingsContent(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             when (selectedTab) {
-                0 -> RulesTab(viewModel, settings, logoutState)
+                0 -> RulesTab(viewModel, settings, settingsLoadError, logoutState)
                 1 -> AppsTab(
                     apps = protectedApps,
                     isRefreshing = appsRefreshing,
@@ -268,9 +281,30 @@ private fun SettingsContent(
 @Composable
 private fun RulesTab(
     viewModel: SettingsViewModel,
-    settings: AppSettings,
+    settings: AppSettings?,
+    settingsLoadError: Boolean,
     logoutState: UiState,
 ) {
+    if (settings == null) {
+        // Null means "not loaded yet" (or a read failure), never "defaults".
+        SectionCard(title = stringResource(R.string.settings_title)) {
+            Text(
+                stringResource(
+                    if (settingsLoadError) R.string.settings_load_error else R.string.state_loading,
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (settingsLoadError) MaterialTheme.colorScheme.error
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        AppLoadingButton(
+            labelRes = R.string.settings_logout,
+            loading = logoutState == UiState.Loading,
+            onClick = viewModel::logout,
+        )
+        return
+    }
     SectionCard(
         title = stringResource(R.string.settings_protection),
         subtitle = stringResource(R.string.settings_protection_hint),

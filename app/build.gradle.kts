@@ -16,6 +16,7 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -69,15 +70,23 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     testImplementation(libs.junit)
+    androidTestImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.core.ktx)
+    androidTestImplementation(libs.androidx.room.testing)
     debugImplementation(libs.compose.ui.tooling)
 }
 
 // TEMPORARY verification bridge.
-// The repository CI workflow only runs `assembleDebug`, and adding a `test`
-// step requires a token with the `workflow` scope. Until that workflow gains
-// an explicit unit-test step, route the JVM unit tests through the debug
-// assembly so CI verifies both compilation and tests.
-// Remove this block once CI runs `./gradlew test` directly.
+// The repository CI workflow only runs `assembleDebug`, and adding explicit
+// `test` / `connectedAndroidTest` steps requires a token with the `workflow`
+// scope. Until that workflow is updated, route the JVM unit tests and the
+// instrumented-test APK compilation through the debug assembly so CI verifies
+// both without an emulator.
+// NOTE: instrumented test *execution* is NOT covered here — see README.
+// Remove this block once CI runs the tasks directly.
 tasks.matching { it.name == "assembleDebug" }.configureEach {
     dependsOn("testDebugUnitTest")
+    dependsOn("assembleDebugAndroidTest")
 }

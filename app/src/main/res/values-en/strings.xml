@@ -271,4 +271,32 @@
     <string name="enroll_hint_too_dark">Move to a brighter place</string>
     <string name="enroll_hint_hold">Great, hold still...</string>
     <string name="enroll_done">Done</string>
+
+    <!-- Group 4: child app policy + settings loading/error -->
+    <string name="child_policy_action">App rules</string>
+    <string name="child_policy_title">App rules</string>
+    <string name="child_policy_subtitle">Choose a rule per app: allow, limit or block.</string>
+    <string name="child_policy_choose_child">Child</string>
+    <string name="child_policy_selected">Selected: %1$s</string>
+    <string name="child_policy_apps_title">Apps</string>
+    <string name="child_policy_empty_apps">No matching apps found</string>
+    <string name="child_policy_empty_apps_hint">Tap \"Refresh apps\" to load the device\'s apps.</string>
+    <string name="child_policy_no_children">Add a child first</string>
+    <string name="child_policy_no_children_hint">Add a child to set app rules.</string>
+    <string name="child_policy_mode_allow">Allow</string>
+    <string name="child_policy_mode_limit">Limit</string>
+    <string name="child_policy_mode_block">Block</string>
+    <string name="child_policy_state_explicit_allow">Allowed</string>
+    <string name="child_policy_state_explicit_limit">Daily limit: %1$d min</string>
+    <string name="child_policy_state_explicit_block">Blocked</string>
+    <string name="child_policy_state_default_allow">Default: allowed</string>
+    <string name="child_policy_state_default_block">Default: blocked (global list)</string>
+    <string name="child_policy_dialog_title">%1$s rule</string>
+    <string name="child_policy_dialog_current">Current: %1$s</string>
+    <string name="child_policy_limit_label">Daily limit</string>
+    <string name="child_policy_minutes">%1$d min</string>
+    <string name="child_policy_limit_note">Note: daily time tracking is not enabled yet, so the limit does not restrict by time in this build.</string>
+    <string name="child_policy_reset">Reset to default</string>
+    <string name="child_policy_open">Set</string>
+    <string name="settings_load_error">Couldn\'t load settings. Please try again.</string>
 </resources>

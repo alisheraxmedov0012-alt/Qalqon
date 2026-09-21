@@ -152,6 +152,7 @@ class ChildProfilesViewModel @Inject constructor(
 fun ChildProfilesScreen(
     onBack: () -> Unit,
     onEnrollChild: (Long) -> Unit,
+    onOpenPolicy: (Long) -> Unit,
     viewModel: ChildProfilesViewModel = hiltViewModel(),
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
@@ -208,6 +209,7 @@ fun ChildProfilesScreen(
                                 ChildCard(
                                     child = child,
                                     onEnrollFace = { onEnrollChild(child.id) },
+                                    onOpenPolicy = { onOpenPolicy(child.id) },
                                     onEdit = { viewModel.openEditDialog(child) },
                                     onDelete = { viewModel.requestDelete(child) },
                                 )
@@ -343,6 +345,7 @@ private fun LevelOption(
 private fun ChildCard(
     child: ChildProfile,
     onEnrollFace: () -> Unit,
+    onOpenPolicy: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -396,6 +399,9 @@ private fun ChildCard(
                         else R.string.btn_enroll_face,
                     ),
                 )
+            }
+            OutlinedButton(onClick = onOpenPolicy, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.child_policy_action))
             }
         }
     }

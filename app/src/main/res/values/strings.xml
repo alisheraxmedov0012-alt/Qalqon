@@ -272,4 +272,32 @@
     <string name="enroll_hint_too_dark">Yorug\'roq joyga o\'ting</string>
     <string name="enroll_hint_hold">Juda yaxshi, qimirlamay turing...</string>
     <string name="enroll_done">Tayyor</string>
+
+    <!-- Group 4: child app policy + settings loading/error -->
+    <string name="child_policy_action">Ilova qoidalari</string>
+    <string name="child_policy_title">Ilova qoidalari</string>
+    <string name="child_policy_subtitle">Har bir ilova uchun qoidani tanlang: ruxsat, limit yoki blok.</string>
+    <string name="child_policy_choose_child">Bola</string>
+    <string name="child_policy_selected">Tanlangan: %1$s</string>
+    <string name="child_policy_apps_title">Ilovalar</string>
+    <string name="child_policy_empty_apps">Mos ilovalar topilmadi</string>
+    <string name="child_policy_empty_apps_hint">Ro\'yxatni yangilash uchun «Ilovalarni yangilash» tugmasini bosing.</string>
+    <string name="child_policy_no_children">Avval bola qo\'shing</string>
+    <string name="child_policy_no_children_hint">Ilova qoidalarini sozlash uchun bola qo\'shing.</string>
+    <string name="child_policy_mode_allow">Ruxsat</string>
+    <string name="child_policy_mode_limit">Limit</string>
+    <string name="child_policy_mode_block">Blok</string>
+    <string name="child_policy_state_explicit_allow">Ruxsat berilgan</string>
+    <string name="child_policy_state_explicit_limit">Kunlik limit: %1$d daqiqa</string>
+    <string name="child_policy_state_explicit_block">Bloklangan</string>
+    <string name="child_policy_state_default_allow">Standart: ruxsat</string>
+    <string name="child_policy_state_default_block">Standart: blok (umumiy ro\'yxat)</string>
+    <string name="child_policy_dialog_title">%1$s qoidasi</string>
+    <string name="child_policy_dialog_current">Joriy holat: %1$s</string>
+    <string name="child_policy_limit_label">Kunlik limit</string>
+    <string name="child_policy_minutes">%1$d daqiqa</string>
+    <string name="child_policy_limit_note">Diqqat: kunlik vaqt hisobi hozircha yoqilmagan, shuning uchun limit vaqt bo\'yicha to\'smaydi.</string>
+    <string name="child_policy_reset">Standartga qaytarish</string>
+    <string name="child_policy_open">Sozlash</string>
+    <string name="settings_load_error">Sozlamalarni yuklab bo\'lmadi. Qayta urinib ko\'ring.</string>
 </resources>

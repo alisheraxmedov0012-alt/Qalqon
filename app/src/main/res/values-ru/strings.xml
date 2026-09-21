@@ -271,4 +271,32 @@
     <string name="enroll_hint_too_dark">Перейдите в более светлое место</string>
     <string name="enroll_hint_hold">Отлично, не двигайтесь...</string>
     <string name="enroll_done">Готово</string>
+
+    <!-- Group 4: child app policy + settings loading/error -->
+    <string name="child_policy_action">Правила приложений</string>
+    <string name="child_policy_title">Правила приложений</string>
+    <string name="child_policy_subtitle">Выберите правило для каждого приложения: разрешить, ограничить или заблокировать.</string>
+    <string name="child_policy_choose_child">Ребёнок</string>
+    <string name="child_policy_selected">Выбран: %1$s</string>
+    <string name="child_policy_apps_title">Приложения</string>
+    <string name="child_policy_empty_apps">Подходящие приложения не найдены</string>
+    <string name="child_policy_empty_apps_hint">Нажмите «Обновить приложения», чтобы загрузить список.</string>
+    <string name="child_policy_no_children">Сначала добавьте ребёнка</string>
+    <string name="child_policy_no_children_hint">Добавьте ребёнка, чтобы настроить правила приложений.</string>
+    <string name="child_policy_mode_allow">Разрешить</string>
+    <string name="child_policy_mode_limit">Ограничить</string>
+    <string name="child_policy_mode_block">Блокировать</string>
+    <string name="child_policy_state_explicit_allow">Разрешено</string>
+    <string name="child_policy_state_explicit_limit">Дневной лимит: %1$d мин</string>
+    <string name="child_policy_state_explicit_block">Заблокировано</string>
+    <string name="child_policy_state_default_allow">По умолчанию: разрешено</string>
+    <string name="child_policy_state_default_block">По умолчанию: заблокировано (общий список)</string>
+    <string name="child_policy_dialog_title">Правило: %1$s</string>
+    <string name="child_policy_dialog_current">Текущее: %1$s</string>
+    <string name="child_policy_limit_label">Дневной лимит</string>
+    <string name="child_policy_minutes">%1$d мин</string>
+    <string name="child_policy_limit_note">Внимание: учёт дневного времени пока не включён, поэтому ограничение по времени в этой сборке не действует.</string>
+    <string name="child_policy_reset">Сбросить к значению по умолчанию</string>
+    <string name="child_policy_open">Настроить</string>
+    <string name="settings_load_error">Не удалось загрузить настройки. Попробуйте ещё раз.</string>
 </resources>

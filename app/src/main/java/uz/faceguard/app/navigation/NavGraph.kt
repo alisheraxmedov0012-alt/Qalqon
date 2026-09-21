@@ -20,6 +20,7 @@ import uz.faceguard.app.feature.help.HelpScreen
 import uz.faceguard.app.feature.home.HomeScreen
 import uz.faceguard.app.feature.privacy.PrivacyScreen
 import uz.faceguard.app.feature.parent.ParentProfileScreen
+import uz.faceguard.app.feature.policy.ChildPolicyScreen
 import uz.faceguard.app.feature.protection.ProtectionScreen
 import uz.faceguard.app.feature.recognition.RecognitionDebugScreen
 import uz.faceguard.app.feature.settings.SettingsScreen
@@ -42,7 +43,9 @@ object Routes {
     const val ACTIVITY_LOG = "activity_log"
     const val PARENT_FACE_ENROLLMENT = "parent_face_enrollment"
     const val CHILD_FACE_ENROLLMENT = "child_face_enrollment/{childId}"
+    const val CHILD_POLICY = "child_policy/{childId}"
     fun childFaceEnrollment(childId: Long) = "child_face_enrollment/$childId"
+    fun childPolicy(childId: Long) = "child_policy/$childId"
 }
 
 /**
@@ -129,6 +132,18 @@ fun FaceGuardNavHost(navController: NavHostController) {
                 onEnrollChild = { childId ->
                     navController.navigate(Routes.childFaceEnrollment(childId))
                 },
+                onOpenPolicy = { childId ->
+                    navController.navigate(Routes.childPolicy(childId))
+                },
+            )
+        }
+        composable(
+            route = Routes.CHILD_POLICY,
+            arguments = listOf(navArgument("childId") { type = NavType.LongType }),
+        ) {
+            ChildPolicyScreen(
+                onBack = { navController.popBackStack() },
+                onOpenChildren = { navController.navigate(Routes.CHILD_PROFILES) },
             )
         }
         composable(Routes.RECOGNITION_DEBUG) {

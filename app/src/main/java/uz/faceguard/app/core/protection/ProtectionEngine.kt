@@ -88,7 +88,6 @@ class ProtectionEngine(
     private val instabilityBand = 0.25
 
     private var lastStableAt = 0L
-    private var lastForegroundProtected = false
     private var lastLoggedForeground: String? = null
 
     private var scope: CoroutineScope? = null
@@ -146,7 +145,6 @@ class ProtectionEngine(
         latestFrame = null
         resetTrackers()
         activationGate.cancel()
-        lastForegroundProtected = false
         lastLoggedForeground = null
         if (_state.value != ProtectionState.UNPROTECTED) {
             transition(ProtectionState.UNPROTECTED, "protection stopped", System.currentTimeMillis())
@@ -183,14 +181,12 @@ class ProtectionEngine(
                 transition(ProtectionState.UNPROTECTED, "no protected app in foreground", now)
                 clearBlock()
             }
-            lastForegroundProtected = false
             resetTrackers()
             return
         }
-        if (!lastForegroundProtected) {
-            lastForegroundProtected = true
-            lastStableAt = now
-        }
+        // Debounce is measured from the last state switch (see transition()),
+        // not from entering the protected app, so the first decision is not
+        // delayed by a full debounce window.
         if (now - lastStableAt < debounceMs) return
         if (scanScheduler != null && scanScheduler?.scanning?.value == false) return
 
@@ -292,8 +288,13 @@ class ProtectionEngine(
                     onEvent(ActivityEventType.UNKNOWN_USER, null)
                 }
 
-                if (!activationGate.request(decision.action, decision.activationDelayMs)) {
-                    // Pending activation: hold the current state until it elapses.
+                // request() arms the steady window; for a positive delay it
+                // returns false until the window has elapsed, so only keep
+                // holding the current state while the activation is still
+                // pending. Once ready, the action is applied below.
+                if (!activationGate.request(decision.action, decision.activationDelayMs) &&
+                    !activationGate.isReady()
+                ) {
                     return
                 }
 

@@ -1,6 +1,8 @@
 package uz.faceguard.app.di
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.room.Room
 import dagger.Module
 import dagger.Provides
@@ -16,9 +18,11 @@ import uz.faceguard.app.data.db.MIGRATION_3_4
 import uz.faceguard.app.data.db.ParentProfileDao
 import uz.faceguard.app.data.db.ProtectedAppDao
 import uz.faceguard.app.data.db.UserAccountDao
+import uz.faceguard.app.data.prefs.settingsDataStore
 import uz.faceguard.app.data.repository.AccountRepositoryImpl
 import uz.faceguard.app.data.repository.ActivityLogRepositoryImpl
 import uz.faceguard.app.data.repository.ChildAppPolicyRepositoryImpl
+import uz.faceguard.app.data.repository.PolicySettingsRepositoryImpl
 import uz.faceguard.app.data.repository.ResetRepositoryImpl
 import uz.faceguard.app.data.repository.ChildProfileRepositoryImpl
 import uz.faceguard.app.data.repository.ParentProfileRepositoryImpl
@@ -32,6 +36,7 @@ import uz.faceguard.app.domain.repository.ActivityLogRepository
 import uz.faceguard.app.domain.repository.ResetRepository
 import uz.faceguard.app.domain.repository.ChildProfileRepository
 import uz.faceguard.app.domain.policy.ChildAppPolicyRepository
+import uz.faceguard.app.domain.policy.PolicySettingsRepository
 import uz.faceguard.app.domain.repository.ParentProfileRepository
 import uz.faceguard.app.domain.repository.ProtectedAppsRepository
 import uz.faceguard.app.domain.repository.SettingsRepository
@@ -81,7 +86,18 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideSettingsDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
+        context.settingsDataStore
+
+    @Provides
+    @Singleton
     fun provideSettingsRepository(impl: SettingsRepositoryImpl): SettingsRepository = impl
+
+    @Provides
+    @Singleton
+    fun providePolicySettingsRepository(
+        impl: PolicySettingsRepositoryImpl,
+    ): PolicySettingsRepository = impl
 
     @Provides
     @Singleton

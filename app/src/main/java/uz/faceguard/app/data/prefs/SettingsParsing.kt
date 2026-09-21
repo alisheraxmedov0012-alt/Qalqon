@@ -24,7 +24,7 @@ internal fun scopedSettingsKeyName(accountId: Long, baseName: String): String =
     "${ACCOUNT_KEY_PREFIX}_${accountId}_$baseName"
 
 /** Parses a stored enum name; unknown or null -> [fallback]. Never throws. */
-internal fun <T : Enum<T>> parseEnumValue(raw: String?, fallback: T): T {
+internal inline fun <reified T : Enum<T>> parseEnumValue(raw: String?, fallback: T): T {
     if (raw == null) return fallback
     return runCatching { enumValueOf<T>(raw) }.getOrDefault(fallback)
 }

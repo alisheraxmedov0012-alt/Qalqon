@@ -26,21 +26,26 @@ import uz.faceguard.app.data.prefs.SettingsStore
 import uz.faceguard.app.data.repository.AccountRepositoryImpl
 import uz.faceguard.app.data.repository.ChildProfileRepositoryImpl
 import uz.faceguard.app.data.repository.ParentProfileRepositoryImpl
-import uz.faceguard.app.data.repository.ProtectedAppsRepositoryImpl
 import uz.faceguard.app.data.repository.ResetRepositoryImpl
 import uz.faceguard.app.data.repository.SettingsRepositoryImpl
 import uz.faceguard.app.domain.model.AppSettings
 import uz.faceguard.app.domain.model.AuthResult
 import uz.faceguard.app.domain.model.BlockPolicy
 import uz.faceguard.app.domain.model.ScanMode
+import uz.faceguard.app.testing.FakeProtectedAppsRepository
 
 /**
  * Group 4 integration tests for [SettingsViewModel].
  *
- * Real DataStore (fresh file per test), real [SettingsStore], real repositories
- * and real Room — no mocks. Verifies every policy setting the parent manages is
- * written through the repository and reflected back in the UI state, and that
- * the state is null (loading) until a persisted value arrives.
+ * Real DataStore (fresh file per test), real [SettingsStore], real
+ * [SettingsRepositoryImpl] and real Room for accounts/children — the settings
+ * path under test is fully production code. Only the installed-app catalogue is
+ * a deterministic in-memory double; `refreshFromDevice()` queries the live
+ * PackageManager and races the in-memory database on teardown.
+ *
+ * Verifies every policy setting the parent manages is written through the
+ * repository and reflected back in the UI state, and that the state is null
+ * (loading) until a persisted value arrives.
  */
 @RunWith(AndroidJUnit4::class)
 class SettingsViewModelTest {
@@ -57,7 +62,7 @@ class SettingsViewModelTest {
     private lateinit var accountRepository: AccountRepositoryImpl
     private lateinit var parentProfileRepository: ParentProfileRepositoryImpl
     private lateinit var childRepository: ChildProfileRepositoryImpl
-    private lateinit var protectedAppsRepository: ProtectedAppsRepositoryImpl
+    private lateinit var protectedAppsRepository: FakeProtectedAppsRepository
     private lateinit var resetRepository: ResetRepositoryImpl
 
     @Before
@@ -75,7 +80,7 @@ class SettingsViewModelTest {
         accountRepository = AccountRepositoryImpl(db.userAccountDao(), sessionManager)
         parentProfileRepository = ParentProfileRepositoryImpl(db.parentProfileDao())
         childRepository = ChildProfileRepositoryImpl(db.childProfileDao())
-        protectedAppsRepository = ProtectedAppsRepositoryImpl(context, db.protectedAppDao())
+        protectedAppsRepository = FakeProtectedAppsRepository()
         resetRepository = ResetRepositoryImpl(db, store, sessionManager)
 
         val result = accountRepository.register("Parent", "901234567", "1234")

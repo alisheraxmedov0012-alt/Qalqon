@@ -4,8 +4,6 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -29,7 +27,7 @@ import uz.faceguard.app.domain.model.RestrictionLevel
 import uz.faceguard.app.domain.policy.AppPolicy
 import uz.faceguard.app.domain.policy.AppPolicyMode
 import uz.faceguard.app.domain.policy.ProtectionAction
-import uz.faceguard.app.domain.repository.ProtectedAppsRepository
+import uz.faceguard.app.testing.FakeProtectedAppsRepository
 
 /**
  * Group 4 integration tests for [ChildPolicyViewModel].
@@ -235,27 +233,5 @@ class ChildPolicyViewModelTest {
         val ui = awaitUi(viewModel(1L)) { it.state is UiState.Error }
 
         assertTrue(ui.state is UiState.Error)
-    }
-}
-
-/** Deterministic in-memory catalog; see the class-level note on why this is a double. */
-private class FakeProtectedAppsRepository : ProtectedAppsRepository {
-
-    private val state = MutableStateFlow<List<ProtectedApp>>(emptyList())
-
-    override val protectedApps: Flow<List<ProtectedApp>> = state
-
-    override suspend fun refreshFromDevice() = Unit
-
-    override suspend fun toggleProtection(packageName: String, isProtected: Boolean) {
-        state.value = state.value.map { app ->
-            if (app.packageName == packageName) app.copy(isProtected = isProtected) else app
-        }
-    }
-
-    override suspend fun countProtected(): Int = state.value.count { it.isProtected }
-
-    fun seed(apps: List<ProtectedApp>) {
-        state.value = apps
     }
 }

@@ -29,6 +29,7 @@ import uz.faceguard.app.data.repository.ParentProfileRepositoryImpl
 import uz.faceguard.app.data.repository.ProtectedAppsRepositoryImpl
 import uz.faceguard.app.core.embed.FaceEmbeddingModel
 import uz.faceguard.app.core.embed.TfLiteMobileFaceNet
+import uz.faceguard.app.core.policy.DefaultPolicyEvaluator
 import uz.faceguard.app.core.recognition.Recognizer
 import uz.faceguard.app.data.repository.SettingsRepositoryImpl
 import uz.faceguard.app.domain.repository.AccountRepository
@@ -36,6 +37,7 @@ import uz.faceguard.app.domain.repository.ActivityLogRepository
 import uz.faceguard.app.domain.repository.ResetRepository
 import uz.faceguard.app.domain.repository.ChildProfileRepository
 import uz.faceguard.app.domain.policy.ChildAppPolicyRepository
+import uz.faceguard.app.domain.policy.PolicyEvaluator
 import uz.faceguard.app.domain.policy.PolicySettingsRepository
 import uz.faceguard.app.domain.repository.ParentProfileRepository
 import uz.faceguard.app.domain.repository.ProtectedAppsRepository
@@ -98,6 +100,12 @@ object AppModule {
     fun providePolicySettingsRepository(
         impl: PolicySettingsRepositoryImpl,
     ): PolicySettingsRepository = impl
+
+    // Single policy decision point for the whole app; the protection engine
+    // depends on the interface, so it must be bound here.
+    @Provides
+    @Singleton
+    fun providePolicyEvaluator(): PolicyEvaluator = DefaultPolicyEvaluator()
 
     @Provides
     @Singleton

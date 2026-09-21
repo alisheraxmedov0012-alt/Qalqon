@@ -97,7 +97,11 @@ class ChildPolicyViewModelTest {
             listOf(ProtectedApp(youtube, "YouTube"), ProtectedApp(chrome, "Chrome")),
         )
 
-        val ui = awaitUi(viewModel(childA)) { it.state is UiState.Success && it.selectedChildId == childA }
+        val ui = awaitUi(viewModel(childA)) {
+            it.state is UiState.Success &&
+                it.selectedChildId == childA &&
+                it.apps.any { app -> app.packageName == youtube }
+        }
 
         assertEquals(2, ui.children.size)
         assertEquals("Child A", ui.selectedChild?.childName)

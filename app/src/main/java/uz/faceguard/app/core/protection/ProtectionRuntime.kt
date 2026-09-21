@@ -7,6 +7,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
@@ -22,6 +23,11 @@ import uz.faceguard.app.core.scan.ScanScheduler
 import uz.faceguard.app.domain.model.ChildProfile
 import uz.faceguard.app.domain.model.ParentProfile
 import uz.faceguard.app.domain.model.ScanMode
+import uz.faceguard.app.domain.policy.AppPolicy
+import uz.faceguard.app.domain.policy.ChildAppPolicyRepository
+import uz.faceguard.app.domain.policy.PolicyEvaluator
+import uz.faceguard.app.domain.policy.PolicySettings
+import uz.faceguard.app.domain.policy.PolicySettingsRepository
 import uz.faceguard.app.domain.repository.AccountRepository
 import uz.faceguard.app.domain.repository.ActivityLogRepository
 import uz.faceguard.app.domain.repository.ChildProfileRepository
@@ -75,14 +81,21 @@ class ProtectionRuntime @Inject constructor(
     private val childProfileRepository: ChildProfileRepository,
     private val accountRepository: AccountRepository,
     private val activityLog: ActivityLogRepository,
+    private val policySettingsRepository: PolicySettingsRepository,
+    private val childAppPolicyRepository: ChildAppPolicyRepository,
+    private val policyEvaluator: PolicyEvaluator,
 ) {
 
     private val monitor = ForegroundAppMonitor(context)
     private val overlay = OverlayControllerImpl(context)
     private val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val scheduler = ScanScheduler(context)
-    private val engine = ProtectionEngine(recognizer, monitor, audio, overlay)
-        .also { it.attachScheduler(scheduler) }
+    private val engine = ProtectionEngine(
+        recognizer = recognizer,
+        monitor = monitor,
+        actions = OverlayProtectionActionExecutor(overlay, audio),
+        policyEvaluator = policyEvaluator,
+    ).also { it.attachScheduler(scheduler) }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -94,21 +107,53 @@ class ProtectionRuntime @Inject constructor(
 
     private var accountId: Long? = null
     private var settings = ProtectionSettings()
+    private var policy = PolicySettings()
     private var parent: ParentProfile? = null
     private var children: List<ChildProfile> = emptyList()
     private var protectedPackages: Set<String> = emptySet()
+
+    private var childPolicies: Map<Long, Map<String, AppPolicy>> = emptyMap()
+    private val childPolicyJobs = mutableListOf<Job>()
+
+    /** Keeps the engine's per-child app-policy lookup in sync with Room. */
+    private fun refreshChildPolicies() {
+        childPolicyJobs.forEach { it.cancel() }
+        childPolicyJobs.clear()
+        childPolicies = emptyMap()
+        val account = accountId ?: return
+        children.forEach { child ->
+            childPolicyJobs += scope.launch {
+                childAppPolicyRepository.observePolicies(account, child.id).collect { list ->
+                    childPolicies = childPolicies + (child.id to list.associateBy { it.packageName })
+                }
+            }
+        }
+    }
 
     fun start() {
         if (started) return
         started = true
         engine.onEvent = { type, detail -> scope.launch { activityLog.log(type, detail) } }
+        engine.appPolicyLookup = { childId, packageName -> childPolicies[childId]?.get(packageName) }
 
-        scope.launch { accountRepository.currentAccountId.collect { id -> accountId = id; syncActive() } }
+        scope.launch {
+            accountRepository.currentAccountId.collect { id ->
+                accountId = id
+                refreshChildPolicies()
+                syncActive()
+            }
+        }
         scope.launch {
             settingsRepository.settings.collect { value ->
                 settings = ProtectionSettings.from(value)
                 syncContext()
                 syncActive()
+            }
+        }
+        scope.launch {
+            policySettingsRepository.observe().collect { value ->
+                policy = value
+                syncContext()
             }
         }
         scope.launch {
@@ -126,7 +171,7 @@ class ProtectionRuntime @Inject constructor(
         scope.launch {
             accountRepository.currentAccountId
                 .flatMapLatest { id -> if (id == null) flowOf<List<ChildProfile>>(emptyList()) else childProfileRepository.observeChildren(id) }
-                .collect { list -> children = list; syncContext(); syncActive() }
+                .collect { list -> children = list; refreshChildPolicies(); syncContext(); syncActive() }
         }
 
         scope.launch { engine.state.collect { value -> _state.update { it.copy(protectionState = value) } } }
@@ -147,7 +192,7 @@ class ProtectionRuntime @Inject constructor(
 
     private fun syncContext() {
         engine.updateContext(parent, children, protectedPackages)
-        engine.updateSettings(settings)
+        engine.updateSettings(settings, policy)
     }
 
     private fun syncActive() {

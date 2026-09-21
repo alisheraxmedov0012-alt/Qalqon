@@ -1,7 +1,5 @@
 package uz.faceguard.app.core.protection
 
-import android.media.AudioManager
-import android.os.Build
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -11,13 +9,22 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import uz.faceguard.app.core.monitor.ForegroundAppMonitor
 import uz.faceguard.app.core.pipeline.FrameEvent
+import uz.faceguard.app.core.policy.ActivationDelayGate
 import uz.faceguard.app.core.recognition.RecognitionResult
 import uz.faceguard.app.core.recognition.Recognizer
 import uz.faceguard.app.core.scan.ScanScheduler
 import uz.faceguard.app.domain.model.ActivityEventType
-import uz.faceguard.app.domain.model.BlockPolicy
 import uz.faceguard.app.domain.model.ChildProfile
 import uz.faceguard.app.domain.model.ParentProfile
+import uz.faceguard.app.domain.policy.AppPolicy
+import uz.faceguard.app.domain.policy.IdentityContext
+import uz.faceguard.app.domain.policy.PolicyContext
+import uz.faceguard.app.domain.policy.PolicyDecision
+import uz.faceguard.app.domain.policy.PolicyEvaluator
+import uz.faceguard.app.domain.policy.PolicySettings
+import uz.faceguard.app.domain.policy.PolicyTrigger
+import uz.faceguard.app.domain.policy.ProtectionAction
+import uz.faceguard.app.domain.policy.UserIdentity
 
 /** Stable overlay state; transitions gated by debounce + recovery delay. */
 enum class ProtectionState { UNPROTECTED, SOFT_BLOCKED, HARD_BLOCKED, RECOVERING }
@@ -29,22 +36,21 @@ data class ProtectionDecision(
 )
 
 /**
- * One engine per active protection session. It ticks continuously while
- * protection is enabled and evaluates:
+ * One engine per active protection session.
  *
- *   monitor.current ------+
- *   recognizer frame -----+--> evaluate() --> overlay + audio effect
- *   ProtectionSettings ---+
+ * It collects recognition + foreground context, asks the Parent Policy Engine
+ * for a decision and executes it through [ProtectionActionExecutor]. It owns no
+ * policy rules of its own — [PolicyEvaluator] is the single source of truth.
  *
- * Resilience: multi-frame confirmation + hysteresis prevent flicker. Unknown
- * faces / obstruction follow the unknown-user policy; missing faces follow the
- * no-face policy (a recognized-then-lost face uses the recovery delay instead).
+ * Resilience (unchanged from the pre-policy engine): multi-frame confirmation
+ * + hysteresis prevent flicker; a recognised-then-lost face holds the block for
+ * the recovery delay before releasing.
  */
 class ProtectionEngine(
     private val recognizer: Recognizer,
     private val monitor: ForegroundAppMonitor,
-    private val audio: AudioManager,
-    private val overlay: OverlayController,
+    private val actions: ProtectionActionExecutor,
+    private val policyEvaluator: PolicyEvaluator,
 ) {
 
     /** Event-driven scan scheduler; camera only on while a scan window is open. */
@@ -60,6 +66,10 @@ class ProtectionEngine(
     val decision: StateFlow<ProtectionDecision?> = _decision
 
     private var settings = ProtectionSettings()
+    private var policy = PolicySettings()
+
+    /** Steady-window gate: a decision only applies after its activation delay. */
+    private val activationGate = ActivationDelayGate()
 
     /** debounce window before a state switch is allowed */
     private val debounceMs = 1_200L
@@ -91,15 +101,19 @@ class ProtectionEngine(
     /** Activity-log hook; set by the caller to persist events. */
     var onEvent: (ActivityEventType, String?) -> Unit = { _, _ -> }
 
-    fun updateSettings(new: ProtectionSettings) {
-        settings = new
-        scanScheduler?.setMode(new.scanMode)
-        scanScheduler?.setLowBatteryBehavior(new.lowBatteryBehaviorEnabled)
+    fun updateSettings(settings: ProtectionSettings, policy: PolicySettings) {
+        this.settings = settings
+        this.policy = policy
+        scanScheduler?.setMode(settings.scanMode)
+        scanScheduler?.setLowBatteryBehavior(settings.lowBatteryBehaviorEnabled)
     }
 
     private var parent: ParentProfile? = null
     private var children: List<ChildProfile> = emptyList()
     private val protectedPackages = mutableSetOf<String>()
+
+    /** Resolves the persisted per-child app policy; set by the runtime. */
+    var appPolicyLookup: (childId: Long, packageName: String) -> AppPolicy? = { _, _ -> null }
 
     fun updateContext(parent: ParentProfile?, children: List<ChildProfile>, protected: Set<String>) {
         this.parent = parent
@@ -131,6 +145,7 @@ class ProtectionEngine(
         scope = null
         latestFrame = null
         resetTrackers()
+        activationGate.cancel()
         lastForegroundProtected = false
         lastLoggedForeground = null
         if (_state.value != ProtectionState.UNPROTECTED) {
@@ -163,6 +178,7 @@ class ProtectionEngine(
     fun evaluate(foreground: String?, frame: FrameEvent?, now: Long = System.currentTimeMillis()) {
         val protectedNow = foreground != null && foreground in protectedPackages
         if (!protectedNow) {
+            activationGate.cancel()
             if (_state.value != ProtectionState.UNPROTECTED) {
                 transition(ProtectionState.UNPROTECTED, "no protected app in foreground", now)
                 clearBlock()
@@ -186,47 +202,122 @@ class ProtectionEngine(
         if (pending.size > confirmFrames) pending.removeAt(0)
         if (pending.size < confirmFrames || pending.distinctBy { it::class }.size != 1) return
 
-        when (result) {
-            is RecognitionResult.ParentRecognized -> {
-                onEvent(ActivityEventType.PARENT_RECOGNIZED, null)
+        applyDecision(policyEvaluator.evaluate(policyContext(result, foreground, now)), result, now)
+    }
+
+    /** Builds the runtime context the evaluator decides on. */
+    private fun policyContext(
+        result: RecognitionResult,
+        foreground: String?,
+        now: Long,
+    ): PolicyContext {
+        val identity = identityOf(result)
+        return PolicyContext(
+            identity = identity,
+            settings = policy,
+            foregroundPackage = foreground,
+            appPolicy = identity.childId?.let { childId ->
+                foreground?.let { appPolicyLookup(childId, it) }
+            },
+            isProtectedApp = foreground != null && foreground in protectedPackages,
+            currentTimeMillis = now,
+        )
+    }
+
+    /** Recognition result -> policy identity. No-face is never treated as unknown. */
+    private fun identityOf(result: RecognitionResult): IdentityContext = when (result) {
+        is RecognitionResult.ParentRecognized -> IdentityContext(
+            identity = UserIdentity.PARENT,
+            confidence = result.confidence.toFloat(),
+        )
+        is RecognitionResult.ChildRecognized -> IdentityContext(
+            identity = UserIdentity.CHILD,
+            childId = result.childId,
+            childName = result.childName,
+            confidence = result.confidence.toFloat(),
+        )
+        is RecognitionResult.Unknown -> IdentityContext(
+            identity = UserIdentity.UNKNOWN,
+            confidence = result.confidence.toFloat(),
+        )
+        RecognitionResult.NoFace -> IdentityContext(identity = UserIdentity.NO_FACE)
+        is RecognitionResult.CameraPossiblyObstructed ->
+            IdentityContext(identity = UserIdentity.CAMERA_OBSTRUCTED)
+        is RecognitionResult.UnstableRecognition -> IdentityContext(identity = UserIdentity.UNKNOWN)
+    }
+
+    private fun applyDecision(
+        decision: PolicyDecision,
+        result: RecognitionResult,
+        now: Long,
+    ) {
+        when (decision) {
+            is PolicyDecision.Allow -> {
+                activationGate.cancel()
+                if (result is RecognitionResult.ParentRecognized) {
+                    onEvent(ActivityEventType.PARENT_RECOGNIZED, null)
+                }
                 if (_state.value != ProtectionState.UNPROTECTED) {
-                    onEvent(ActivityEventType.PARENT_UNLOCKED, null)
-                    transition(
-                        ProtectionState.UNPROTECTED,
-                        "parent recognized (confidence=${result.confidence})",
-                        now,
-                        result.confidence,
-                    )
-                    clearBlock()
+                    if (result is RecognitionResult.ParentRecognized) {
+                        onEvent(ActivityEventType.PARENT_UNLOCKED, null)
+                        transition(
+                            ProtectionState.UNPROTECTED,
+                            "parent recognized (confidence=${result.confidence})",
+                            now,
+                            result.confidence,
+                        )
+                        clearBlock()
+                    } else if (_state.value != ProtectionState.RECOVERING) {
+                        beginRecovery(now, policy.recoveryDelayMs)
+                    }
                 }
             }
-            is RecognitionResult.ChildRecognized -> {
-                onEvent(ActivityEventType.CHILD_RECOGNIZED, result.childName)
-                if (_state.value == ProtectionState.UNPROTECTED) {
+
+            is PolicyDecision.Warn -> {
+                activationGate.cancel()
+                if (_state.value != ProtectionState.UNPROTECTED &&
+                    _state.value != ProtectionState.RECOVERING
+                ) {
+                    beginRecovery(now, policy.recoveryDelayMs)
+                }
+            }
+
+            is PolicyDecision.Protect -> {
+                if (decision.trigger == PolicyTrigger.PROTECTED_APP_OPENED &&
+                    result is RecognitionResult.ChildRecognized
+                ) {
+                    onEvent(ActivityEventType.CHILD_RECOGNIZED, result.childName)
+                }
+                if (decision.trigger == PolicyTrigger.UNKNOWN_USER) {
+                    onEvent(ActivityEventType.UNKNOWN_USER, null)
+                }
+
+                if (!activationGate.request(decision.action, decision.activationDelayMs)) {
+                    // Pending activation: hold the current state until it elapses.
+                    return
+                }
+
+                val target = stateFor(decision.action)
+                if (_state.value == target) return
+                if (target == ProtectionState.HARD_BLOCKED && result is RecognitionResult.ChildRecognized) {
                     onEvent(ActivityEventType.CHILD_BLOCKED, result.childName)
-                    applyBlock(
-                        ProtectionState.HARD_BLOCKED,
-                        "child recognized (confidence=${result.confidence})",
-                        now,
-                        result.confidence,
-                    )
                 }
-            }
-            is RecognitionResult.Unknown -> {
-                onEvent(ActivityEventType.UNKNOWN_USER, null)
-                applyPolicy(settings.unknownUserPolicy, "unknown user", now, result.confidence)
-            }
-            is RecognitionResult.CameraPossiblyObstructed ->
-                applyPolicy(settings.unknownUserPolicy, "camera possibly obstructed", now, null)
-            is RecognitionResult.UnstableRecognition ->
-                // hold current state; hysteresis keeps us from flickering
-                transition(_state.value, "unstable recognition; holding state", now)
-            RecognitionResult.NoFace -> when (settings.noFacePolicy) {
-                BlockPolicy.ALLOW -> beginRecovery(now)
-                BlockPolicy.SOFT_BLOCK -> applyBlock(ProtectionState.SOFT_BLOCKED, "no face; soft block", now, null)
-                BlockPolicy.HARD_BLOCK -> applyBlock(ProtectionState.HARD_BLOCKED, "no face; hard block", now, null)
+                transition(target, decision.reason, now, result.confidenceOrNull())
+                actions.execute(decision.action)
             }
         }
+    }
+
+    private fun RecognitionResult.confidenceOrNull(): Double? = when (this) {
+        is RecognitionResult.ParentRecognized -> confidence
+        is RecognitionResult.ChildRecognized -> confidence
+        is RecognitionResult.Unknown -> confidence
+        else -> null
+    }
+
+    private fun stateFor(action: ProtectionAction): ProtectionState = when (action) {
+        ProtectionAction.SOFT_BLOCK, ProtectionAction.MUTE -> ProtectionState.SOFT_BLOCKED
+        else -> ProtectionState.HARD_BLOCKED
     }
 
     /** Enrich raw results with obstruction + instability classification. */
@@ -237,12 +328,7 @@ class ProtectionEngine(
             return raw
         }
         emptyFaceStreak = 0
-        val confidence = when (raw) {
-            is RecognitionResult.ParentRecognized -> raw.confidence
-            is RecognitionResult.ChildRecognized -> raw.confidence
-            is RecognitionResult.Unknown -> raw.confidence
-            else -> null
-        }
+        val confidence = raw.confidenceOrNull()
         if (confidence != null) {
             recentConfidences += confidence
             if (recentConfidences.size > confidenceWindow) recentConfidences.removeFirst()
@@ -254,29 +340,10 @@ class ProtectionEngine(
         return raw
     }
 
-    private fun applyPolicy(policy: BlockPolicy, reason: String, now: Long, confidence: Double?) {
-        when (policy) {
-            BlockPolicy.ALLOW -> Unit
-            BlockPolicy.SOFT_BLOCK -> applyBlock(ProtectionState.SOFT_BLOCKED, "$reason; soft block policy", now, confidence)
-            BlockPolicy.HARD_BLOCK -> applyBlock(ProtectionState.HARD_BLOCKED, "$reason; hard block policy", now, confidence)
-        }
-    }
-
-    private fun applyBlock(target: ProtectionState, reason: String, now: Long, confidence: Double?) {
-        if (_state.value == target) return
-        transition(target, reason, now, confidence)
-        when (target) {
-            ProtectionState.SOFT_BLOCKED -> applySoftBlock()
-            ProtectionState.HARD_BLOCKED -> applyHardBlock()
-            else -> Unit
-        }
-    }
-
     /** A recognized face was lost: hold the block for the recovery delay, then release. */
-    private fun beginRecovery(now: Long) {
+    private fun beginRecovery(now: Long, delayMs: Long) {
         if (_state.value == ProtectionState.UNPROTECTED || _state.value == ProtectionState.RECOVERING) return
-        transition(ProtectionState.RECOVERING, "face lost; recovery window", now)
-        val delayMs = settings.recoveryDelayMs
+        transition(ProtectionState.RECOVERING, "restriction lifted; recovery window", now)
         scope?.launch {
             delay(delayMs)
             if (_state.value == ProtectionState.RECOVERING) {
@@ -298,37 +365,8 @@ class ProtectionEngine(
         lastStableAt = now
     }
 
-    private fun applyHardBlock() {
-        overlay.show()
-        muteMedia()
-    }
-
-    private fun applySoftBlock() {
-        overlay.show()
-    }
-
     private fun clearBlock() {
-        overlay.hide()
-        unmuteMedia()
-    }
-
-    /** best-effort volume mute; modern Android routes through policy */
-    private fun muteMedia() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_MUTE, 0)
-        } else {
-            @Suppress("DEPRECATION")
-            audio.setStreamMute(AudioManager.STREAM_MUSIC, true)
-        }
-    }
-
-    private fun unmuteMedia() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_UNMUTE, 0)
-        } else {
-            @Suppress("DEPRECATION")
-            audio.setStreamMute(AudioManager.STREAM_MUSIC, false)
-        }
+        actions.clear()
     }
 
     interface OverlayController {
@@ -339,6 +377,7 @@ class ProtectionEngine(
     /** PIN-based parent emergency unlock; caller validates against stored PIN. */
     fun emergencyUnlock() {
         onEvent(ActivityEventType.EMERGENCY_UNLOCK, null)
+        activationGate.cancel()
         transition(ProtectionState.UNPROTECTED, "emergency unlock", System.currentTimeMillis())
         clearBlock()
     }

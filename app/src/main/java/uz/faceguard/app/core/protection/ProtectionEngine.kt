@@ -17,13 +17,11 @@ import uz.faceguard.app.domain.model.ActivityEventType
 import uz.faceguard.app.domain.model.ChildProfile
 import uz.faceguard.app.domain.model.ParentProfile
 import uz.faceguard.app.domain.policy.AppPolicy
-import uz.faceguard.app.domain.policy.IdentityContext
 import uz.faceguard.app.domain.policy.PolicyContext
 import uz.faceguard.app.domain.policy.PolicyDecision
 import uz.faceguard.app.domain.policy.PolicyEvaluator
 import uz.faceguard.app.domain.policy.PolicySettings
 import uz.faceguard.app.domain.policy.ProtectionAction
-import uz.faceguard.app.domain.policy.UserIdentity
 
 /** Stable overlay state; transitions gated by debounce + recovery delay. */
 enum class ProtectionState { UNPROTECTED, SOFT_BLOCKED, HARD_BLOCKED, RECOVERING }
@@ -63,6 +61,14 @@ class ProtectionEngine(
 
     private val _decision = MutableStateFlow<ProtectionDecision?>(null)
     val decision: StateFlow<ProtectionDecision?> = _decision
+
+    /**
+     * Group 8: the identity signal ("who is in front of the phone"). Updated only
+     * when the confirmed identity actually changes, so it is a state, not a
+     * per-frame stream. The foreground app is tracked separately by the monitor.
+     */
+    private val _identity = MutableStateFlow<IdentitySnapshot?>(null)
+    val identity: StateFlow<IdentitySnapshot?> = _identity
 
     private var settings = ProtectionSettings()
     private var policy = PolicySettings()
@@ -159,6 +165,8 @@ class ProtectionEngine(
         }
         clearBlock()
         _decision.value = null
+        // Group 8: a stopped session holds no identity state.
+        _identity.value = null
     }
 
     private fun tick(now: Long) {
@@ -206,7 +214,28 @@ class ProtectionEngine(
         if (pending.size > confirmFrames) pending.removeAt(0)
         if (pending.size < confirmFrames || pending.distinctBy { it::class }.size != 1) return
 
+        // Group 8: publish the confirmed identity signal before deciding, so the
+        // runtime always holds the identity that the decision was based on.
+        recordIdentity(result, frameAvailable = frame != null, now = now)
+
         applyDecision(policyEvaluator.evaluate(policyContext(result, foreground, now)), result, now)
+    }
+
+    /**
+     * Records the confirmed identity, collapsing repeats (StateFlow equality on
+     * the identity context + source) so nothing downstream sees per-frame churn.
+     */
+    private fun recordIdentity(result: RecognitionResult, frameAvailable: Boolean, now: Long) {
+        val context = identityContextOf(result)
+        val source = if (frameAvailable) IdentitySource.CAMERA else IdentitySource.NONE
+        val current = _identity.value
+        if (current?.context == context && current.source == source) return
+        _identity.value = IdentitySnapshot(context = context, source = source, updatedAt = now)
+    }
+
+    /** Clears the identity signal (account change / sign-out / session stop). */
+    fun resetIdentity() {
+        _identity.value = null
     }
 
     /** Builds the runtime context the evaluator decides on. */
@@ -215,7 +244,7 @@ class ProtectionEngine(
         foreground: String?,
         now: Long,
     ): PolicyContext {
-        val identity = identityOf(result)
+        val identity = identityContextOf(result)
         return PolicyContext(
             identity = identity,
             settings = policy,
@@ -228,27 +257,6 @@ class ProtectionEngine(
         )
     }
 
-    /** Recognition result -> policy identity. No-face is never treated as unknown. */
-    private fun identityOf(result: RecognitionResult): IdentityContext = when (result) {
-        is RecognitionResult.ParentRecognized -> IdentityContext(
-            identity = UserIdentity.PARENT,
-            confidence = result.confidence.toFloat(),
-        )
-        is RecognitionResult.ChildRecognized -> IdentityContext(
-            identity = UserIdentity.CHILD,
-            childId = result.childId,
-            childName = result.childName,
-            confidence = result.confidence.toFloat(),
-        )
-        is RecognitionResult.Unknown -> IdentityContext(
-            identity = UserIdentity.UNKNOWN,
-            confidence = result.confidence.toFloat(),
-        )
-        RecognitionResult.NoFace -> IdentityContext(identity = UserIdentity.NO_FACE)
-        is RecognitionResult.CameraPossiblyObstructed ->
-            IdentityContext(identity = UserIdentity.CAMERA_OBSTRUCTED)
-        is RecognitionResult.UnstableRecognition -> IdentityContext(identity = UserIdentity.UNKNOWN)
-    }
 
     private fun applyDecision(
         decision: PolicyDecision,

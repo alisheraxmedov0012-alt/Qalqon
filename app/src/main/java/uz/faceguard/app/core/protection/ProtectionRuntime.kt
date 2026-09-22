@@ -50,6 +50,11 @@ data class ProtectionRuntimeState(
     val usageAccessGranted: Boolean = false,
     /** True when the user has explicitly enabled QALQON's accessibility service. */
     val accessibilityEnabled: Boolean = false,
+    /**
+     * Group 8: the identity signal, independent of [foregroundApp]. Null means no
+     * identity has been observed for the active protection session yet.
+     */
+    val identity: IdentitySnapshot? = null,
     val scanMode: ScanMode = ScanMode.BALANCED,
     val scanning: Boolean = false,
     val cooldownRemainingMs: Long = 0L,
@@ -74,6 +79,12 @@ data class ProtectionRuntimeState(
  * engine. The Group 6 foreground service keeps this session alive while Qalqon
  * is backgrounded, and the Group 7 accessibility service feeds it real
  * foreground window transitions through [onAccessibilityForegroundApp].
+ *
+ * Group 8 keeps the two protection signals explicit and independent in
+ * [ProtectionRuntimeState]: `identity` ("who is looking", from the camera
+ * pipeline via [onIdentityChanged]) and `foregroundApp` ("which app is open",
+ * from usage-stats/accessibility). Both are combined by the engine into the
+ * existing PolicyContext — the evaluator is still the only decision point.
  *
  * Remaining limitation: with no camera bound — e.g. Qalqon backgrounded — the
  * engine sees "no face" and follows the no-face policy, so identity detection is
@@ -116,6 +127,9 @@ class ProtectionRuntime @Inject constructor(
     private var active = false
 
     private var accountId: Long? = null
+
+    /** Group 8: identity is cleared whenever the signed-in account changes. */
+    private var lastAccountId: Long? = null
     private var settings = ProtectionSettings()
     private var policy = PolicySettings()
     private var parent: ParentProfile? = null
@@ -166,6 +180,14 @@ class ProtectionRuntime @Inject constructor(
 
         scope.launch {
             accountRepository.currentAccountId.collect { id ->
+                if (id != lastAccountId) {
+                    // Group 8: identity is account-scoped. A session change must not
+                    // leave a previous account's child identity behind. The state is
+                    // cleared explicitly because a no-op flow emission is deduped.
+                    lastAccountId = id
+                    engine.resetIdentity()
+                    onIdentityChanged(null)
+                }
                 accountId = id
                 refreshChildPolicies()
                 syncActive()
@@ -208,6 +230,10 @@ class ProtectionRuntime @Inject constructor(
                 _state.update { it.copy(decision = value?.reason ?: "", confidence = value?.confidence) }
             }
         }
+        // Group 8: identity signal ("who is looking") stays separate from the
+        // foreground-app signal (Group 7) and is the exact identity the last
+        // policy decision was based on.
+        scope.launch { engine.identity.collect { snapshot -> onIdentityChanged(snapshot) } }
         scope.launch { monitor.current.collect { value -> _state.update { it.copy(foregroundApp = value) } } }
         scope.launch { scheduler.scanning.collect { value -> _state.update { it.copy(scanning = value) } } }
         scope.launch {
@@ -257,6 +283,8 @@ class ProtectionRuntime @Inject constructor(
         monitor.stop()
         overlay.hide()
         serviceLauncher.stop()
+        // Group 8: a stopped session holds no identity state.
+        onIdentityChanged(null)
     }
 
     /**
@@ -319,6 +347,15 @@ class ProtectionRuntime @Inject constructor(
                 monitor.updateFromAccessibility(pkg)
             }
         }
+    }
+
+    /**
+     * Group 8: identity signal from the recognition pipeline (single funnel used
+     * by the engine collector). The foreground app remains a separate signal in
+     * [ProtectionRuntimeState.foregroundApp].
+     */
+    fun onIdentityChanged(snapshot: IdentitySnapshot?) {
+        _state.update { it.copy(identity = snapshot) }
     }
 
     fun usageAccessIntent(): Intent = monitor.usageAccessIntent()

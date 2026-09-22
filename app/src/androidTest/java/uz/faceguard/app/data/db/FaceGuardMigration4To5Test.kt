@@ -41,7 +41,7 @@ class FaceGuardMigration4To5Test {
     }
 
     /** DDL Room generated for schema v4 (6 tables + 4 indices). */
-    private fun createV4Database(accountCount: Int = 1) {
+    private fun createV4Database(accountCount: Int = 1, legacyEvent: Boolean = true) {
         val db = SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath(DB_NAME), null)
         db.execSQL(
             "CREATE TABLE IF NOT EXISTS `user_accounts` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
@@ -104,9 +104,11 @@ class FaceGuardMigration4To5Test {
                 "VALUES (5, 1, 'Vali', 1, 'template-child', 'MEDIUM', 'ENROLLED', 1, 1200, 1000, 1200)",
         )
         // Legacy, account-unscoped events that must not be shown to any account.
-        db.execSQL(
-            "INSERT INTO activity_events (id, type, detail, at) VALUES (1, 'CHILD_BLOCKED', 'Vali', 1400)",
-        )
+        if (legacyEvent) {
+            db.execSQL(
+                "INSERT INTO activity_events (id, type, detail, at) VALUES (1, 'CHILD_BLOCKED', 'Vali', 1400)",
+            )
+        }
 
         db.version = 4 // PRAGMA user_version -> Room runs the 4 -> 5 migration
         db.close()
@@ -166,7 +168,7 @@ class FaceGuardMigration4To5Test {
 
     @Test
     fun migration4To5_activityLogIsUsableAndAccountScoped() = runBlocking {
-        createV4Database()
+        createV4Database(legacyEvent = false)
         val db = openV5()
         val dao = db.activityEventDao()
 

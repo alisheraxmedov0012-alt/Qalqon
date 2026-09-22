@@ -12,7 +12,7 @@ import androidx.room.RoomDatabase
         ActivityEventEntity::class,
         ChildAppPolicyEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class FaceGuardDatabase : RoomDatabase() {

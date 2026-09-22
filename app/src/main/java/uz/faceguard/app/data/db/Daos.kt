@@ -82,8 +82,12 @@ interface ActivityEventDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(event: ActivityEventEntity): Long
 
-    @Query("SELECT * FROM activity_events ORDER BY at DESC LIMIT 100")
-    fun observeRecent(): Flow<List<ActivityEventEntity>>
+    /** Newest-first events of a single account; the log never leaks across accounts. */
+    @Query("SELECT * FROM activity_events WHERE accountId = :accountId ORDER BY at DESC LIMIT 100")
+    fun observeRecent(accountId: Long): Flow<List<ActivityEventEntity>>
+
+    @Query("DELETE FROM activity_events WHERE accountId = :accountId")
+    suspend fun deleteForAccount(accountId: Long)
 
     @Query("DELETE FROM activity_events")
     suspend fun deleteAll()

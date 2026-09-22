@@ -75,11 +75,17 @@ interface SettingsRepository {
     suspend fun setLowBatteryBehaviorEnabled(enabled: Boolean)
 }
 
-/** Local activity log; newest first, capped by the DAO query. */
+/** Local activity log; account-scoped, newest first, capped by the DAO query. */
 interface ActivityLogRepository {
-    val recent: Flow<List<uz.faceguard.app.domain.model.ActivityEvent>>
-    suspend fun log(type: uz.faceguard.app.domain.model.ActivityEventType, detail: String? = null)
-    suspend fun clear()
+    fun recent(accountId: Long): Flow<List<uz.faceguard.app.domain.model.ActivityEvent>>
+
+    suspend fun log(
+        accountId: Long,
+        type: uz.faceguard.app.domain.model.ActivityEventType,
+        detail: String? = null,
+    )
+
+    suspend fun clear(accountId: Long)
 }
 
 /** Live installed-apps catalog with per-app protection selection. */

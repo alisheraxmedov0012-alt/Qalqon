@@ -16,13 +16,14 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Real instrumented test for [MIGRATION_3_4].
+ * Real instrumented test for the migrations starting at schema v3.
  *
  * `exportSchema = false`, so instead of Room schema assets this test builds a
  * genuine v3 database with the DDL Room generated for v3, writes real rows into
- * every legacy table, then opens the v4 database through Room. Room then runs
- * the migration *and* validates the resulting schema against the v4 entities,
- * so a wrong migration fails here rather than on a user's device.
+ * every legacy table, then opens the latest database through Room. Room then
+ * runs every migration (3 -> 4 -> 5) *and* validates the resulting schema
+ * against the current entities, so a wrong migration fails here rather than on
+ * a user's device.
  */
 @RunWith(AndroidJUnit4::class)
 class FaceGuardMigrationTest {
@@ -108,9 +109,9 @@ class FaceGuardMigrationTest {
         db.close()
     }
 
-    private fun openV4(): FaceGuardDatabase =
+    private fun openLatest(): FaceGuardDatabase =
         Room.databaseBuilder(context, FaceGuardDatabase::class.java, DB_NAME)
-            .addMigrations(MIGRATION_3_4)
+            .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
             .allowMainThreadQueries()
             .build()
             .also {
@@ -123,7 +124,7 @@ class FaceGuardMigrationTest {
     @Test
     fun migration3To4_keepsAccountsAndProfiles() = runBlocking {
         createV3Database()
-        val db = openV4()
+        val db = openLatest()
 
         val account = db.userAccountDao().getById(1L)
         assertNotNull("user account must survive the migration", account)
@@ -144,7 +145,7 @@ class FaceGuardMigrationTest {
     @Test
     fun migration3To4_keepsProtectedAppsAndActivityLog() = runBlocking {
         createV3Database()
-        val db = openV4()
+        val db = openLatest()
 
         assertEquals(1, db.protectedAppDao().countProtected())
         val apps = db.protectedAppDao().observeAll().first()
@@ -152,16 +153,19 @@ class FaceGuardMigrationTest {
         assertEquals("com.example.youtube", apps.first().packageName)
         assertTrue(apps.first().isProtected)
 
-        val events = db.activityEventDao().observeRecent().first()
+        // One account owns the legacy events, so MIGRATION_4_5 carries them into
+        // the account-scoped log instead of dropping them.
+        val events = db.activityEventDao().observeRecent(1L).first()
         assertEquals(1, events.size)
         assertEquals("CHILD_BLOCKED", events.first().type)
         assertEquals("Vali", events.first().detail)
+        assertEquals(1L, events.first().accountId)
     }
 
     @Test
     fun migration3To4_createsAUsableChildAppPoliciesTable() = runBlocking {
         createV3Database()
-        val db = openV4()
+        val db = openLatest()
         val dao = db.childAppPolicyDao()
 
         assertNull(dao.getPolicy(1L, 5L, "com.example.youtube"))
@@ -187,7 +191,7 @@ class FaceGuardMigrationTest {
     @Test
     fun migration3To4_createsTheExpectedSchema() {
         createV3Database()
-        val db = openV4()
+        val db = openLatest()
         val raw = db.openHelper.readableDatabase
 
         raw.query("PRAGMA table_info(`child_app_policies`)").use { cursor ->
@@ -218,7 +222,7 @@ class FaceGuardMigrationTest {
     @Test
     fun migration3To4_supportsCompositePrimaryKeyAfterUpgrade() = runBlocking {
         createV3Database()
-        val db = openV4()
+        val db = openLatest()
         val dao = db.childAppPolicyDao()
 
         dao.upsert(policy(childId = 5L, packageName = "com.example.youtube", mode = "BLOCK"))

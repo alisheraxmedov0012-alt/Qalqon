@@ -35,23 +35,38 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import uz.faceguard.app.R
 import uz.faceguard.app.domain.model.ActivityEvent
 import uz.faceguard.app.domain.model.ActivityEventType
+import uz.faceguard.app.domain.repository.AccountRepository
 import uz.faceguard.app.domain.repository.ActivityLogRepository
 
 @HiltViewModel
 class ActivityLogViewModel @Inject constructor(
     private val repository: ActivityLogRepository,
+    private val accountRepository: AccountRepository,
 ) : ViewModel() {
-    val events = repository.recent
+
+    /** Only the signed-in account's events; another account's log is never shown. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val events = accountRepository.currentAccountId
+        .flatMapLatest { accountId ->
+            if (accountId == null) flowOf(emptyList()) else repository.recent(accountId)
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun clear() {
-        viewModelScope.launch { repository.clear() }
+        viewModelScope.launch {
+            val accountId = accountRepository.currentAccountId.first() ?: return@launch
+            repository.clear(accountId)
+        }
     }
 }
 
@@ -108,8 +123,10 @@ private fun ActivityRow(event: ActivityEvent) {
                             ActivityEventType.CHILD_RECOGNIZED -> R.string.activity_child_recognized
                             ActivityEventType.PARENT_RECOGNIZED -> R.string.activity_parent_recognized
                             ActivityEventType.UNKNOWN_USER -> R.string.activity_unknown_user
+                            ActivityEventType.NO_FACE -> R.string.activity_no_face
                             ActivityEventType.PROTECTED_APP_ENTERED -> R.string.activity_protected_app_entered
                             ActivityEventType.CHILD_BLOCKED -> R.string.activity_child_blocked
+                            ActivityEventType.PROTECTION_RELEASED -> R.string.activity_protection_released
                             ActivityEventType.PARENT_UNLOCKED -> R.string.activity_parent_unlocked
                             ActivityEventType.EMERGENCY_UNLOCK -> R.string.activity_emergency_unlock
                         },

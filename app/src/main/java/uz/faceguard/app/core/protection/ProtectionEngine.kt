@@ -22,7 +22,6 @@ import uz.faceguard.app.domain.policy.PolicyContext
 import uz.faceguard.app.domain.policy.PolicyDecision
 import uz.faceguard.app.domain.policy.PolicyEvaluator
 import uz.faceguard.app.domain.policy.PolicySettings
-import uz.faceguard.app.domain.policy.PolicyTrigger
 import uz.faceguard.app.domain.policy.ProtectionAction
 import uz.faceguard.app.domain.policy.UserIdentity
 
@@ -89,6 +88,15 @@ class ProtectionEngine(
 
     private var lastStableAt = 0L
     private var lastLoggedForeground: String? = null
+
+    /**
+     * Last identity written to the activity log. Recognition is confirmed over
+     * several frames and the engine keeps evaluating while a protected app is
+     * foreground, so without this a steady child/unknown state would emit an
+     * event every tick (an event storm) instead of on the transition only.
+     */
+    private var lastLoggedType: ActivityEventType? = null
+    private var lastLoggedChildId: Long? = null
 
     private var scope: CoroutineScope? = null
     private var engineJob: Job? = null
@@ -158,7 +166,7 @@ class ProtectionEngine(
         val protectedNow = foreground != null && foreground in protectedPackages
         if (protectedNow) {
             if (foreground != lastLoggedForeground) {
-                onEvent(ActivityEventType.PROTECTED_APP_ENTERED, foreground)
+                safeLog(ActivityEventType.PROTECTED_APP_ENTERED, foreground)
             }
             // Re-arms a scan after a cooldown; no-op while scanning or cooling down.
             scanScheduler?.onProtectedAppOpened()
@@ -247,15 +255,17 @@ class ProtectionEngine(
         result: RecognitionResult,
         now: Long,
     ) {
+        // Meaningful recognition transitions only: the multi-frame confirmation
+        // above suppresses per-frame chatter and logIdentityTransition suppresses
+        // repeats while the identity itself does not change.
+        logIdentityTransition(result)
+
         when (decision) {
             is PolicyDecision.Allow -> {
                 activationGate.cancel()
-                if (result is RecognitionResult.ParentRecognized) {
-                    onEvent(ActivityEventType.PARENT_RECOGNIZED, null)
-                }
                 if (_state.value != ProtectionState.UNPROTECTED) {
                     if (result is RecognitionResult.ParentRecognized) {
-                        onEvent(ActivityEventType.PARENT_UNLOCKED, null)
+                        safeLog(ActivityEventType.PARENT_UNLOCKED, null)
                         transition(
                             ProtectionState.UNPROTECTED,
                             "parent recognized (confidence=${result.confidence})",
@@ -279,15 +289,6 @@ class ProtectionEngine(
             }
 
             is PolicyDecision.Protect -> {
-                if (decision.trigger == PolicyTrigger.PROTECTED_APP_OPENED &&
-                    result is RecognitionResult.ChildRecognized
-                ) {
-                    onEvent(ActivityEventType.CHILD_RECOGNIZED, result.childName)
-                }
-                if (decision.trigger == PolicyTrigger.UNKNOWN_USER) {
-                    onEvent(ActivityEventType.UNKNOWN_USER, null)
-                }
-
                 // request() arms the steady window; for a positive delay it
                 // returns false until the window has elapsed, so only keep
                 // holding the current state while the activation is still
@@ -300,13 +301,49 @@ class ProtectionEngine(
 
                 val target = stateFor(decision.action)
                 if (_state.value == target) return
-                if (target == ProtectionState.HARD_BLOCKED && result is RecognitionResult.ChildRecognized) {
-                    onEvent(ActivityEventType.CHILD_BLOCKED, result.childName)
-                }
+
                 transition(target, decision.reason, now, result.confidenceOrNull())
                 actions.execute(decision.action)
+                // Recorded after the action was applied, so a block that never
+                // reached the executor does not appear in the log. The executor
+                // is fire-and-forget, hence this states the outcome rather than
+                // claiming an executor "success".
+                if (result is RecognitionResult.ChildRecognized &&
+                    (target == ProtectionState.SOFT_BLOCKED || target == ProtectionState.HARD_BLOCKED)
+                ) {
+                    safeLog(ActivityEventType.CHILD_BLOCKED, result.childName)
+                }
             }
         }
+    }
+
+    /**
+     * Writes a recognition transition to the activity log, at most once per
+     * distinct identity. Unstable or obstructed recognition produces no identity
+     * event rather than being mislabelled as an unknown user.
+     */
+    private fun logIdentityTransition(result: RecognitionResult) {
+        val type = when (result) {
+            is RecognitionResult.ParentRecognized -> ActivityEventType.PARENT_RECOGNIZED
+            is RecognitionResult.ChildRecognized -> ActivityEventType.CHILD_RECOGNIZED
+            is RecognitionResult.Unknown -> ActivityEventType.UNKNOWN_USER
+            RecognitionResult.NoFace -> ActivityEventType.NO_FACE
+            is RecognitionResult.CameraPossiblyObstructed,
+            is RecognitionResult.UnstableRecognition,
+            -> null
+        } ?: return
+
+        val child = result as? RecognitionResult.ChildRecognized
+        if (type == lastLoggedType && child?.childId == lastLoggedChildId) return
+        lastLoggedType = type
+        lastLoggedChildId = child?.childId
+
+        safeLog(type, child?.childName)
+    }
+
+    /** Logging is observability: a failing hook must never break protection. */
+    private fun safeLog(type: ActivityEventType, detail: String?) {
+        runCatching { onEvent(type, detail) }
     }
 
     private fun RecognitionResult.confidenceOrNull(): Double? = when (this) {
@@ -350,6 +387,7 @@ class ProtectionEngine(
             if (_state.value == ProtectionState.RECOVERING) {
                 transition(ProtectionState.UNPROTECTED, "recovery delay elapsed", System.currentTimeMillis())
                 clearBlock()
+                safeLog(ActivityEventType.PROTECTION_RELEASED, null)
             }
         }
     }
@@ -358,6 +396,10 @@ class ProtectionEngine(
         pending.clear()
         emptyFaceStreak = 0
         recentConfidences.clear()
+        // Leaving the protected-app context clears the identity baseline, so the
+        // next session logs its first identity transition again.
+        lastLoggedType = null
+        lastLoggedChildId = null
     }
 
     private fun transition(newState: ProtectionState, reason: String, now: Long, confidence: Double? = null) {
@@ -377,7 +419,7 @@ class ProtectionEngine(
 
     /** PIN-based parent emergency unlock; caller validates against stored PIN. */
     fun emergencyUnlock() {
-        onEvent(ActivityEventType.EMERGENCY_UNLOCK, null)
+        safeLog(ActivityEventType.EMERGENCY_UNLOCK, null)
         activationGate.cancel()
         transition(ProtectionState.UNPROTECTED, "emergency unlock", System.currentTimeMillis())
         clearBlock()

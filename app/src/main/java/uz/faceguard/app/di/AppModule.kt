@@ -15,6 +15,7 @@ import uz.faceguard.app.data.db.ChildAppPolicyDao
 import uz.faceguard.app.data.db.ChildProfileDao
 import uz.faceguard.app.data.db.FaceGuardDatabase
 import uz.faceguard.app.data.db.MIGRATION_3_4
+import uz.faceguard.app.data.db.MIGRATION_4_5
 import uz.faceguard.app.data.db.ParentProfileDao
 import uz.faceguard.app.data.db.ProtectedAppDao
 import uz.faceguard.app.data.db.UserAccountDao
@@ -58,7 +59,7 @@ object AppModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): FaceGuardDatabase =
         Room.databaseBuilder(context, FaceGuardDatabase::class.java, "faceguard.db")
-            .addMigrations(MIGRATION_3_4) // additive v3 -> v4; keeps existing user data
+            .addMigrations(MIGRATION_3_4, MIGRATION_4_5) // additive v3 -> v4 -> v5; keeps existing user data
             .build()
 
     @Provides fun provideUserAccountDao(db: FaceGuardDatabase): UserAccountDao = db.userAccountDao()

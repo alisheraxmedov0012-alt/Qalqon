@@ -59,14 +59,22 @@ enum class ActivityEventType {
     CHILD_RECOGNIZED,
     PARENT_RECOGNIZED,
     UNKNOWN_USER,
+
+    /** A frame with no face; never logged as [UNKNOWN_USER]. */
+    NO_FACE,
     PROTECTED_APP_ENTERED,
     CHILD_BLOCKED,
+
+    /** A restriction was lifted after the recovery window elapsed. */
+    PROTECTION_RELEASED,
     PARENT_UNLOCKED,
     EMERGENCY_UNLOCK,
 }
 
 data class ActivityEvent(
     val id: Long = 0,
+    /** Owning account; events are never shown across accounts. */
+    val accountId: Long = 0,
     val type: ActivityEventType,
     val detail: String? = null,
     val at: Long = System.currentTimeMillis(),

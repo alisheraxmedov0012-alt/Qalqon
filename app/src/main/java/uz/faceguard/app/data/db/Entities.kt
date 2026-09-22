@@ -67,10 +67,12 @@ data class ProtectedAppEntity(
 
 @Entity(
     tableName = "activity_events",
-    indices = [Index(value = ["at"])],
+    indices = [Index(value = ["at"]), Index(value = ["accountId", "at"])],
 )
 data class ActivityEventEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    /** Owning account; the activity log is account-scoped (see MIGRATION_4_5). */
+    val accountId: Long,
     /** ActivityEventType.name */
     val type: String,
     val detail: String? = null,

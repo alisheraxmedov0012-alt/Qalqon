@@ -3,6 +3,7 @@ package uz.faceguard.app.core.protection
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
+import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -133,7 +134,18 @@ class ProtectionRuntime @Inject constructor(
     fun start() {
         if (started) return
         started = true
-        engine.onEvent = { type, detail -> scope.launch { activityLog.log(type, detail) } }
+        engine.onEvent = { type, detail ->
+            // Activity logging is secondary observability: it must never
+            // interrupt protection, so a write failure is swallowed (and only
+            // reported to logcat) instead of failing the runtime's scope.
+            val owner = accountId
+            if (owner != null) {
+                scope.launch {
+                    runCatching { activityLog.log(owner, type, detail) }
+                        .onFailure { Log.w(TAG, "activity log write failed", it) }
+                }
+            }
+        }
         engine.appPolicyLookup = { childId, packageName -> childPolicies[childId]?.get(packageName) }
 
         scope.launch {
@@ -250,4 +262,8 @@ class ProtectionRuntime @Inject constructor(
     fun usageAccessIntent(): Intent = monitor.usageAccessIntent()
 
     fun overlayPermissionIntent(): Intent = overlay.permissionIntent()
+
+    private companion object {
+        const val TAG = "ProtectionRuntime"
+    }
 }

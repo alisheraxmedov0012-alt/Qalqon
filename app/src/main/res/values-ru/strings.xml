@@ -194,6 +194,8 @@
     <string name="activity_child_blocked">Ребёнок заблокирован</string>
     <string name="activity_parent_unlocked">Родитель разблокировал</string>
     <string name="activity_emergency_unlock">Аварийная разблокировка по PIN</string>
+    <string name="activity_no_face">Лицо не обнаружено</string>
+    <string name="activity_protection_released">Ограничение снято</string>
     <string name="settings_tab_data">Данные</string>
     <string name="data_section_faces">Данные лиц</string>
     <string name="data_delete_parent_face">Удалить лицо родителя</string>

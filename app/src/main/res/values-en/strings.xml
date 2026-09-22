@@ -1,7 +1,8 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="app_name">Qalqon</string>
-    <string name="accessibility_service_description">Qalqon protection service</string>
+    <string name="accessibility_service_description">Qalqon watches protected apps and applies your parental rules.</string>
+    <string name="protection_req_accessibility">Background app monitoring service</string>
     <string name="splash_tagline">Face-based protection for children</string>
     <string name="welcome_title">Welcome to Qalqon</string>
     <string name="welcome_subtitle">Create a parent account or log in to keep children safe inside protected apps</string>

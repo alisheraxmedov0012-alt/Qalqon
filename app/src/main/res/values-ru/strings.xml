@@ -1,7 +1,8 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="app_name">Qalqon</string>
-    <string name="accessibility_service_description">Служба защиты Qalqon</string>
+    <string name="accessibility_service_description">Qalqon отслеживает защищённые приложения и применяет родительские правила.</string>
+    <string name="protection_req_accessibility">Служба фонового мониторинга приложений</string>
     <string name="splash_tagline">Защита детей по распознаванию лица</string>
     <string name="welcome_title">Добро пожаловать в Qalqon</string>
     <string name="welcome_subtitle">Создайте родительский аккаунт или войдите, чтобы защитить детей в выбранных приложениях</string>

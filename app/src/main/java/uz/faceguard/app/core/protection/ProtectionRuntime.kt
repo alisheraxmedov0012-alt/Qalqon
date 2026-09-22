@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import uz.faceguard.app.core.accessibility.AccessibilityCapability
+import uz.faceguard.app.core.accessibility.AccessibilityForegroundTracker
 import uz.faceguard.app.core.monitor.ForegroundAppMonitor
 import uz.faceguard.app.core.recognition.Recognizer
 import uz.faceguard.app.core.scan.ScanScheduler
@@ -46,6 +48,8 @@ data class ProtectionRuntimeState(
     val foregroundApp: String? = null,
     val overlayGranted: Boolean = false,
     val usageAccessGranted: Boolean = false,
+    /** True when the user has explicitly enabled QALQON's accessibility service. */
+    val accessibilityEnabled: Boolean = false,
     val scanMode: ScanMode = ScanMode.BALANCED,
     val scanning: Boolean = false,
     val cooldownRemainingMs: Long = 0L,
@@ -67,9 +71,13 @@ data class ProtectionRuntimeState(
  *
  * Recognition frames arrive through the shared [Recognizer] flow, so whichever
  * camera is active (the protection screen, enrollment, diagnostics) feeds the
- * engine. Limitation: with no camera bound — e.g. Qalqon backgrounded — the
- * engine sees "no face" and follows the no-face policy. Reliable system-wide
- * blocking still needs a foreground service + AccessibilityService.
+ * engine. The Group 6 foreground service keeps this session alive while Qalqon
+ * is backgrounded, and the Group 7 accessibility service feeds it real
+ * foreground window transitions through [onAccessibilityForegroundApp].
+ *
+ * Remaining limitation: with no camera bound — e.g. Qalqon backgrounded — the
+ * engine sees "no face" and follows the no-face policy, so identity detection is
+ * still camera-bound even though foreground detection is now system-wide.
  */
 @Singleton
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -116,6 +124,9 @@ class ProtectionRuntime @Inject constructor(
 
     private var childPolicies: Map<Long, Map<String, AppPolicy>> = emptyMap()
     private val childPolicyJobs = mutableListOf<Job>()
+
+    /** Group 7: collapses duplicate accessibility window transitions. */
+    private val accessibilityTracker = AccessibilityForegroundTracker()
 
     /** Keeps the engine's per-child app-policy lookup in sync with Room. */
     private fun refreshChildPolicies() {
@@ -222,6 +233,7 @@ class ProtectionRuntime @Inject constructor(
                 childrenFaceEnrolled = children.count { child -> child.isFaceEnrolled },
                 overlayGranted = overlay.hasPermission(),
                 usageAccessGranted = monitor.hasUsageAccess(),
+                accessibilityEnabled = AccessibilityCapability.isEnabled(context),
             )
         }
     }
@@ -270,13 +282,47 @@ class ProtectionRuntime @Inject constructor(
             it.copy(
                 overlayGranted = overlay.hasPermission(),
                 usageAccessGranted = monitor.hasUsageAccess(),
+                accessibilityEnabled = AccessibilityCapability.isEnabled(context),
             )
+        }
+    }
+
+    /**
+     * Group 7: the accessibility service is bound. It becomes the authoritative
+     * foreground source for the existing engine (which is unchanged).
+     */
+    fun onAccessibilityConnected() {
+        monitor.setAccessibilityActive(true)
+        refreshPermissions()
+    }
+
+    /**
+     * Group 7: the accessibility service was unbound. Foreground detection falls
+     * back to usage-stats polling and the transition baseline is cleared.
+     */
+    fun onAccessibilityDisconnected() {
+        monitor.setAccessibilityActive(false)
+        accessibilityTracker.reset()
+        refreshPermissions()
+    }
+
+    /**
+     * Group 7: a foreground window transition reported by the accessibility
+     * service. Only the package identifier is used; duplicates are collapsed.
+     */
+    fun onAccessibilityForegroundApp(packageName: String?) {
+        packageName?.let { pkg ->
+            if (accessibilityTracker.onForegroundPackage(pkg)) {
+                monitor.updateFromAccessibility(pkg)
+            }
         }
     }
 
     fun usageAccessIntent(): Intent = monitor.usageAccessIntent()
 
     fun overlayPermissionIntent(): Intent = overlay.permissionIntent()
+
+    fun accessibilitySettingsIntent(): Intent = AccessibilityCapability.settingsIntent()
 
     private companion object {
         const val TAG = "ProtectionRuntime"

@@ -99,6 +99,8 @@ class ProtectionViewModel @Inject constructor(
     fun usageAccessIntent(): Intent = runtime.usageAccessIntent()
 
     fun overlayPermissionIntent(): Intent = runtime.overlayPermissionIntent()
+
+    fun accessibilitySettingsIntent(): Intent = runtime.accessibilitySettingsIntent()
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
@@ -172,6 +174,7 @@ fun ProtectionScreen(
                 onGrantCamera = { cameraPermission.launchPermissionRequest() },
                 onGrantUsage = { context.startActivity(viewModel.usageAccessIntent()) },
                 onGrantOverlay = { context.startActivity(viewModel.overlayPermissionIntent()) },
+                onOpenAccessibility = { context.startActivity(viewModel.accessibilitySettingsIntent()) },
                 onOpenParentProfile = onOpenParentProfile,
                 onOpenProtectedApps = onOpenProtectedApps,
             )
@@ -273,6 +276,7 @@ private fun RequirementsCard(
     onGrantCamera: () -> Unit,
     onGrantUsage: () -> Unit,
     onGrantOverlay: () -> Unit,
+    onOpenAccessibility: () -> Unit,
     onOpenParentProfile: () -> Unit,
     onOpenProtectedApps: () -> Unit,
 ) {
@@ -297,6 +301,12 @@ private fun RequirementsCard(
                 satisfied = state.overlayGranted,
                 actionLabel = stringResource(R.string.protection_req_grant),
                 onAction = onGrantOverlay,
+            )
+            RequirementRow(
+                label = stringResource(R.string.protection_req_accessibility),
+                satisfied = state.accessibilityEnabled,
+                actionLabel = stringResource(R.string.protection_req_open),
+                onAction = onOpenAccessibility,
             )
             RequirementRow(
                 label = stringResource(R.string.protection_req_parent_face),

@@ -43,5 +43,21 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="parental_control_protection_state" />
         </service>
+
+        <!-- Group 7: system interaction layer. The system is the only caller
+             (guarded by BIND_ACCESSIBILITY_SERVICE) and only window/app
+             transitions are requested; window content stays unreadable. -->
+        <service
+            android:name=".core.accessibility.ProtectionAccessibilityService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
     </application>
 </manifest>

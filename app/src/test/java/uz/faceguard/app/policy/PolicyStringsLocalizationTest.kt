@@ -41,6 +41,9 @@ class PolicyStringsLocalizationTest {
         "child_policy_reset",
         "child_policy_open",
         "settings_load_error",
+        // Group 5 activity log labels
+        "activity_no_face",
+        "activity_protection_released",
     )
 
     @Test

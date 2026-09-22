@@ -17,7 +17,13 @@ import android.view.accessibility.AccessibilityManager
  */
 object AccessibilityCapability {
 
-    fun isEnabled(context: Context): Boolean {
+    fun isEnabled(context: Context): Boolean =
+        isEnabledInManager(context) || isEnabledInSettings(context)
+
+    /**
+     * Live framework state: what the system is actually running.
+     */
+    private fun isEnabledInManager(context: Context): Boolean {
         val manager = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager
             ?: return false
         val expected = ComponentName(context, ProtectionAccessibilityService::class.java)
@@ -27,6 +33,24 @@ object AccessibilityCapability {
                 val service = info.resolveInfo?.serviceInfo ?: return@any false
                 service.packageName == expected.packageName && service.name == expected.className
             }
+    }
+
+    /**
+     * Persisted user decision. The manager can lag behind a just-changed setting,
+     * so this is the robust source for "has the user enabled the service".
+     */
+    private fun isEnabledInSettings(context: Context): Boolean {
+        val raw = runCatching {
+            Settings.Secure.getString(
+                context.contentResolver,
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+            )
+        }.getOrNull() ?: return false
+
+        val expected = ComponentName(context, ProtectionAccessibilityService::class.java)
+        return raw.split(':').any { entry ->
+            entry.isNotBlank() && ComponentName.unflattenFromString(entry) == expected
+        }
     }
 
     fun settingsIntent(): Intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)

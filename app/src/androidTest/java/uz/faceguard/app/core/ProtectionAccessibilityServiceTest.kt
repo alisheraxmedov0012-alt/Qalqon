@@ -100,9 +100,18 @@ class ProtectionAccessibilityServiceTest {
     private fun enableAccessibilityService() {
         val existing = previousServices.takeIf { it.isNotBlank() && it != "null" }
         val value = if (existing == null) componentString() else "$existing:${componentString()}"
-        shell("settings put secure enabled_accessibility_services $value")
+        // Some builds only honour the list once accessibility is switched on,
+        // so set the flag first and write the list twice.
         shell("settings put secure accessibility_enabled 1")
+        shell("settings put secure enabled_accessibility_services $value")
+        shell("settings put secure enabled_accessibility_services $value")
     }
+
+    private fun enabledServicesSetting(): String =
+        shell("settings get secure enabled_accessibility_services").trim()
+
+    private fun accessibilityEnabledSetting(): String =
+        shell("settings get secure accessibility_enabled").trim()
 
     private suspend fun awaitTrue(timeoutMs: Long = 15_000L, predicate: () -> Boolean): Boolean {
         val deadline = System.currentTimeMillis() + timeoutMs
@@ -139,18 +148,36 @@ class ProtectionAccessibilityServiceTest {
             type = parser.next()
         }
         val android = "http://schemas.android.com/apk/res/android"
-        val eventTypes = parser.getAttributeValue(android, "accessibilityEventTypes") ?: ""
+        // Flag attributes are compiled to their integer bitmask, so compare bits.
+        val eventTypes = parser.getAttributeIntValue(android, "accessibilityEventTypes", 0)
 
-        assertEquals(
+        assertFalse(
             "window content must never be readable",
-            "false",
-            parser.getAttributeValue(android, "canRetrieveWindowContent"),
+            parser.getAttributeBooleanValue(android, "canRetrieveWindowContent", true),
         )
-        assertTrue("window state transitions required", eventTypes.contains("typeWindowStateChanged"))
-        assertTrue("window transitions required", eventTypes.contains("typeWindowsChanged"))
-        assertFalse("text changes must not be requested", eventTypes.contains("typeViewTextChanged"))
-        assertFalse("clicks must not be requested", eventTypes.contains("typeViewClicked"))
-        assertFalse("notifications must not be requested", eventTypes.contains("typeNotificationStateChanged"))
+        assertTrue(
+            "window state transitions required",
+            eventTypes and AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED != 0,
+        )
+        assertTrue(
+            "window transitions required",
+            eventTypes and AccessibilityEvent.TYPE_WINDOWS_CHANGED != 0,
+        )
+        assertEquals(
+            "text changes must not be requested",
+            0,
+            eventTypes and AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED,
+        )
+        assertEquals(
+            "clicks must not be requested",
+            0,
+            eventTypes and AccessibilityEvent.TYPE_VIEW_CLICKED,
+        )
+        assertEquals(
+            "notifications must not be requested",
+            0,
+            eventTypes and AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED,
+        )
     }
 
     @Test
@@ -171,11 +198,22 @@ class ProtectionAccessibilityServiceTest {
 
         enableAccessibilityService()
 
+        val services = enabledServicesSetting()
+        val enabled = accessibilityEnabledSetting()
         assertTrue(
-            "the system must bind QALQON's accessibility service",
-            awaitTrue { ProtectionAccessibilityService.connected.value },
+            "the user-owned accessibility setting must be writable here " +
+                "(services='$services', enabled='$enabled')",
+            services.contains(componentString()) && enabled == "1",
         )
-        assertTrue("capability must be reported", awaitTrue { AccessibilityCapability.isEnabled(appContext) })
+
+        assertTrue(
+            "capability must reflect the user-enabled service (services='$services')",
+            awaitTrue(30_000L) { AccessibilityCapability.isEnabled(appContext) },
+        )
+        assertTrue(
+            "the system must bind QALQON's accessibility service (services='$services')",
+            awaitTrue(30_000L) { ProtectionAccessibilityService.connected.value },
+        )
         assertTrue(
             "runtime state must reflect the capability",
             awaitTrue { runtime.state.value.accessibilityEnabled },

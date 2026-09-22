@@ -85,6 +85,7 @@ class ProtectionRuntime @Inject constructor(
     private val policySettingsRepository: PolicySettingsRepository,
     private val childAppPolicyRepository: ChildAppPolicyRepository,
     private val policyEvaluator: PolicyEvaluator,
+    private val serviceLauncher: ProtectionServiceLauncher,
 ) {
 
     private val monitor = ForegroundAppMonitor(context)
@@ -208,7 +209,7 @@ class ProtectionRuntime @Inject constructor(
     }
 
     private fun syncActive() {
-        val shouldBeActive = settings.enabled && accountId != null
+        val shouldBeActive = ProtectionServicePolicy.shouldRun(settings.enabled, accountId)
         if (shouldBeActive && !active) activate() else if (!shouldBeActive && active) deactivate()
         _state.update {
             it.copy(
@@ -230,6 +231,8 @@ class ProtectionRuntime @Inject constructor(
         syncContext()
         monitor.start(scope)
         engine.start(scope)
+        // Keep the process alive so the session survives Qalqon being backgrounded.
+        serviceLauncher.start()
     }
 
     private fun deactivate() {
@@ -238,6 +241,18 @@ class ProtectionRuntime @Inject constructor(
         scheduler.detach()
         monitor.stop()
         overlay.hide()
+        serviceLauncher.stop()
+    }
+
+    /**
+     * Clean, idempotent stop of active protection (used by the foreground
+     * service when it is destroyed). The settings/account observers are kept:
+     * they remain the single source of truth, so protection activates again on
+     * the next relevant change instead of leaving a stale session behind.
+     */
+    fun stop() {
+        if (active) deactivate()
+        _state.update { it.copy(active = false) }
     }
 
     /** PIN-based parent emergency unlock; verified against the stored PIN. */

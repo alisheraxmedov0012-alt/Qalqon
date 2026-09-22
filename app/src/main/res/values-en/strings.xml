@@ -196,6 +196,12 @@
     <string name="activity_emergency_unlock">Emergency PIN unlock</string>
     <string name="activity_no_face">No face detected</string>
     <string name="activity_protection_released">Restriction lifted</string>
+
+    <!-- Group 6: background protection foreground service -->
+    <string name="protection_service_channel_name">Protection service</string>
+    <string name="protection_service_channel_description">Shows the protection status while Qalqon runs in the background.</string>
+    <string name="protection_service_notification_title">Qalqon protection is active</string>
+    <string name="protection_service_notification_text">Qalqon is monitoring your selected rules.</string>
     <string name="settings_tab_data">Data</string>
     <string name="data_section_faces">Face data</string>
     <string name="data_delete_parent_face">Delete parent face</string>

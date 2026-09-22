@@ -31,6 +31,8 @@ import uz.faceguard.app.data.repository.ProtectedAppsRepositoryImpl
 import uz.faceguard.app.core.embed.FaceEmbeddingModel
 import uz.faceguard.app.core.embed.TfLiteMobileFaceNet
 import uz.faceguard.app.core.policy.DefaultPolicyEvaluator
+import uz.faceguard.app.core.protection.AndroidProtectionServiceLauncher
+import uz.faceguard.app.core.protection.ProtectionServiceLauncher
 import uz.faceguard.app.core.recognition.Recognizer
 import uz.faceguard.app.data.repository.SettingsRepositoryImpl
 import uz.faceguard.app.domain.repository.AccountRepository
@@ -107,6 +109,14 @@ object AppModule {
     @Provides
     @Singleton
     fun providePolicyEvaluator(): PolicyEvaluator = DefaultPolicyEvaluator()
+
+    // Group 6: the runtime owns active protection and delegates the process
+    // lifecycle (foreground service) to this launcher.
+    @Provides
+    @Singleton
+    fun provideProtectionServiceLauncher(
+        @ApplicationContext context: Context,
+    ): ProtectionServiceLauncher = AndroidProtectionServiceLauncher(context)
 
     @Provides
     @Singleton

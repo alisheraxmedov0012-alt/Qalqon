@@ -197,6 +197,12 @@
     <string name="activity_emergency_unlock">PIN orqali favqulodda ochish</string>
     <string name="activity_no_face">Yuz ko\'rinmadi</string>
     <string name="activity_protection_released">Cheklov olib tashlandi</string>
+
+    <!-- Group 6: background protection foreground service -->
+    <string name="protection_service_channel_name">Himoya xizmati</string>
+    <string name="protection_service_channel_description">Qalqon fonda ishlayotganda himoya holati ko\'rsatiladi.</string>
+    <string name="protection_service_notification_title">Qalqon himoyasi faol</string>
+    <string name="protection_service_notification_text">Qalqon tanlangan qoidalarni kuzatmoqda.</string>
     <string name="settings_tab_data">Ma\'lumotlar</string>
     <string name="data_section_faces">Yuz ma\'lumotlari</string>
     <string name="data_delete_parent_face">Ota-ona yuzini o\'chirish</string>

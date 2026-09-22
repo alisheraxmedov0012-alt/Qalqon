@@ -196,6 +196,12 @@
     <string name="activity_emergency_unlock">Аварийная разблокировка по PIN</string>
     <string name="activity_no_face">Лицо не обнаружено</string>
     <string name="activity_protection_released">Ограничение снято</string>
+
+    <!-- Group 6: background protection foreground service -->
+    <string name="protection_service_channel_name">Служба защиты</string>
+    <string name="protection_service_channel_description">Показывает статус защиты, пока Qalqon работает в фоне.</string>
+    <string name="protection_service_notification_title">Защита Qalqon активна</string>
+    <string name="protection_service_notification_text">Qalqon отслеживает выбранные правила.</string>
     <string name="settings_tab_data">Данные</string>
     <string name="data_section_faces">Данные лиц</string>
     <string name="data_delete_parent_face">Удалить лицо родителя</string>

@@ -146,6 +146,10 @@ class ProtectionRuntime @Inject constructor(
     fun start() {
         if (started) return
         started = true
+        // One-time permission/capability snapshot; the screen refreshes it on
+        // resume. Probes are kept out of the hot syncActive() path because they
+        // read system state and run on the main dispatcher.
+        refreshPermissions()
         engine.onEvent = { type, detail ->
             // Activity logging is secondary observability: it must never
             // interrupt protection, so a write failure is swallowed (and only
@@ -233,7 +237,6 @@ class ProtectionRuntime @Inject constructor(
                 childrenFaceEnrolled = children.count { child -> child.isFaceEnrolled },
                 overlayGranted = overlay.hasPermission(),
                 usageAccessGranted = monitor.hasUsageAccess(),
-                accessibilityEnabled = AccessibilityCapability.isEnabled(context),
             )
         }
     }

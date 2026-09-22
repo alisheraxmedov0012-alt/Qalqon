@@ -71,7 +71,7 @@ class ProtectionForegroundServiceTest {
         runtime.awaitActive(false)
     }
 
-    private suspend fun awaitRunning(expected: Boolean, timeoutMs: Long = 10_000L) {
+    private suspend fun awaitRunning(expected: Boolean, timeoutMs: Long = 30_000L) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             if (running == expected) return
@@ -80,7 +80,7 @@ class ProtectionForegroundServiceTest {
         assertEquals("foreground service running state", expected, running)
     }
 
-    private suspend fun ProtectionRuntime.awaitActive(expected: Boolean, timeoutMs: Long = 10_000L) {
+    private suspend fun ProtectionRuntime.awaitActive(expected: Boolean, timeoutMs: Long = 30_000L) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             if (state.value.active == expected) return

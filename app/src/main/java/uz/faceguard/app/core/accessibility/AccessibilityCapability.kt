@@ -18,7 +18,8 @@ import android.view.accessibility.AccessibilityManager
 object AccessibilityCapability {
 
     fun isEnabled(context: Context): Boolean =
-        isEnabledInManager(context) || isEnabledInSettings(context)
+        runCatching { isEnabledInManager(context) || isEnabledInSettings(context) }
+            .getOrDefault(false)
 
     /**
      * Live framework state: what the system is actually running.

@@ -92,7 +92,9 @@ class SettingsViewModelTest {
     fun tearDown() {
         scope.cancel()
         runBlocking { sessionManager.clearSession() }
-        db.close()
+        // The ViewModel's Room flows outlive the test; closing the in-memory
+        // database would make them fail and crash the process, so it is left
+        // open (process-scoped).
         file.delete()
     }
 

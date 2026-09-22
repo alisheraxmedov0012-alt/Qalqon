@@ -72,7 +72,10 @@ class ChildPolicyViewModelTest {
 
     @After
     fun tearDown() = runBlocking {
-        db.close()
+        // The ViewModel's Room flows outlive the test (viewModelScope cannot be
+        // cancelled from here). Closing the in-memory database would make those
+        // collectors fail with "connection pool has been closed" and crash the
+        // test process, so the process-scoped in-memory DB is left open.
         sessionManager.clearSession()
     }
 

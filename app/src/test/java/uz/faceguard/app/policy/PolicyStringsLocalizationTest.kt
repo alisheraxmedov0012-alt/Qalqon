@@ -44,6 +44,11 @@ class PolicyStringsLocalizationTest {
         // Group 5 activity log labels
         "activity_no_face",
         "activity_protection_released",
+        // Group 6 foreground service notification
+        "protection_service_channel_name",
+        "protection_service_channel_description",
+        "protection_service_notification_title",
+        "protection_service_notification_text",
     )
 
     @Test

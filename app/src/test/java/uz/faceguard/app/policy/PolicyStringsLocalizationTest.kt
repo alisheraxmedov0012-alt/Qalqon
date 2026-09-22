@@ -49,6 +49,9 @@ class PolicyStringsLocalizationTest {
         "protection_service_channel_description",
         "protection_service_notification_title",
         "protection_service_notification_text",
+        // Group 7 accessibility service
+        "accessibility_service_description",
+        "protection_req_accessibility",
     )
 
     @Test

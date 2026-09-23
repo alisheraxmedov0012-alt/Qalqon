@@ -206,13 +206,22 @@ class ProtectionRuntimeRecoveryTest {
         return engine.state.value == expected
     }
 
-    /** Drives the real engine into BLOCKED then RECOVERING. */
+    /**
+     * Drives the real engine into BLOCKED then RECOVERING.
+     *
+     * The context/settings are re-asserted on the engine inside the same
+     * single-threaded block as the evaluation, so the runtime's asynchronous
+     * sync cannot slip a different context between setup and the decision.
+     */
     private suspend fun enterRecovery() {
-        installContext()
-        withContext(dispatcher) { engine.driveBlocked() }
-        assertEquals("the runtime's engine must block the child", ProtectionState.HARD_BLOCKED, engine.state.value)
-        withContext(dispatcher) { engine.driveNoFace() }
-        assertEquals("losing the face must start the recovery window", ProtectionState.RECOVERING, engine.state.value)
+        withContext(dispatcher) {
+            engine.updateContext(parent, listOf(child), setOf(protectedApp))
+            engine.updateSettings(ProtectionSettings(), policySettings())
+            engine.driveBlocked()
+            assertEquals("the runtime's engine must block the child", ProtectionState.HARD_BLOCKED, engine.state.value)
+            engine.driveNoFace()
+            assertEquals("losing the face must start the recovery window", ProtectionState.RECOVERING, engine.state.value)
+        }
     }
 
     private suspend fun assertNeverReleased() {

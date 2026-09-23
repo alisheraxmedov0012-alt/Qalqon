@@ -306,13 +306,16 @@ class ProtectionRuntimeRecoveryTest {
 
     @Test
     fun protectionDisabled_dropsThePendingRecovery() = runBlocking {
-        // Enabling with no signed-in account keeps the runtime from activating, so
-        // the settings path (`syncActive` -> cancelRecovery) is exercised directly.
-        settingsStore.setProtectionEnabled(true)
-        delay(500L)
         enterRecovery()
 
-        settingsStore.setProtectionEnabled(false)
+        // Protection is disabled (no enabled setting + no account), so the runtime's
+        // sync path - the method its settings collector runs - must drop the pending
+        // recovery. Invoked directly to avoid DataStore emission latency deciding
+        // whether the timer or the boundary wins.
+        ProtectionRuntime::class.java.getDeclaredMethod("syncActive").let {
+            it.isAccessible = true
+            it.invoke(runtime)
+        }
 
         assertTrue(awaitState(ProtectionState.UNPROTECTED))
         assertNeverReleased()

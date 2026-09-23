@@ -198,6 +198,7 @@ class ProtectionRuntimeRecoveryTest {
 
     @After
     fun tearDown() = runBlocking {
+        withContext(dispatcher) { engine.scanScheduler?.detach() }
         withContext(dispatcher) { engine.stop() }
         previousOnEvent?.let { engine.onEvent = it }
         scope.cancel()
@@ -244,6 +245,11 @@ class ProtectionRuntimeRecoveryTest {
         withContext(dispatcher) {
             engine.updateContext(parent, listOf(child), setOf(protectedApp))
             engine.updateSettings(ProtectionSettings(), policySettings())
+            // The runtime's engine gates evaluation on its scan scheduler being in
+            // an open window; arm it (the runtime does this on activation) so the
+            // engine actually decides. detach() in tearDown resets it afterwards.
+            engine.scanScheduler?.attach(scope)
+            engine.scanScheduler?.onProtectedAppOpened()
             resetEngineClock()
             engine.driveBlocked()
             assertEquals("the runtime's engine must block the child", ProtectionState.HARD_BLOCKED, engine.state.value)

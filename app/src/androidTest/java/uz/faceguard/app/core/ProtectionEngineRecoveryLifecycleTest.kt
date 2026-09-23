@@ -183,6 +183,20 @@ class ProtectionEngineRecoveryLifecycleTest {
         drive(protectedApp, childVec, times = 5, startAt = startAt)
     }
 
+    /**
+     * Keeps the engine on the "blocked" state while wall-clock time passes by
+     * re-publishing the child frame (the engine's frame TTL is 1.5s, so a single
+     * frame would otherwise go stale and the tick would start a new recovery).
+     */
+    private suspend fun Harness.holdBlocked(totalMs: Long) {
+        var elapsed = 0L
+        while (elapsed < totalMs) {
+            publish(childVec)
+            delay(300L)
+            elapsed += 300L
+        }
+    }
+
     private suspend fun Harness.awaitState(expected: ProtectionState, timeoutMs: Long = 5_000L): Boolean {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
@@ -232,7 +246,7 @@ class ProtectionEngineRecoveryLifecycleTest {
         val clearsAfterReBlock = exec.clearCount
 
         // Wait well past the first cycle's delay: the stale timer must not release.
-        delay(1_200L)
+        holdBlocked(1_000L)
 
         assertEquals("a stale timer must not release a newer cycle", ProtectionState.HARD_BLOCKED, engine.state.value)
         assertEquals(0, events.count(ActivityEventType.PROTECTION_RELEASED))

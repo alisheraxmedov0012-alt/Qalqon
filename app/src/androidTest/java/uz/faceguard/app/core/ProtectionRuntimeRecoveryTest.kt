@@ -128,6 +128,33 @@ class ProtectionRuntimeRecoveryTest {
         (f.get(monitor) as MutableStateFlow<String?>).value = packageName
     }
 
+    /**
+     * Test plumbing: resets the engine's per-session timing trackers so the test's
+     * logical clock starts fresh. The app-scoped singleton may carry a wall-clock
+     * `lastStableAt` from earlier activity, which would otherwise make the engine's
+     * 1.2s debounce swallow every evaluation driven with the test clock.
+     */
+    private fun resetEngineClock() {
+        fun set(name: String, value: Any) {
+            ProtectionEngine::class.java.getDeclaredField(name).let {
+                it.isAccessible = true
+                it.set(engine, value)
+            }
+        }
+        set("lastStableAt", 0L)
+        set("emptyFaceStreak", 0)
+        ProtectionEngine::class.java.getDeclaredField("pending").let {
+            it.isAccessible = true
+            @Suppress("UNCHECKED_CAST")
+            (it.get(engine) as MutableList<Any?>).clear()
+        }
+        ProtectionEngine::class.java.getDeclaredField("recentConfidences").let {
+            it.isAccessible = true
+            @Suppress("UNCHECKED_CAST")
+            (it.get(engine) as ArrayDeque<Any?>).clear()
+        }
+    }
+
     private fun injectScope() {
         ProtectionEngine::class.java.getDeclaredField("scope").let {
             it.isAccessible = true
@@ -217,6 +244,7 @@ class ProtectionRuntimeRecoveryTest {
         withContext(dispatcher) {
             engine.updateContext(parent, listOf(child), setOf(protectedApp))
             engine.updateSettings(ProtectionSettings(), policySettings())
+            resetEngineClock()
             engine.driveBlocked()
             assertEquals("the runtime's engine must block the child", ProtectionState.HARD_BLOCKED, engine.state.value)
             engine.driveNoFace()

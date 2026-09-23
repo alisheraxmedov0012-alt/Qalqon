@@ -87,6 +87,26 @@ class ProtectionEngine(
     private val _liveness = MutableStateFlow<LivenessResult?>(null)
     val liveness: StateFlow<LivenessResult?> = _liveness
 
+    /**
+     * Phase 9: the package the current protection cycle is holding (the app that
+     * was in the foreground when the block was applied). It is the best-effort
+     * "restore to this context" target: when the block is released we simply stop
+     * drawing our overlay, so the (still-foreground) app is usable again. We never
+     * force a third-party app back or touch its private state. Cleared whenever the
+     * cycle ends (release, cancel, stop, leave-protected-app).
+     */
+    private val _blockedApp = MutableStateFlow<String?>(null)
+    val blockedApp: StateFlow<String?> = _blockedApp
+
+    /**
+     * Phase 9: generation token for the recovery timer. Bumped whenever a recovery
+     * cycle starts, is replaced by a new block, or is cancelled. A timer only
+     * releases protection when the generation it was armed with is still current,
+     * so a stale timer can never shorten or end a newer cycle.
+     */
+    private var recoveryGeneration = 0L
+    private var recoveryJob: Job? = null
+
     private var settings = ProtectionSettings()
     private var policy = PolicySettings()
 
@@ -176,6 +196,8 @@ class ProtectionEngine(
         latestFrame = null
         resetTrackers()
         activationGate.cancel()
+        // Phase 9: no pending recovery release may outlive the session.
+        invalidateRecoveryTimer()
         lastLoggedForeground = null
         if (_state.value != ProtectionState.UNPROTECTED) {
             transition(ProtectionState.UNPROTECTED, "protection stopped", System.currentTimeMillis())
@@ -245,7 +267,12 @@ class ProtectionEngine(
         // runtime always holds the identity that the decision was based on.
         recordIdentity(result, frameAvailable = frame != null, now = now)
 
-        applyDecision(policyEvaluator.evaluate(policyContext(result, foreground, now, livenessResult)), result, now)
+        applyDecision(
+            policyEvaluator.evaluate(policyContext(result, foreground, now, livenessResult)),
+            result,
+            now,
+            foreground,
+        )
     }
 
     /**
@@ -308,6 +335,7 @@ class ProtectionEngine(
         decision: PolicyDecision,
         result: RecognitionResult,
         now: Long,
+        foreground: String?,
     ) {
         // Meaningful recognition transitions only: the multi-frame confirmation
         // above suppresses per-frame chatter and logIdentityTransition suppresses
@@ -328,7 +356,7 @@ class ProtectionEngine(
                         )
                         clearBlock()
                     } else if (_state.value != ProtectionState.RECOVERING) {
-                        beginRecovery(now, policy.recoveryDelayMs)
+                        beginRecovery(now, policy.recoveryDelayMs, foreground)
                     }
                 }
             }
@@ -338,7 +366,7 @@ class ProtectionEngine(
                 if (_state.value != ProtectionState.UNPROTECTED &&
                     _state.value != ProtectionState.RECOVERING
                 ) {
-                    beginRecovery(now, policy.recoveryDelayMs)
+                    beginRecovery(now, policy.recoveryDelayMs, foreground)
                 }
             }
 
@@ -355,6 +383,12 @@ class ProtectionEngine(
 
                 val target = stateFor(decision.action)
                 if (_state.value == target) return
+
+                // Phase 9: a (re)block replaces any pending recovery release, so the
+                // old timer is invalidated now instead of lingering until it fires.
+                invalidateRecoveryTimer()
+                // Best-effort restoration target for this protection cycle.
+                _blockedApp.value = foreground
 
                 transition(target, decision.reason, now, result.confidenceOrNull())
                 actions.execute(decision.action)
@@ -432,17 +466,64 @@ class ProtectionEngine(
         return raw
     }
 
-    /** A recognized face was lost: hold the block for the recovery delay, then release. */
-    private fun beginRecovery(now: Long, delayMs: Long) {
+    /**
+     * Phase 9: a recognized face was lost while blocked. Hold the block for the
+     * recovery delay, then release exactly once.
+     *
+     * The timer is armed with a generation token, so only the timer belonging to
+     * the *current* recovery cycle may release; a stale timer can never shorten or
+     * end a newer cycle. Arming also cancels any previous timer, so there is never
+     * more than one recovery timer alive.
+     */
+    private fun beginRecovery(now: Long, delayMs: Long, foreground: String?) {
         if (_state.value == ProtectionState.UNPROTECTED || _state.value == ProtectionState.RECOVERING) return
+        // Replace any previous timer: never a duplicate.
+        recoveryJob?.cancel()
+        val generation = ++recoveryGeneration
+        if (foreground != null) _blockedApp.value = foreground
         transition(ProtectionState.RECOVERING, "restriction lifted; recovery window", now)
-        scope?.launch {
+        // No running session (a bare evaluate() call) -> no timer, exactly as before.
+        val session = scope ?: return
+        recoveryJob = session.launch {
             delay(delayMs)
-            if (_state.value == ProtectionState.RECOVERING) {
-                transition(ProtectionState.UNPROTECTED, "recovery delay elapsed", System.currentTimeMillis())
-                clearBlock()
-                safeLog(ActivityEventType.PROTECTION_RELEASED, null)
+            // Stale-guard: only the cycle that armed this timer may release.
+            if (generation == recoveryGeneration && _state.value == ProtectionState.RECOVERING) {
+                releaseRecovered(System.currentTimeMillis())
             }
+        }
+    }
+
+    /** Ends a recovery cycle: releases the block once and logs it exactly once. */
+    private fun releaseRecovered(now: Long) {
+        recoveryJob = null
+        // Invalidate any sibling timer so a second release can never follow.
+        recoveryGeneration++
+        transition(ProtectionState.UNPROTECTED, "recovery delay elapsed", now)
+        clearBlock()
+        safeLog(ActivityEventType.PROTECTION_RELEASED, null)
+    }
+
+    /**
+     * Cancels the pending timer and invalidates it (generation bump). The current
+     * protection state is left alone; callers decide what the boundary means.
+     */
+    private fun invalidateRecoveryTimer() {
+        recoveryJob?.cancel()
+        recoveryJob = null
+        recoveryGeneration++
+    }
+
+    /**
+     * Phase 9: drops any pending recovery window at a lifecycle boundary (account
+     * change, sign-out, protection disable, runtime stop). No PROTECTION_RELEASED
+     * is logged, because the cycle did not end by the recovery rule; the state is
+     * reset so a stale timer can never touch a later cycle or another account.
+     */
+    fun cancelRecovery() {
+        invalidateRecoveryTimer()
+        if (_state.value == ProtectionState.RECOVERING) {
+            transition(ProtectionState.UNPROTECTED, "recovery cancelled", System.currentTimeMillis())
+            clearBlock()
         }
     }
 
@@ -464,6 +545,10 @@ class ProtectionEngine(
 
     private fun clearBlock() {
         actions.clear()
+        // Phase 9: the protection cycle is over, so its best-effort restoration
+        // target is dropped with it and any pending release is invalidated.
+        _blockedApp.value = null
+        invalidateRecoveryTimer()
     }
 
     interface OverlayController {
@@ -475,6 +560,8 @@ class ProtectionEngine(
     fun emergencyUnlock() {
         safeLog(ActivityEventType.EMERGENCY_UNLOCK, null)
         activationGate.cancel()
+        // Phase 9: an emergency unlock supersedes any pending recovery release.
+        invalidateRecoveryTimer()
         transition(ProtectionState.UNPROTECTED, "emergency unlock", System.currentTimeMillis())
         clearBlock()
     }

@@ -62,6 +62,11 @@ data class ProtectionRuntimeState(
      * the active protection session yet.
      */
     val liveness: LivenessResult? = null,
+    /**
+     * Phase 9: the app the current protection cycle is holding (best-effort
+     * restoration target). Null when no cycle is active.
+     */
+    val blockedApp: String? = null,
     val scanMode: ScanMode = ScanMode.BALANCED,
     val scanning: Boolean = false,
     val cooldownRemainingMs: Long = 0L,
@@ -198,6 +203,9 @@ class ProtectionRuntime @Inject constructor(
                     // Group 9: liveness is account-scoped too.
                     engine.resetLiveness()
                     onLivenessChanged(null)
+                    // Phase 9: a previous account's pending recovery must never
+                    // release or alter anything in the new session.
+                    engine.cancelRecovery()
                 }
                 accountId = id
                 refreshChildPolicies()
@@ -248,6 +256,8 @@ class ProtectionRuntime @Inject constructor(
         // Group 9: liveness ("is it a real person") is its own signal, kept
         // separate from identity and foreground.
         scope.launch { engine.liveness.collect { result -> onLivenessChanged(result) } }
+        // Phase 9: the app the current protection cycle is holding.
+        scope.launch { engine.blockedApp.collect { pkg -> _state.update { it.copy(blockedApp = pkg) } } }
         scope.launch { monitor.current.collect { value -> _state.update { it.copy(foregroundApp = value) } } }
         scope.launch { scheduler.scanning.collect { value -> _state.update { it.copy(scanning = value) } } }
         scope.launch {
@@ -266,6 +276,9 @@ class ProtectionRuntime @Inject constructor(
     private fun syncActive() {
         val shouldBeActive = ProtectionServicePolicy.shouldRun(settings.enabled, accountId)
         if (shouldBeActive && !active) activate() else if (!shouldBeActive && active) deactivate()
+        // Phase 9: while protection must not run (disabled / signed out) there can
+        // be no pending recovery release either.
+        if (!shouldBeActive) engine.cancelRecovery()
         _state.update {
             it.copy(
                 enabled = settings.enabled,
@@ -311,6 +324,8 @@ class ProtectionRuntime @Inject constructor(
      */
     fun stop() {
         if (active) deactivate()
+        // Phase 9: an explicit stop always drops any pending recovery.
+        engine.cancelRecovery()
         _state.update { it.copy(active = false) }
     }
 

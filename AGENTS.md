@@ -146,3 +146,20 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   `PolicySettings.spoofAction` defaults to SOFT_BLOCK (not persisted yet).
   Accessibility/FGS untouched; no INTERNET; no UI change; no anti-spoofing model
   bundled (photo/screen/replay not provably defeated - documented in README).
+
+- 2026-09-23 Phase 9 (recovery & state restoration), branch `feature/phase9-recovery`
+  off Group 9 HEAD 18012c3. `ProtectionEngine` recovery is now generation-guarded:
+  `recoveryJob` + `recoveryGeneration` token, so a stale timer can never release or
+  shorten a newer cycle; `beginRecovery` cancels any previous timer (no duplicates);
+  a (re)block invalidates the pending timer; `clearBlock()` invalidates it too.
+  New `cancelRecovery()` drops a pending window without logging PROTECTION_RELEASED
+  (idempotent, generation-bumping). `stop()` and `emergencyUnlock()` invalidate the
+  timer. New `blockedApp: StateFlow<String?>` = the app the current cycle holds
+  (best-effort restoration target; overlay removal returns the user to the
+  still-foreground app - third-party internal state is never restored/claimed).
+  `ProtectionRuntime` now cancels recovery on account change, when protection must
+  not run (`syncActive`), and on `stop()`, and mirrors `blockedApp` into
+  `ProtectionRuntimeState.blockedApp`. Events unchanged: CHILD_BLOCKED once per
+  block transition, PROTECTION_RELEASED once per recovery cycle, no timer-tick events.
+  Tests: `ProtectionEngineRecoveryLifecycleTest` + `ProtectionRuntimeRecoveryTest`.
+  JVM regression 87/87 unchanged.

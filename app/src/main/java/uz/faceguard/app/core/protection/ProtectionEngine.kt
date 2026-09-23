@@ -107,6 +107,18 @@ class ProtectionEngine(
     private var recoveryGeneration = 0L
     private var recoveryJob: Job? = null
 
+    /**
+     * Phase 9: the engine's logical clock - the last `now` it was evaluated with.
+     * Recovery transitions use it so the engine's debounce window stays consistent
+     * with the clock that drives evaluation. In production that is the tick's
+     * wall-clock time; in tests it is the injected `now`.
+     */
+    @Volatile
+    private var lastEvaluateNow = 0L
+
+    private fun logicalNow(): Long =
+        if (lastEvaluateNow > 0L) lastEvaluateNow else System.currentTimeMillis()
+
     private var settings = ProtectionSettings()
     private var policy = PolicySettings()
 
@@ -231,6 +243,7 @@ class ProtectionEngine(
     }
 
     fun evaluate(foreground: String?, frame: FrameEvent?, now: Long = System.currentTimeMillis()) {
+        lastEvaluateNow = now
         // Group 9: feed the liveness window from the same frames the identity
         // signal uses and publish the resulting state. This runs before the
         // protected-app / debounce gates and is completely independent of the
@@ -498,7 +511,7 @@ class ProtectionEngine(
         recoveryJob = null
         // Invalidate any sibling timer so a second release can never follow.
         recoveryGeneration++
-        transition(ProtectionState.UNPROTECTED, "recovery delay elapsed", now)
+        transition(ProtectionState.UNPROTECTED, "recovery delay elapsed", logicalNow())
         clearBlock()
         safeLog(ActivityEventType.PROTECTION_RELEASED, null)
     }
@@ -522,7 +535,7 @@ class ProtectionEngine(
     fun cancelRecovery() {
         invalidateRecoveryTimer()
         if (_state.value == ProtectionState.RECOVERING) {
-            transition(ProtectionState.UNPROTECTED, "recovery cancelled", System.currentTimeMillis())
+            transition(ProtectionState.UNPROTECTED, "recovery cancelled", logicalNow())
             clearBlock()
         }
     }

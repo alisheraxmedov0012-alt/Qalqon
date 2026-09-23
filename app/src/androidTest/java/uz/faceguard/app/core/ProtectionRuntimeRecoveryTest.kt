@@ -47,14 +47,18 @@ import uz.faceguard.app.domain.policy.ProtectionAction
 /**
  * Phase 9: the runtime lifecycle boundaries must drop a pending recovery.
  *
- * The CI emulator has no controllable camera, so the runtime's own engine is
- * driven through its real, production `evaluate()` (reached via reflection, the
- * same instance the runtime owns) instead of through frames. Each test asserts
- * the binding invariant from the spec: after an account change / sign-out /
- * disable / explicit stop, the previous cycle's pending recovery must never emit
- * a `PROTECTION_RELEASED` (or modify the new session), even after its original
- * delay has long elapsed. The engine-level cancellation mechanic itself is
- * verified directly in [ProtectionEngineRecoveryLifecycleTest].
+ * The runtime's own engine instance is used (reached via reflection, exactly the
+ * one the runtime owns), driven through its real `evaluate()`. The runtime's
+ * private context/policy fields are set to the same test data, so the runtime's
+ * own `syncContext()` re-asserts that context instead of wiping it; protection
+ * stays disabled at the settings level (no account), so the runtime never
+ * activates the session and the test keeps deterministic control of the engine.
+ *
+ * Each test asserts the binding invariant from the spec: after an account change /
+ * sign-out / disable / explicit stop, the previous cycle's pending recovery must
+ * never emit a `PROTECTION_RELEASED` (or modify the new session), even after its
+ * original delay has elapsed. The cancellation mechanic itself is verified
+ * directly in [ProtectionEngineRecoveryLifecycleTest].
  */
 @RunWith(AndroidJUnit4::class)
 class ProtectionRuntimeRecoveryTest {
@@ -89,7 +93,7 @@ class ProtectionRuntimeRecoveryTest {
     )
 
     private val protectedApp = "com.example.youtube"
-    private val recoveryMs = 250L
+    private val recoveryMs = 3_000L
 
     private val released = CopyOnWriteArrayList<ActivityEventType>()
     private var previousOnEvent: ((ActivityEventType, String?) -> Unit)? = null
@@ -99,22 +103,58 @@ class ProtectionRuntimeRecoveryTest {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 
     private val engine: ProtectionEngine
-        get() = ProtectionRuntime::class.java.getDeclaredField("engine").let {
-            it.isAccessible = true
-            it.get(runtime) as ProtectionEngine
-        }
+        get() = field("engine") as ProtectionEngine
 
     private val monitor: ForegroundAppMonitor
-        get() = ProtectionRuntime::class.java.getDeclaredField("monitor").let {
+        get() = field("monitor") as ForegroundAppMonitor
+
+    private fun field(name: String): Any? =
+        ProtectionRuntime::class.java.getDeclaredField(name).let {
             it.isAccessible = true
-            it.get(runtime) as ForegroundAppMonitor
+            it.get(runtime)
         }
 
+    private fun setField(name: String, value: Any?) {
+        ProtectionRuntime::class.java.getDeclaredField(name).let {
+            it.isAccessible = true
+            it.set(runtime, value)
+        }
+    }
+
     private fun withForeground(packageName: String?) {
-        val field = ForegroundAppMonitor::class.java.getDeclaredField("_current")
-        field.isAccessible = true
+        val f = ForegroundAppMonitor::class.java.getDeclaredField("_current")
+        f.isAccessible = true
         @Suppress("UNCHECKED_CAST")
-        (field.get(monitor) as MutableStateFlow<String?>).value = packageName
+        (f.get(monitor) as MutableStateFlow<String?>).value = packageName
+    }
+
+    private fun injectScope() {
+        ProtectionEngine::class.java.getDeclaredField("scope").let {
+            it.isAccessible = true
+            it.set(engine, scope)
+        }
+    }
+
+    private fun policySettings() = PolicySettings(
+        enabled = true,
+        activationDelayMs = 0L,
+        childAction = ProtectionAction.HARD_BLOCK,
+        unknownUserAction = ProtectionAction.SOFT_BLOCK,
+        noFaceAction = ProtectionAction.ALLOW,
+        recoveryDelayMs = recoveryMs,
+    )
+
+    /** Re-asserts the runtime's own context/policy to the test data. */
+    private suspend fun installContext() {
+        setField("parent", parent)
+        setField("children", listOf(child))
+        setField("protectedPackages", setOf(protectedApp))
+        setField("policy", policySettings())
+        withContext(dispatcher) {
+            engine.updateContext(parent, listOf(child), setOf(protectedApp))
+            engine.updateSettings(ProtectionSettings(), policySettings())
+        }
+        injectScope()
     }
 
     @Before
@@ -122,15 +162,11 @@ class ProtectionRuntimeRecoveryTest {
         settingsStore.clearAll()
         session.clearSession()
         released.clear()
-        // The runtime may have left the singleton engine started from an earlier
-        // test; settle so this test owns a stopped engine, then capture its sink.
         delay(700L)
         previousOnEvent = engine.onEvent
         engine.onEvent = { type, _ -> released += type }
-        engine.updateContext(parent, listOf(child), setOf(protectedApp))
-        engine.updateSettings(ProtectionSettings(), policySettings())
         withForeground(protectedApp)
-        engine.start(scope)
+        installContext()
     }
 
     @After
@@ -145,29 +181,20 @@ class ProtectionRuntimeRecoveryTest {
         delay(200L)
     }
 
-    private fun policySettings() = PolicySettings(
-        enabled = true,
-        activationDelayMs = 0L,
-        childAction = ProtectionAction.HARD_BLOCK,
-        unknownUserAction = ProtectionAction.SOFT_BLOCK,
-        noFaceAction = ProtectionAction.ALLOW,
-        recoveryDelayMs = recoveryMs,
-    )
-
     private fun frame(features: FloatArray?): FrameEvent = FrameEvent(
         image = InputImage.fromBitmap(Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888), 0),
         faceCount = if (features != null) 1 else 0,
         features = features,
     )
 
-    private suspend fun ProtectionEngine.driveBlocked() = withContext(dispatcher) {
+    private fun ProtectionEngine.driveBlocked() {
         var now = 100_000L
         repeat(5) { evaluate(protectedApp, frame(childVec), now); now += 50 }
     }
 
-    private suspend fun ProtectionEngine.driveNoFace() = withContext(dispatcher) {
+    private fun ProtectionEngine.driveNoFace() {
         var now = 400_000L
-        repeat(5) { evaluate(protectedApp, frame(null), now); now += 50 }
+        repeat(3) { evaluate(protectedApp, frame(null), now); now += 50 }
     }
 
     private suspend fun awaitState(expected: ProtectionState, timeoutMs: Long = 5_000L): Boolean {
@@ -179,17 +206,19 @@ class ProtectionRuntimeRecoveryTest {
         return engine.state.value == expected
     }
 
+    /** Drives the real engine into BLOCKED then RECOVERING. */
     private suspend fun enterRecovery() {
+        installContext()
         withContext(dispatcher) { engine.driveBlocked() }
-        assertEquals(ProtectionState.HARD_BLOCKED, engine.state.value)
+        assertEquals("the runtime's engine must block the child", ProtectionState.HARD_BLOCKED, engine.state.value)
         withContext(dispatcher) { engine.driveNoFace() }
-        assertEquals(ProtectionState.RECOVERING, engine.state.value)
+        assertEquals("losing the face must start the recovery window", ProtectionState.RECOVERING, engine.state.value)
     }
 
     private suspend fun assertNeverReleased() {
-        delay(recoveryMs * 3)
+        delay(recoveryMs + 900L)
         assertEquals(
-            "a stale recovery cycle must not emit PROTECTION_RELEASED",
+            "a dropped recovery cycle must not emit PROTECTION_RELEASED",
             0,
             released.count { it == ActivityEventType.PROTECTION_RELEASED },
         )
@@ -200,11 +229,6 @@ class ProtectionRuntimeRecoveryTest {
     fun accountChange_dropsThePendingRecovery() = runBlocking {
         session.setCurrentAccountId(11L)
         delay(700L)
-        withContext(dispatcher) {
-            engine.updateContext(parent, listOf(child), setOf(protectedApp))
-            engine.updateSettings(ProtectionSettings(), policySettings())
-        }
-        withForeground(protectedApp)
         enterRecovery()
 
         session.setCurrentAccountId(12L)
@@ -217,11 +241,6 @@ class ProtectionRuntimeRecoveryTest {
     fun signOut_dropsThePendingRecovery() = runBlocking {
         session.setCurrentAccountId(21L)
         delay(700L)
-        withContext(dispatcher) {
-            engine.updateContext(parent, listOf(child), setOf(protectedApp))
-            engine.updateSettings(ProtectionSettings(), policySettings())
-        }
-        withForeground(protectedApp)
         enterRecovery()
 
         session.clearSession()
@@ -234,11 +253,6 @@ class ProtectionRuntimeRecoveryTest {
     fun runtimeStop_dropsThePendingRecovery() = runBlocking {
         session.setCurrentAccountId(31L)
         delay(700L)
-        withContext(dispatcher) {
-            engine.updateContext(parent, listOf(child), setOf(protectedApp))
-            engine.updateSettings(ProtectionSettings(), policySettings())
-        }
-        withForeground(protectedApp)
         enterRecovery()
 
         runtime.stop()
@@ -249,15 +263,10 @@ class ProtectionRuntimeRecoveryTest {
 
     @Test
     fun protectionDisabled_dropsThePendingRecovery() = runBlocking {
-        // Enabled with no signed-in account: protection still must not run, so the
-        // runtime never owns the engine and this test keeps control of it.
+        // Enabling with no signed-in account keeps the runtime from activating, so
+        // the settings path (`syncActive` -> cancelRecovery) is exercised directly.
         settingsStore.setProtectionEnabled(true)
         delay(500L)
-        withContext(dispatcher) {
-            engine.updateContext(parent, listOf(child), setOf(protectedApp))
-            engine.updateSettings(ProtectionSettings(), policySettings())
-        }
-        withForeground(protectedApp)
         enterRecovery()
 
         settingsStore.setProtectionEnabled(false)

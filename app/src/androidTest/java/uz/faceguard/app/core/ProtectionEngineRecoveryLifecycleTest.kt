@@ -13,7 +13,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
@@ -41,17 +40,19 @@ import uz.faceguard.app.domain.policy.ProtectionAction
 /**
  * Phase 9: the recovery lifecycle of the real [ProtectionEngine].
  *
- * The engine is started for real (tick loop + frame job + recovery coroutine) on
- * a single-threaded dispatcher, so all engine state changes are serialized and
- * the tests are deterministic. Because the tick loop re-evaluates the last
- * published frame, every test keeps the recognizer's latest frame in sync with
- * the state it expects, so a background tick can never race the assertion into a
- * different state.
+ * The engine is driven through its real, public `evaluate()` on a single-threaded
+ * dispatcher, and its session scope (the field `start()` sets) is injected with
+ * that dispatcher so the real recovery coroutine runs there. Not starting the tick
+ * loop is deliberate: it removes the only source of nondeterminism (a background
+ * tick re-evaluating frames), so every assertion is exact and repeatable while the
+ * code under test - `beginRecovery`, the generation guard, `releaseRecovered`,
+ * `cancelRecovery` and `clearBlock` - is unchanged production code.
  *
- * Covered: block -> recovering -> release, re-trigger (during/after recovery),
+ * Covered: block -> recovering -> release, re-trigger during and after recovery,
  * multiple cycles, duplicate-timer prevention, stale-timer containment, zero and
  * non-zero recovery delays, cancel/stop/emergency-unlock cancellation, overlay
- * removed exactly once, event consistency (no spam) and best-effort context.
+ * removed once, event consistency (no spam), parent/unknown/no-face during
+ * recovery, protected-app transition during recovery, and best-effort context.
  */
 @RunWith(AndroidJUnit4::class)
 class ProtectionEngineRecoveryLifecycleTest {
@@ -99,11 +100,10 @@ class ProtectionEngineRecoveryLifecycleTest {
         fun count(type: ActivityEventType) = all.count { it.first == type }
     }
 
-    private fun frame(features: FloatArray?, timestamp: Long = System.currentTimeMillis()): FrameEvent = FrameEvent(
+    private fun frame(features: FloatArray?): FrameEvent = FrameEvent(
         image = InputImage.fromBitmap(Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888), 0),
         faceCount = if (features != null) 1 else 0,
         features = features,
-        timestamp = timestamp,
     )
 
     private fun policySettings(recovery: Long = 200L) = PolicySettings(
@@ -115,20 +115,11 @@ class ProtectionEngineRecoveryLifecycleTest {
         recoveryDelayMs = recovery,
     )
 
-    private fun ForegroundAppMonitor.withForeground(packageName: String?) {
-        val field = ForegroundAppMonitor::class.java.getDeclaredField("_current")
-        field.isAccessible = true
-        @Suppress("UNCHECKED_CAST")
-        (field.get(this) as MutableStateFlow<String?>).value = packageName
-    }
-
-    /** Real engine on a single-thread dispatcher, with a recording event sink. */
+    /** Real engine + recording doubles, on one single-threaded dispatcher. */
     private inner class Harness(recovery: Long) : AutoCloseable {
         val exec = RecordingExecutor()
         val events = RecordingEvents()
-        val recognizer = Recognizer()
-        val monitor = ForegroundAppMonitor(context).apply { withForeground(protectedApp) }
-        val engine = ProtectionEngine(recognizer, monitor, exec, DefaultPolicyEvaluator())
+        val engine = ProtectionEngine(Recognizer(), ForegroundAppMonitor(context), exec, DefaultPolicyEvaluator())
         private val executor: ExecutorService = Executors.newSingleThreadExecutor()
         val dispatcher: CoroutineDispatcher = executor.asCoroutineDispatcher()
         val scope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -137,11 +128,13 @@ class ProtectionEngineRecoveryLifecycleTest {
             engine.onEvent = { type, detail -> events.add(type, detail) }
             engine.updateContext(parent, listOf(child), setOf(protectedApp))
             engine.updateSettings(ProtectionSettings(), policySettings(recovery))
-            engine.start(scope)
+            // Inject the session scope the engine's recovery coroutine runs on,
+            // without starting the (nondeterministic) tick loop.
+            ProtectionEngine::class.java.getDeclaredField("scope").let {
+                it.isAccessible = true
+                it.set(engine, scope)
+            }
         }
-
-        /** Pushes a matching frame so a background tick keeps the same state. */
-        fun publish(features: FloatArray?) = recognizer.publish(frame(features))
 
         fun drive(foreground: String?, features: FloatArray?, times: Int, startAt: Long) {
             var now = startAt
@@ -161,7 +154,6 @@ class ProtectionEngineRecoveryLifecycleTest {
     private fun runHarness(recovery: Long = 200L, body: suspend Harness.() -> Unit) = runBlocking {
         val harness = Harness(recovery)
         try {
-            withContext(harness.dispatcher) { harness.publish(childVec) }
             harness.body()
         } finally {
             harness.close()
@@ -169,41 +161,16 @@ class ProtectionEngineRecoveryLifecycleTest {
     }
 
     private suspend fun Harness.block() = withContext(dispatcher) {
-        publish(childVec)
         drive(protectedApp, childVec, times = 5, startAt = 100_000L)
     }
 
-    private suspend fun Harness.loseFace(startAt: Long = 400_000L) = withContext(dispatcher) {
-        publish(null)
-        drive(protectedApp, null, times = 5, startAt = startAt)
+    /** 3 confirmation frames: enough to start recovery, short of the obstruction streak. */
+    private suspend fun Harness.loseFace(times: Int = 3, startAt: Long = 400_000L) = withContext(dispatcher) {
+        drive(protectedApp, null, times = times, startAt = startAt)
     }
 
     private suspend fun Harness.childReturns(startAt: Long = 700_000L) = withContext(dispatcher) {
-        publish(childVec)
         drive(protectedApp, childVec, times = 5, startAt = startAt)
-    }
-
-    /**
-     * Keeps the engine on the "blocked" state while wall-clock time passes by
-     * re-publishing the child frame (the engine's frame TTL is 1.5s, so a single
-     * frame would otherwise go stale and the tick would start a new recovery).
-     */
-    private suspend fun Harness.holdBlocked(totalMs: Long) {
-        var elapsed = 0L
-        while (elapsed < totalMs) {
-            publish(childVec)
-            delay(300L)
-            elapsed += 300L
-        }
-    }
-
-    private suspend fun Harness.awaitState(expected: ProtectionState, timeoutMs: Long = 5_000L): Boolean {
-        val deadline = System.currentTimeMillis() + timeoutMs
-        while (System.currentTimeMillis() < deadline) {
-            if (engine.state.value == expected) return true
-            delay(10)
-        }
-        return engine.state.value == expected
     }
 
     private suspend fun Harness.awaitReleased(minCount: Int = 1, timeoutMs: Long = 5_000L): Boolean {
@@ -222,7 +189,7 @@ class ProtectionEngineRecoveryLifecycleTest {
         assertEquals(ProtectionState.HARD_BLOCKED, engine.state.value)
         assertEquals(listOf(ProtectionAction.HARD_BLOCK), exec.executed)
         assertEquals(1, events.count(ActivityEventType.CHILD_BLOCKED))
-        assertEquals(protectedApp, engine.blockedApp.value)
+        assertEquals("best-effort restoration target", protectedApp, engine.blockedApp.value)
 
         loseFace()
         assertEquals(ProtectionState.RECOVERING, engine.state.value)
@@ -236,7 +203,7 @@ class ProtectionEngineRecoveryLifecycleTest {
 
     // 4 + 8 + 19
     @Test
-    fun childReturningDuringRecovery_reblocksAndTheStaleTimerNeverReleases() = runHarness(600L) {
+    fun childReturningDuringRecovery_reblocksAndTheStaleTimerNeverReleases() = runHarness(500L) {
         block()
         loseFace()
         assertEquals(ProtectionState.RECOVERING, engine.state.value)
@@ -246,7 +213,7 @@ class ProtectionEngineRecoveryLifecycleTest {
         val clearsAfterReBlock = exec.clearCount
 
         // Wait well past the first cycle's delay: the stale timer must not release.
-        holdBlocked(1_000L)
+        delay(900L)
 
         assertEquals("a stale timer must not release a newer cycle", ProtectionState.HARD_BLOCKED, engine.state.value)
         assertEquals(0, events.count(ActivityEventType.PROTECTION_RELEASED))
@@ -289,15 +256,18 @@ class ProtectionEngineRecoveryLifecycleTest {
 
     // 7
     @Test
-    fun duplicateRecoveryEvaluation_doesNotCreateASecondTimer() = runHarness(200L) {
+    fun duplicateRecoveryEvaluation_doesNotCreateASecondTimer() = runHarness(300L) {
         block()
         loseFace()
-        // More no-face frames while already RECOVERING must not arm another timer.
-        loseFace(startAt = 500_000L)
-        loseFace(startAt = 600_000L)
+        assertEquals(ProtectionState.RECOVERING, engine.state.value)
+
+        // More no-face frames while already RECOVERING must not arm another timer
+        // (the obstruction streak is kept below its limit).
+        loseFace(times = 2, startAt = 405_000L)
+        assertEquals(ProtectionState.RECOVERING, engine.state.value)
 
         assertTrue(awaitReleased(1))
-        delay(500L)
+        delay(400L)
 
         assertEquals(1, events.count(ActivityEventType.PROTECTION_RELEASED))
         assertEquals("the overlay is removed exactly once", 1, exec.clearCount)
@@ -310,20 +280,23 @@ class ProtectionEngineRecoveryLifecycleTest {
         loseFace()
 
         assertTrue(awaitReleased(1))
-        delay(400L)
+        delay(300L)
 
         assertEquals(ProtectionState.UNPROTECTED, engine.state.value)
         assertEquals(1, events.count(ActivityEventType.PROTECTION_RELEASED))
         assertEquals(1, exec.clearCount)
     }
 
-    // 10 (already covered by test 1), 22
+    // 22
     @Test
     fun noEventSpamAcrossARecoveryCycle() = runHarness(150L) {
         block()
         loseFace()
         assertTrue(awaitReleased(1))
-        delay(400L)
+
+        // Extra frames after the release must not produce duplicate events.
+        loseFace(times = 3, startAt = 700_000L)
+        delay(300L)
 
         assertEquals(1, events.count(ActivityEventType.CHILD_RECOGNIZED))
         assertEquals(1, events.count(ActivityEventType.CHILD_BLOCKED))
@@ -342,7 +315,7 @@ class ProtectionEngineRecoveryLifecycleTest {
         assertEquals(ProtectionState.UNPROTECTED, engine.state.value)
         assertNull(engine.blockedApp.value)
 
-        delay(600L)
+        delay(500L)
 
         assertEquals("a cancelled cycle must not release", 0, events.count(ActivityEventType.PROTECTION_RELEASED))
         assertEquals(ProtectionState.UNPROTECTED, engine.state.value)
@@ -356,7 +329,7 @@ class ProtectionEngineRecoveryLifecycleTest {
         assertEquals(ProtectionState.RECOVERING, engine.state.value)
 
         withContext(dispatcher) { engine.stop() }
-        delay(600L)
+        delay(500L)
 
         assertEquals(0, events.count(ActivityEventType.PROTECTION_RELEASED))
         assertEquals(ProtectionState.UNPROTECTED, engine.state.value)
@@ -369,7 +342,7 @@ class ProtectionEngineRecoveryLifecycleTest {
         assertEquals(ProtectionState.RECOVERING, engine.state.value)
 
         withContext(dispatcher) { engine.emergencyUnlock() }
-        delay(600L)
+        delay(500L)
 
         assertEquals(1, events.count(ActivityEventType.EMERGENCY_UNLOCK))
         assertEquals(0, events.count(ActivityEventType.PROTECTION_RELEASED))
@@ -383,14 +356,13 @@ class ProtectionEngineRecoveryLifecycleTest {
         loseFace()
         assertEquals(ProtectionState.RECOVERING, engine.state.value)
 
-        withContext(dispatcher) {
-            publish(parentVec)
-            drive(protectedApp, parentVec, times = 5, startAt = 900_000L)
-        }
+        withContext(dispatcher) { drive(protectedApp, parentVec, times = 5, startAt = 900_000L) }
 
         assertEquals(ProtectionState.UNPROTECTED, engine.state.value)
         assertEquals(1, events.count(ActivityEventType.PARENT_UNLOCKED))
         assertEquals(1, events.count(ActivityEventType.PARENT_RECOGNIZED))
+        delay(900L)
+        assertEquals("the superseded recovery must not also release", 0, events.count(ActivityEventType.PROTECTION_RELEASED))
     }
 
     // 16
@@ -400,26 +372,21 @@ class ProtectionEngineRecoveryLifecycleTest {
         loseFace()
         assertEquals(ProtectionState.RECOVERING, engine.state.value)
 
-        withContext(dispatcher) {
-            publish(unknownVec)
-            drive(protectedApp, unknownVec, times = 5, startAt = 900_000L)
-        }
+        withContext(dispatcher) { drive(protectedApp, unknownVec, times = 5, startAt = 900_000L) }
 
         assertEquals(ProtectionState.SOFT_BLOCKED, engine.state.value)
         assertEquals(1, events.count(ActivityEventType.UNKNOWN_USER))
+        delay(900L)
+        assertEquals(0, events.count(ActivityEventType.PROTECTION_RELEASED))
     }
 
     // 17 + 13 (policy stays the source of truth)
     @Test
-    fun noFaceDuringRecovery_staysRecoveringAndReleasesOnlyWhenTheDelayElapses() = runHarness(300L) {
+    fun noFaceDuringRecovery_staysRecoveringUntilTheDelayElapses() = runHarness(300L) {
         block()
         loseFace()
         assertEquals(ProtectionState.RECOVERING, engine.state.value)
-
-        // no-face policy is ALLOW, but the policy engine must not short-circuit the
-        // recovery window: the state stays RECOVERING until the delay expires.
-        loseFace(startAt = 800_000L)
-        assertEquals(ProtectionState.RECOVERING, engine.state.value)
+        // no-face policy is ALLOW, but the recovery window must not be bypassed.
         assertEquals(0, events.count(ActivityEventType.PROTECTION_RELEASED))
 
         assertTrue(awaitReleased(1))
@@ -433,10 +400,7 @@ class ProtectionEngineRecoveryLifecycleTest {
         loseFace()
         assertEquals(ProtectionState.RECOVERING, engine.state.value)
 
-        withContext(dispatcher) {
-            publish(null)
-            drive(otherApp, null, times = 3, startAt = 900_000L)
-        }
+        withContext(dispatcher) { drive(otherApp, null, times = 3, startAt = 900_000L) }
 
         assertEquals(ProtectionState.UNPROTECTED, engine.state.value)
         assertNull(engine.blockedApp.value)

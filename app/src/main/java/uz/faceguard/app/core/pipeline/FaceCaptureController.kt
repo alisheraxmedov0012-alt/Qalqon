@@ -22,6 +22,7 @@ import java.util.concurrent.Executors
 import uz.faceguard.app.core.embed.FaceEmbeddingModel
 import uz.faceguard.app.core.embed.FaceFeatureExtractor
 import uz.faceguard.app.core.embed.FaceImageUtils
+import uz.faceguard.app.core.liveness.AntiSpoofModel
 import uz.faceguard.app.core.recognition.Recognizer
 
 /**
@@ -45,6 +46,14 @@ class FaceCaptureController(
 
     private var embeddingModel: FaceEmbeddingModel? = null
     fun setEmbeddingModel(value: FaceEmbeddingModel) { embeddingModel = value }
+
+    /**
+     * Group 9: optional anti-spoofing model. Null (the default) leaves
+     * [FrameEvent.liveProbability] null and liveness is decided by the passive
+     * heuristic. A model is only queried when [AntiSpoofModel.isReady].
+     */
+    private var antiSpoofModel: AntiSpoofModel? = null
+    fun setAntiSpoofModel(value: AntiSpoofModel?) { antiSpoofModel = value }
 
     private var errorListener: ((Throwable) -> Unit)? = null
     fun setErrorListener(listener: (Throwable) -> Unit) { errorListener = listener }
@@ -147,11 +156,13 @@ class FaceCaptureController(
                                 try {
                                     val primary = faces.firstOrNull()
                                     val features = primary?.let { extractEmbedding(upright, it) }
+                                    val liveProbability = primary?.let { runAntiSpoof(upright, it) }
                                     val frame = FrameEvent(
                                         image = input,
                                         faceCount = faces.size,
                                         features = features,
                                         quality = buildQuality(faces, primary, upright),
+                                        liveProbability = liveProbability,
                                     )
                                     recognizer?.publish(frame)
                                     callback?.onFaceFrame(frame)
@@ -185,6 +196,27 @@ class FaceCaptureController(
         return runCatching { FaceFeatureExtractor.extract(face, bitmap.width, bitmap.height) }.getOrNull()
     }
 
+    /**
+     * Group 9: runs the optional anti-spoofing model on the face crop. Returns
+     * null when no model is configured/ready or inference fails, so the passive
+     * heuristic decides liveness instead of a fabricated score.
+     */
+    private fun runAntiSpoof(bitmap: Bitmap, face: Face): Float? {
+        val model = antiSpoofModel ?: return null
+        if (!model.isReady()) return null
+        return try {
+            val crop = FaceImageUtils.cropFace(bitmap, face.boundingBox) ?: return null
+            try {
+                model.livenessScore(crop)
+            } finally {
+                if (crop !== bitmap) crop.recycle()
+            }
+        } catch (t: Throwable) {
+            reportError(t)
+            null
+        }
+    }
+
     /** Live face metrics for enrollment guidance. */
     private fun buildQuality(faces: List<Face>, primary: Face?, bitmap: Bitmap): FaceQuality {
         if (primary == null) return FaceQuality(faceCount = 0)
@@ -192,6 +224,7 @@ class FaceCaptureController(
         val widthRatio = if (bitmap.width > 0) box.width().toFloat() / bitmap.width.toFloat() else 0f
         return FaceQuality(
             faceCount = faces.size,
+            headEulerAngleX = primary.headEulerAngleX,
             headEulerAngleY = primary.headEulerAngleY,
             headEulerAngleZ = primary.headEulerAngleZ,
             faceWidthRatio = widthRatio,

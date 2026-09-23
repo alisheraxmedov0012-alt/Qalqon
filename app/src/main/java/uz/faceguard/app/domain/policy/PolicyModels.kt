@@ -39,6 +39,39 @@ data class IdentityContext(
 )
 
 // ---------------------------------------------------------------------------
+// Liveness (Group 9)
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether the face in front of the camera belongs to a real, live person.
+ *
+ * Deliberately separate from [UserIdentity] ("who"): identity answers *who* the
+ * device believes is using it, liveness answers *whether a real person is
+ * there*. A spoofed presentation can still be *recognised* as a parent or child;
+ * the policy layer must never trust that recognised identity (see
+ * [PolicyContext.liveness] handling in the evaluator).
+ */
+enum class LivenessState {
+    /** No liveness evidence yet (pipeline idle, no frames, or window not filled). */
+    UNKNOWN,
+
+    /** The observation window shows a real, live face. */
+    LIVE,
+
+    /** The observation window indicates a presentation attack (photo/screen/replay). */
+    SPOOF,
+
+    /** No face in the observation window. */
+    NO_FACE,
+
+    /** A face is present but the evidence is too inconsistent to decide. */
+    UNSTABLE,
+}
+
+/** True only for [LivenessState.LIVE]; every other state is not trusted as live. */
+fun LivenessState.isTrustedLive(): Boolean = this == LivenessState.LIVE
+
+// ---------------------------------------------------------------------------
 // Actions
 // ---------------------------------------------------------------------------
 
@@ -86,6 +119,8 @@ enum class PolicyTrigger {
     NO_FACE,
     CAMERA_OBSTRUCTED,
     PROTECTED_APP_OPENED,
+    /** Group 9: the presentation is not a real person (photo/screen/replay). */
+    LIVENESS_SPOOF,
     SCREEN_TIME_EXCEEDED,
     SCHEDULE_ACTIVE,
     EYE_SAFETY_WARNING,
@@ -135,6 +170,15 @@ data class PolicySettings(
     val unknownUserAction: ProtectionAction = ProtectionAction.SOFT_BLOCK,
     val noFaceAction: ProtectionAction = ProtectionAction.ALLOW,
     val obstructionAction: ProtectionAction = ProtectionAction.SOFT_BLOCK,
+    /**
+     * Group 9: action when the presentation is a spoof ([LivenessState.SPOOF]).
+     *
+     * Not persisted yet — kept as an explicit, documented default. [SOFT_BLOCK]
+     * is the safe choice: a recognised-but-spoofed face must not unlock the
+     * device, and a soft block is recoverable without the aggressive, parent
+     * false-positive-prone behaviour of a hard block.
+     */
+    val spoofAction: ProtectionAction = ProtectionAction.SOFT_BLOCK,
     val recoveryDelayMs: Long = 30_000L,
     /** When true a parent device also applies the child policy. */
     val parentDeviceChildPolicyEnabled: Boolean = false,
@@ -147,6 +191,12 @@ data class PolicySettings(
 data class PolicyContext(
     val identity: IdentityContext,
     val settings: PolicySettings,
+    /**
+     * Group 9: whether a real person is in front of the camera, kept separate
+     * from [identity]. Defaults to [LivenessState.UNKNOWN], i.e. "no liveness
+     * evidence", so every existing caller keeps today's behaviour.
+     */
+    val liveness: LivenessState = LivenessState.UNKNOWN,
     val foregroundPackage: String? = null,
     val deviceOwnerMode: DeviceOwnerMode = DeviceOwnerMode.CHILD_DEVICE,
     /** Resolved policy for [foregroundPackage], if any. */

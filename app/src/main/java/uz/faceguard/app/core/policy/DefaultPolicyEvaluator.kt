@@ -3,6 +3,7 @@ package uz.faceguard.app.core.policy
 import uz.faceguard.app.domain.policy.AppPolicy
 import uz.faceguard.app.domain.policy.AppPolicyMode
 import uz.faceguard.app.domain.policy.DeviceOwnerMode
+import uz.faceguard.app.domain.policy.LivenessState
 import uz.faceguard.app.domain.policy.PolicyContext
 import uz.faceguard.app.domain.policy.PolicyDecision
 import uz.faceguard.app.domain.policy.PolicyEvaluator
@@ -26,14 +27,28 @@ class DefaultPolicyEvaluator : PolicyEvaluator {
         // 1. Protection switched off -> nothing to enforce.
         if (!settings.enabled) return PolicyDecision.Allow
 
+        // 2. A spoofed presentation is never trusted. A printed photo, screen or
+        //    replay that is *recognised* as the parent (or child) must not inherit
+        //    that identity's policy, so this gate runs before the identity switch.
+        //    Non-spoof liveness states (LIVE/UNKNOWN/NO_FACE/UNSTABLE) fall through
+        //    unchanged, preserving all pre-Group-9 behaviour.
+        if (context.liveness == LivenessState.SPOOF) {
+            return configured(
+                settings.spoofAction,
+                PolicyTrigger.LIVENESS_SPOOF,
+                "spoofed presentation",
+                settings,
+            )
+        }
+
         return when (context.identity.identity) {
-            // 2. Parent always wins, on both device modes.
+            // 3. Parent always wins, on both device modes.
             UserIdentity.PARENT -> PolicyDecision.Allow
 
-            // 3. Child -> app-scoped policy, then global protected app.
+            // 4. Child -> app-scoped policy, then global protected app.
             UserIdentity.CHILD -> evaluateChild(context, settings)
 
-            // 4. Unknown / 5. obstructed / 6. no face follow configured actions.
+            // 5. Unknown / 6. obstructed / 7. no face follow configured actions.
             UserIdentity.UNKNOWN -> configured(
                 settings.unknownUserAction,
                 PolicyTrigger.UNKNOWN_USER,

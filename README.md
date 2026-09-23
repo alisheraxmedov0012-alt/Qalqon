@@ -44,9 +44,40 @@ fallback policy. All face processing happens on-device.
 ### Still limited (see "Known limitations (MVP)" below)
 
 - System-wide blocking needs a foreground service + AccessibilityService.
-- Matching is not spoof-resistant (no liveness check).
+- Matching is not yet spoof-resistant: a passive liveness foundation (Group 9)
+  ships, but no real anti-spoofing model is bundled — see below.
 - The child "restriction level" is stored and shown but not yet enforced by the
   protection engine.
+
+### Liveness & anti-spoofing foundation (Group 9)
+
+Recognition answers *who* is in front of the camera; liveness is a separate
+signal answering *whether a real person is there*. Group 9 adds:
+
+- A pure `core/liveness` package: `LivenessState`
+  (`UNKNOWN`/`LIVE`/`SPOOF`/`NO_FACE`/`UNSTABLE`), `LivenessResult` (state,
+  optional confidence, timestamp, source), a short temporal window
+  (`LivenessWindow`, ~2.5 s) and a `TemporalLivenessDetector`. The identity and
+  liveness signals stay independent all the way into `PolicyContext`.
+- The engine and runtime only *carry* the state — no camera, ML or liveness
+  algorithm moved into them (the foreground service and AccessibilityService are
+  untouched and do not own the camera).
+- A spoof gate in `DefaultPolicyEvaluator` runs **before** the identity override,
+  so a recognised-but-spoofed parent/child is never trusted. The action is
+  configurable (`PolicySettings.spoofAction`, default `SOFT_BLOCK`); `LIVE`
+  leaves every pre-existing behaviour unchanged.
+- An `AntiSpoofModel` seam: when a model supplies a per-frame live probability
+  (`FrameEvent.liveProbability`) the detector decides `LIVE`/`SPOOF` from it;
+  otherwise a passive motion **heuristic** runs.
+
+Honest limits (no fabricated claims): **no anti-spoofing model is bundled**, so
+this build does not defeat printed-photo, phone-screen or video-replay attacks —
+a hand-shaken photo moves too. The heuristic only reaches `LIVE` on genuine
+motion, reports `UNKNOWN` (never `LIVE`) for a motionless face, and never emits
+`SPOOF` on its own. `SPOOF` is reachable only through a real model (exercised in
+tests via a deterministic per-frame model score), so photo/screen/replay
+resilience is *architecturally implemented and tested*, not proven against real
+attacks.
 
 ### Protected app selection reliability
 
@@ -131,10 +162,12 @@ user-facing apps.
   `TfLiteMobileFaceNet.isReady()` is false and the app transparently falls back
   to the geometry extractor (`FaceFeatureExtractor`, 19-dim ML Kit landmarks +
   pose).
-- Embeddings are real and local, but **not spoof-resistant** in this MVP: the
-  pipeline does not yet add liveness/anti-spoof checks, and geometry fallback is
-  weaker than a deep embedding. `core/embed` and `core/recognition` remain the
-  seams for a production model.
+- Embeddings are real and local, but **not spoof-resistant**: Group 9 added a
+  liveness/anti-spoofing *foundation* (see the Group 9 section) with a passive
+  motion heuristic and an `AntiSpoofModel` seam, but no anti-spoofing model is
+  bundled yet, and the geometry fallback is weaker than a deep embedding.
+  `core/embed`, `core/recognition` and `core/liveness` remain the seams for a
+  production model.
 - `sync/` gateways are no-ops (see Phase 14 notes below).
 
 ## Required Android permissions
@@ -160,9 +193,9 @@ No `INTERNET` permission. The app cannot talk to a network.
 ## Recommended next development order
 
 1. AccessibilityService for system-wide protection (biggest product gap)
-2. Add liveness/anti-spoof checks around the bundled MobileFaceNet model
-   (the upstream repo also ships a `FaceAntiSpoofing.tflite` that could be
-   reused)
+2. Ship a real anti-spoofing model behind the Group 9 `AntiSpoofModel` seam
+   (the liveness architecture and passive heuristic already exist; no model is
+   bundled yet). See the Group 9 section above.
 3. Foreground service so the protection session (and camera) survives leaving
    the app
 4. Encrypted template storage + Room migrations
@@ -650,8 +683,10 @@ sync; the app remains fully functional with sync disabled or absent.
 - **Face matching is real but not spoof-resistant.** The recognizer compares a
   frame-derived embedding (TFLite MobileFaceNet when bundled, otherwise ML Kit
   geometry fallback) against the stored per-profile template using cosine
-  similarity. It is real and local, but there is no liveness/anti-spoof layer
-  yet — see "Biometric capability" above.
+  similarity. Group 9 adds a liveness layer (a passive motion heuristic plus an
+  `AntiSpoofModel` seam), but no anti-spoofing model is bundled and the heuristic
+  is a weak signal: printed photos, phone screens and video replays are **not**
+  reliably detected — see the Group 9 section and "Biometric capability" above.
 - **Accessibility-service blocking is not implemented.** Protection runs as an
   app-scoped session (`ProtectionRuntime`) driven by `protectionEnabled`; it
   works while the Qalqon process is alive and the overlay permission is

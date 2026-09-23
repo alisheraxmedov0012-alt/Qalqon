@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uz.faceguard.app.core.accessibility.AccessibilityCapability
 import uz.faceguard.app.core.accessibility.AccessibilityForegroundTracker
+import uz.faceguard.app.core.liveness.LivenessResult
 import uz.faceguard.app.core.monitor.ForegroundAppMonitor
 import uz.faceguard.app.core.recognition.Recognizer
 import uz.faceguard.app.core.scan.ScanScheduler
@@ -55,6 +56,12 @@ data class ProtectionRuntimeState(
      * identity has been observed for the active protection session yet.
      */
     val identity: IdentitySnapshot? = null,
+    /**
+     * Group 9: the liveness signal, independent of both [identity] and
+     * [foregroundApp]. Null means no liveness observation has been published for
+     * the active protection session yet.
+     */
+    val liveness: LivenessResult? = null,
     val scanMode: ScanMode = ScanMode.BALANCED,
     val scanning: Boolean = false,
     val cooldownRemainingMs: Long = 0L,
@@ -80,11 +87,12 @@ data class ProtectionRuntimeState(
  * is backgrounded, and the Group 7 accessibility service feeds it real
  * foreground window transitions through [onAccessibilityForegroundApp].
  *
- * Group 8 keeps the two protection signals explicit and independent in
- * [ProtectionRuntimeState]: `identity` ("who is looking", from the camera
- * pipeline via [onIdentityChanged]) and `foregroundApp` ("which app is open",
- * from usage-stats/accessibility). Both are combined by the engine into the
- * existing PolicyContext — the evaluator is still the only decision point.
+ * Group 8 exposes the identity signal ("who is looking") and Group 9 the
+ * liveness signal ("is a real person there"): both are independent of the
+ * `foregroundApp` signal ("which app is open", from usage-stats/accessibility)
+ * and of each other in [ProtectionRuntimeState]. All three are combined by the
+ * engine into the existing PolicyContext — the evaluator is still the only
+ * decision point, and no camera/ML/liveness algorithm lives in this class.
  *
  * Remaining limitation: with no camera bound — e.g. Qalqon backgrounded — the
  * engine sees "no face" and follows the no-face policy, so identity detection is
@@ -187,6 +195,9 @@ class ProtectionRuntime @Inject constructor(
                     lastAccountId = id
                     engine.resetIdentity()
                     onIdentityChanged(null)
+                    // Group 9: liveness is account-scoped too.
+                    engine.resetLiveness()
+                    onLivenessChanged(null)
                 }
                 accountId = id
                 refreshChildPolicies()
@@ -234,6 +245,9 @@ class ProtectionRuntime @Inject constructor(
         // foreground-app signal (Group 7) and is the exact identity the last
         // policy decision was based on.
         scope.launch { engine.identity.collect { snapshot -> onIdentityChanged(snapshot) } }
+        // Group 9: liveness ("is it a real person") is its own signal, kept
+        // separate from identity and foreground.
+        scope.launch { engine.liveness.collect { result -> onLivenessChanged(result) } }
         scope.launch { monitor.current.collect { value -> _state.update { it.copy(foregroundApp = value) } } }
         scope.launch { scheduler.scanning.collect { value -> _state.update { it.copy(scanning = value) } } }
         scope.launch {
@@ -285,6 +299,8 @@ class ProtectionRuntime @Inject constructor(
         serviceLauncher.stop()
         // Group 8: a stopped session holds no identity state.
         onIdentityChanged(null)
+        // Group 9: and no liveness state.
+        onLivenessChanged(null)
     }
 
     /**
@@ -356,6 +372,15 @@ class ProtectionRuntime @Inject constructor(
      */
     fun onIdentityChanged(snapshot: IdentitySnapshot?) {
         _state.update { it.copy(identity = snapshot) }
+    }
+
+    /**
+     * Group 9: liveness signal from the recognition pipeline (single funnel used
+     * by the engine collector). Kept separate from [onIdentityChanged] and from
+     * the foreground app.
+     */
+    fun onLivenessChanged(result: LivenessResult?) {
+        _state.update { it.copy(liveness = result) }
     }
 
     fun usageAccessIntent(): Intent = monitor.usageAccessIntent()

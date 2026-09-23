@@ -39,6 +39,9 @@ interface PolicySettingsRepository {
  * - `childAction = HARD_BLOCK` -> preserves the legacy hard-block behaviour
  * - `obstructionAction` follows the unknown-user policy, matching the
  *   ProtectionEngine's existing fail-safe rule
+ * - `spoofAction = SOFT_BLOCK` -> Group 9 safe default (not persisted yet):
+ *   a spoofed presentation must not unlock, without the parent false-positive
+ *   risk of a hard block
  * - `parentDeviceChildPolicyEnabled = false` -> device mode is not persisted yet
  */
 fun AppSettings.toPolicySettings(): PolicySettings = PolicySettings(

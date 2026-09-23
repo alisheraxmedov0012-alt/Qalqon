@@ -7,6 +7,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import uz.faceguard.app.core.liveness.LivenessEvaluator
+import uz.faceguard.app.core.liveness.LivenessFrame
+import uz.faceguard.app.core.liveness.LivenessResult
 import uz.faceguard.app.core.monitor.ForegroundAppMonitor
 import uz.faceguard.app.core.pipeline.FrameEvent
 import uz.faceguard.app.core.policy.ActivationDelayGate
@@ -48,6 +51,12 @@ class ProtectionEngine(
     private val monitor: ForegroundAppMonitor,
     private val actions: ProtectionActionExecutor,
     private val policyEvaluator: PolicyEvaluator,
+    /**
+     * Group 9: the liveness decision lives outside the engine (no camera/ML code
+     * here). The engine only feeds it frames and passes its state into the policy
+     * context, exactly as it does for the identity signal.
+     */
+    private val livenessEvaluator: LivenessEvaluator = LivenessEvaluator(),
 ) {
 
     /** Event-driven scan scheduler; camera only on while a scan window is open. */
@@ -69,6 +78,14 @@ class ProtectionEngine(
      */
     private val _identity = MutableStateFlow<IdentitySnapshot?>(null)
     val identity: StateFlow<IdentitySnapshot?> = _identity
+
+    /**
+     * Group 9: the liveness signal ("is a real person in front of the camera?").
+     * Independent of [identity] and of the foreground app. Published as a state
+     * (only when the state/source actually changes), never as a per-frame stream.
+     */
+    private val _liveness = MutableStateFlow<LivenessResult?>(null)
+    val liveness: StateFlow<LivenessResult?> = _liveness
 
     private var settings = ProtectionSettings()
     private var policy = PolicySettings()
@@ -167,6 +184,8 @@ class ProtectionEngine(
         _decision.value = null
         // Group 8: a stopped session holds no identity state.
         _identity.value = null
+        // Group 9: and no liveness state either.
+        resetLiveness()
     }
 
     private fun tick(now: Long) {
@@ -190,6 +209,14 @@ class ProtectionEngine(
     }
 
     fun evaluate(foreground: String?, frame: FrameEvent?, now: Long = System.currentTimeMillis()) {
+        // Group 9: feed the liveness window from the same frames the identity
+        // signal uses and publish the resulting state. This runs before the
+        // protected-app / debounce gates and is completely independent of the
+        // identity confirmation semantics below.
+        if (frame != null) livenessEvaluator.observe(LivenessFrame.from(frame))
+        val livenessResult = livenessEvaluator.result(now)
+        recordLiveness(livenessResult)
+
         val protectedNow = foreground != null && foreground in protectedPackages
         if (!protectedNow) {
             activationGate.cancel()
@@ -218,7 +245,24 @@ class ProtectionEngine(
         // runtime always holds the identity that the decision was based on.
         recordIdentity(result, frameAvailable = frame != null, now = now)
 
-        applyDecision(policyEvaluator.evaluate(policyContext(result, foreground, now)), result, now)
+        applyDecision(policyEvaluator.evaluate(policyContext(result, foreground, now, livenessResult)), result, now)
+    }
+
+    /**
+     * Publishes the liveness signal, collapsing repeats (state + source) so
+     * downstream code sees a state, not per-frame churn. [LivenessResult] values
+     * with the same state and source are equivalent for the policy decision.
+     */
+    private fun recordLiveness(result: LivenessResult) {
+        val current = _liveness.value
+        if (current?.state == result.state && current.source == result.source) return
+        _liveness.value = result
+    }
+
+    /** Clears the liveness signal (account change / sign-out / session stop). */
+    fun resetLiveness() {
+        livenessEvaluator.reset()
+        _liveness.value = null
     }
 
     /**
@@ -243,11 +287,13 @@ class ProtectionEngine(
         result: RecognitionResult,
         foreground: String?,
         now: Long,
+        liveness: LivenessResult,
     ): PolicyContext {
         val identity = identityContextOf(result)
         return PolicyContext(
             identity = identity,
             settings = policy,
+            liveness = liveness.state,
             foregroundPackage = foreground,
             appPolicy = identity.childId?.let { childId ->
                 foreground?.let { appPolicyLookup(childId, it) }

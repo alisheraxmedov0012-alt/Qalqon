@@ -127,3 +127,22 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
 - 2026-09-12 Protection runtime coherence: replaced the debug-only engine flow with an app-scoped `ProtectionRuntime` (singleton) started from `FaceGuardApp`, activated purely by `protectionEnabled` + a signed-in account. It owns `ForegroundAppMonitor` + `ScanScheduler` + `ProtectionEngine`, applies `ProtectionSettings` (unknown/no-face policies, recovery delay, scan mode, low-battery) live, and shares frames via the `Recognizer` flow. `ProtectionEngine` now ticks every 500ms, honors no-face policy, uses recovery delay, and treats frames older than 1.5s as no-face. Added parent-facing `ProtectionScreen` (route `protection`) with master toggle, setup checklist, live status, emergency PIN unlock and collapsible technical details; removed `ProtectionDebugScreen`.
 
 - 2026-09-12 Parent-facing UI polish: added shared `SectionCard` in `core/ui/Components.kt` and replaced the duplicated private `SettingSection` in Settings. Home setup checklist now names the next step and collapses when complete. ParentProfile/ChildProfiles rebuilt on SectionCard with labeled phone, clear face-enroll primary actions, actionable empty state and radio-select restriction level. Settings sections gained plain-language subtitles; Protected apps tab is carded, count highlighted, whole-row toggle, and a search field appears past 15 apps. Uzbek copy de-jargoned (checking mode / unfamiliar face / no face visible / soft-hard close). Removed 3 now-unused parent string keys.
+
+- 2026-09-23 Group 9 (liveness & anti-spoofing foundation) on branch
+  `feature/policy-engine-foundation`, based on Group 8 HEAD 6554a4d. New pure
+  `core/liveness` package: `LivenessState` (UNKNOWN/LIVE/SPOOF/NO_FACE/UNSTABLE,
+  domain/policy), `LivenessResult`/`LivenessSource`/`LivenessFrame`/
+  `LivenessWindow` (~2.5s temporal buffer, independent of engine debounce/TTL),
+  `LivenessDetector` + `TemporalLivenessDetector` (model-score path first, else a
+  passive pose-motion heuristic; the heuristic never emits SPOOF and never marks a
+  motionless face LIVE), `LivenessEvaluator`, and an `AntiSpoofModel` seam.
+  Pipeline: `FrameEvent` gained `liveProbability` + `FaceQuality.headEulerAngleX`;
+  `FaceCaptureController.setAntiSpoofModel` populates it. `ProtectionEngine` gained
+  a default-constructed `livenessEvaluator` + `liveness: StateFlow`, feeds the
+  window in `evaluate()`, and passes `liveness.state` into `PolicyContext`.
+  `ProtectionRuntimeState.liveness` mirrors it (account-scoped; cleared on account
+  change / sign-out / deactivate). Policy: the `DefaultPolicyEvaluator` SPOOF gate
+  runs BEFORE the parent override (a spoofed identity is never trusted);
+  `PolicySettings.spoofAction` defaults to SOFT_BLOCK (not persisted yet).
+  Accessibility/FGS untouched; no INTERNET; no UI change; no anti-spoofing model
+  bundled (photo/screen/replay not provably defeated - documented in README).

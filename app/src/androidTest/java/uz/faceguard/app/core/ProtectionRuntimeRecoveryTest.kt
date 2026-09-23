@@ -200,6 +200,13 @@ class ProtectionRuntimeRecoveryTest {
     fun tearDown() = runBlocking {
         withContext(dispatcher) { engine.scanScheduler?.detach() }
         withContext(dispatcher) { engine.stop() }
+        // The runtime is an app-scoped singleton shared with every other test, so
+        // the test data installed on it is removed again.
+        withContext(dispatcher) { engine.updateContext(null, emptyList(), emptySet()) }
+        setField("parent", null)
+        setField("children", emptyList<ChildProfile>())
+        setField("protectedPackages", emptySet<String>())
+        setField("policy", PolicySettings())
         previousOnEvent?.let { engine.onEvent = it }
         scope.cancel()
         executor.shutdown()

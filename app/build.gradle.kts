@@ -36,6 +36,9 @@ android {
     }
     buildFeatures {
         compose = true
+        // Phase 14: BuildConfig.DEBUG gates the developer-only screens so they are
+        // present in debug builds and absent from release.
+        buildConfig = true
     }
     androidResources {
         // TFLite models must stay uncompressed so the Interpreter can mmap them.

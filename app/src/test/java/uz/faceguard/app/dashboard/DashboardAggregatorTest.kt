@@ -405,7 +405,9 @@ class DashboardAggregatorTest {
 
         children.set(1L, listOf(child(6L, "Ali")))
 
-        val afterDelete = await(state) { it.selectedChildId == 6L }
+        // Wait for the fallback child's data too: asserting only the selection
+        // raced the policy load (found by the Phase 13 flakiness audit).
+        val afterDelete = await(state) { it.selectedChildId == 6L && it.child?.policies?.total == 1 }
         assertEquals("Ali", afterDelete.child?.name)
         assertEquals(1, afterDelete.child?.policies?.total)
     }

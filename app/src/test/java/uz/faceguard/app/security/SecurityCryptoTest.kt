@@ -1,6 +1,5 @@
 package uz.faceguard.app.security
 
-import java.security.SecureRandom
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import org.junit.Assert.assertEquals
@@ -116,15 +115,22 @@ class SecurityCryptoTest {
     }
 
     @Test
-    fun corruptedBytesNeverDecryptToSomethingElse() {
+    fun everySingleByteCorruptionIsDetected() {
         val crypto = cryptoWith(aesKey())
         val payload = encryptOrFail(crypto, "secret")
-        val random = SecureRandom()
-        repeat(20) {
+
+        // Deterministic: flip every byte outside the magic (a magic flip is a
+        // Malformed payload, covered separately). A previous random flip could
+        // write the same value back, which made this assertion flaky and proved
+        // nothing for that iteration (found by the Phase 13 flakiness audit).
+        for (index in AesGcmSecureCrypto.MAGIC.size until payload.size) {
             val tampered = payload.copyOf()
-            tampered[random.nextInt(tampered.size)] = random.nextInt(256).toByte()
+            tampered[index] = (tampered[index].toInt() xor 0xFF).toByte()
             val result = crypto.decrypt(tampered)
-            assertTrue("tampering must never yield plaintext", result !is CryptoResult.Success)
+            assertTrue(
+                "byte $index tampering must never yield plaintext (was $result)",
+                result !is CryptoResult.Success,
+            )
         }
     }
 

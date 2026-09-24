@@ -8,12 +8,19 @@ import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -30,6 +37,12 @@ import uz.faceguard.app.R
  */
 class OverlayControllerImpl(
     private val context: Context,
+    /**
+     * Phase 11: the child-facing "request extra time" action. Null disables the
+     * button (e.g. when no account is signed in). The callback is supplied by the
+     * runtime, which owns the account and the currently blocked package.
+     */
+    private val onRequestExtraTime: (() -> Unit)? = null,
 ) : ProtectionEngine.OverlayController {
 
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -44,7 +57,7 @@ class OverlayControllerImpl(
         if (!hasPermission()) return
         if (overlayView != null) return
         val view = ComposeView(context).apply {
-            setContent { ProtectionOverlay() }
+            setContent { ProtectionOverlay(onRequestExtraTime = onRequestExtraTime) }
         }
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -67,18 +80,42 @@ class OverlayControllerImpl(
 }
 
 @Composable
-private fun ProtectionOverlay() {
+private fun ProtectionOverlay(onRequestExtraTime: (() -> Unit)?) {
+    // Local, per-overlay-instance feedback: the button can be tapped once per
+    // protection cycle and reflects that a request was actually created.
+    var requested by remember { mutableStateOf(false) }
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.92f)),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = stringResource(R.string.protection_overlay_message),
-            style = MaterialTheme.typography.titleLarge,
-            color = Color.White,
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.padding(24.dp),
-        )
+        ) {
+            Text(
+                text = stringResource(R.string.protection_overlay_message),
+                style = MaterialTheme.typography.titleLarge,
+                color = Color.White,
+            )
+            if (onRequestExtraTime != null) {
+                Button(
+                    onClick = {
+                        requested = true
+                        onRequestExtraTime()
+                    },
+                    enabled = !requested,
+                ) {
+                    Text(
+                        stringResource(
+                            if (requested) R.string.request_extra_time_sent
+                            else R.string.request_extra_time,
+                        ),
+                    )
+                }
+            }
+        }
     }
 }

@@ -26,6 +26,7 @@ import uz.faceguard.app.domain.repository.AccountRepository
 import uz.faceguard.app.domain.repository.ActivityLogRepository
 import uz.faceguard.app.domain.repository.ChildProfileRepository
 import uz.faceguard.app.domain.repository.ProtectedAppsRepository
+import uz.faceguard.app.domain.request.ParentRequestRepository
 import uz.faceguard.app.domain.repository.SettingsRepository
 
 /**
@@ -51,6 +52,7 @@ class DashboardAggregator(
     private val protectedAppsRepository: ProtectedAppsRepository,
     private val activityLogRepository: ActivityLogRepository,
     private val settingsRepository: SettingsRepository,
+    private val requestRepository: ParentRequestRepository,
     private val runtimeState: Flow<ProtectionRuntimeState>,
     private val recentEventLimit: Int = RECENT_EVENT_LIMIT,
 ) {
@@ -123,6 +125,7 @@ class DashboardAggregator(
 
         val protectedApps = protectedAppsRepository.protectedApps.catch { emit(emptyList()) }
         val events = activityLogRepository.recent(accountId).catch { emit(emptyList()) }
+        val pendingRequests = requestRepository.observePendingCount(accountId).catch { emit(0) }
 
         val core = combine(children, resolvedChildId, policies, protectedApps, events) { kids, childId, policySnapshot, apps, eventList ->
             Sources(kids, childId, policySnapshot, apps, eventList)
@@ -132,13 +135,15 @@ class DashboardAggregator(
             core,
             settingsRepository.settings.catch { emit(AppSettings()) },
             runtimeState,
-        ) { sources, settings, runtime -> buildState(sources, settings, runtime) }
+            pendingRequests,
+        ) { sources, settings, runtime, pending -> buildState(sources, settings, runtime, pending) }
     }
 
     private fun buildState(
         sources: Sources,
         settings: AppSettings,
         runtime: ProtectionRuntimeState,
+        pendingRequestCount: Int,
     ): DashboardUiState {
         val selectedChildId = sources.resolvedChildId
         val profile = sources.children.firstOrNull { it.id == selectedChildId }
@@ -176,6 +181,8 @@ class DashboardAggregator(
             accessibilityEnabled = runtime.accessibilityEnabled,
             parentFaceEnrolled = runtime.parentFaceEnrolled,
             protectedAppsCount = sources.protectedApps.count { it.isProtected },
+            pendingRequestCount = pendingRequestCount,
+            notificationsEnabled = runtime.notificationsEnabled,
             recentEvents = recentEventSummaries(sources.events, recentEventLimit),
         )
     }

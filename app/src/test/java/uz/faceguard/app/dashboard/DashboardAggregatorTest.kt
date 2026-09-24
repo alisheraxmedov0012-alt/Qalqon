@@ -48,6 +48,10 @@ import uz.faceguard.app.domain.repository.ActivityLogRepository
 import uz.faceguard.app.domain.repository.ChildProfileRepository
 import uz.faceguard.app.domain.repository.ProtectedAppsRepository
 import uz.faceguard.app.domain.repository.SettingsRepository
+import uz.faceguard.app.domain.request.ParentRequest
+import uz.faceguard.app.domain.request.ParentRequestRepository
+import uz.faceguard.app.domain.request.RequestCreationResult
+import uz.faceguard.app.domain.request.RequestResolutionResult
 import uz.faceguard.app.feature.home.DashboardAggregator
 import uz.faceguard.app.feature.home.DashboardStatus
 import uz.faceguard.app.feature.home.DashboardUiState
@@ -135,6 +139,22 @@ class DashboardAggregatorTest {
         override suspend fun setLowBatteryBehaviorEnabled(enabled: Boolean) = error("not used")
     }
 
+    private class FakeRequests : ParentRequestRepository {
+        val pendingCount = MutableStateFlow(0)
+        override fun observePending(accountId: Long): Flow<List<ParentRequest>> = MutableStateFlow(emptyList())
+        override fun observeForAccount(accountId: Long): Flow<List<ParentRequest>> = MutableStateFlow(emptyList())
+        override fun observePendingCount(accountId: Long): Flow<Int> = pendingCount
+        override fun observePendingForChild(accountId: Long, childId: Long): Flow<List<ParentRequest>> =
+            MutableStateFlow(emptyList())
+        override suspend fun byId(accountId: Long, requestId: Long): ParentRequest? = null
+        override suspend fun create(request: ParentRequest): RequestCreationResult = error("not used")
+        override suspend fun approve(accountId: Long, requestId: Long, approvedDurationMinutes: Int?, now: Long) =
+            error("not used")
+        override suspend fun reject(accountId: Long, requestId: Long, now: Long) = error("not used")
+        override suspend fun cancel(accountId: Long, requestId: Long, now: Long) = error("not used")
+        override suspend fun expireStale(accountId: Long, now: Long): Int = 0
+    }
+
     /** Runtime source that can be made to fail once, to exercise the error path. */
     private class FakeRuntime {
         val state = MutableStateFlow(ProtectionRuntimeState())
@@ -155,6 +175,7 @@ class DashboardAggregatorTest {
     private val apps = FakeApps()
     private val activity = FakeActivity()
     private val settings = FakeSettings()
+    private val requests = FakeRequests()
     private val runtime = FakeRuntime()
 
     private fun aggregator() = DashboardAggregator(
@@ -164,6 +185,7 @@ class DashboardAggregatorTest {
         protectedAppsRepository = apps,
         activityLogRepository = activity,
         settingsRepository = settings,
+        requestRepository = requests,
         runtimeState = runtime.flow,
     )
 

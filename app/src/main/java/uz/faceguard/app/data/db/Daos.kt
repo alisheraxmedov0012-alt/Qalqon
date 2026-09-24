@@ -157,3 +157,99 @@ interface ChildAppPolicyDao {
     @Query("DELETE FROM child_app_policies")
     suspend fun deleteAll()
 }
+
+/**
+ * Phase 11: parent requests. All mutations are ownership-checked and
+ * transition-checked in SQL (`WHERE ... status = 'PENDING'`), so concurrent or
+ * repeated decisions cannot produce contradictory states.
+ */
+@Dao
+interface ParentRequestDao {
+
+    @Insert
+    suspend fun insert(request: ParentRequestEntity): Long
+
+    @Query(
+        "SELECT * FROM parent_requests WHERE accountId = :accountId AND status = 'PENDING' " +
+            "ORDER BY createdAt DESC LIMIT :limit",
+    )
+    fun observePending(accountId: Long, limit: Int): Flow<List<ParentRequestEntity>>
+
+    @Query(
+        "SELECT * FROM parent_requests WHERE accountId = :accountId " +
+            "ORDER BY createdAt DESC LIMIT :limit",
+    )
+    fun observeForAccount(accountId: Long, limit: Int): Flow<List<ParentRequestEntity>>
+
+    @Query("SELECT COUNT(*) FROM parent_requests WHERE accountId = :accountId AND status = 'PENDING'")
+    fun observePendingCount(accountId: Long): Flow<Int>
+
+    @Query(
+        "SELECT * FROM parent_requests WHERE accountId = :accountId AND childId = :childId " +
+            "AND status = 'PENDING' ORDER BY createdAt DESC LIMIT :limit",
+    )
+    fun observePendingForChild(accountId: Long, childId: Long, limit: Int): Flow<List<ParentRequestEntity>>
+
+    @Query("SELECT * FROM parent_requests WHERE accountId = :accountId AND id = :id LIMIT 1")
+    suspend fun byId(accountId: Long, id: Long): ParentRequestEntity?
+
+    @Query(
+        "SELECT * FROM parent_requests WHERE accountId = :accountId AND deduplicationKey = :key " +
+            "AND status = 'PENDING' ORDER BY createdAt DESC LIMIT 1",
+    )
+    suspend fun activeByKey(accountId: Long, key: String): ParentRequestEntity?
+
+    /**
+     * Atomic resolution: only a still-PENDING row of *this account* is updated,
+     * so a duplicate/concurrent decision updates zero rows.
+     */
+    @Query(
+        "UPDATE parent_requests SET status = :newStatus, approvedDurationMinutes = :approvedMinutes, " +
+            "resolvedAt = :now, updatedAt = :now, resolutionReason = :reason " +
+            "WHERE accountId = :accountId AND id = :id AND status = 'PENDING'",
+    )
+    suspend fun resolve(
+        accountId: Long,
+        id: Long,
+        newStatus: String,
+        approvedMinutes: Int?,
+        now: Long,
+        reason: String?,
+    ): Int
+
+    /**
+     * Idempotent expiration: only pending rows past their expiry change, and a
+     * second call updates nothing.
+     */
+    @Query(
+        "UPDATE parent_requests SET status = 'EXPIRED', resolvedAt = :now, updatedAt = :now, " +
+            "resolutionReason = 'expired' " +
+            "WHERE accountId = :accountId AND status = 'PENDING' AND expiresAt IS NOT NULL " +
+            "AND expiresAt <= :now",
+    )
+    suspend fun expireStale(accountId: Long, now: Long): Int
+
+    @Query("DELETE FROM parent_requests")
+    suspend fun deleteAll()
+}
+
+/** Phase 11: durable notification dedup keys + delivery status. */
+@Dao
+interface NotificationRecordDao {
+
+    /** IGNORE on conflict: an existing dedup key means "already notified". */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insert(record: NotificationRecordEntity): Long
+
+    @Query(
+        "UPDATE notification_records SET delivered = :delivered, deliveryAt = :at " +
+            "WHERE deduplicationKey = :key",
+    )
+    suspend fun markDelivered(key: String, delivered: Boolean, at: Long)
+
+    @Query("SELECT * FROM notification_records WHERE deduplicationKey = :key LIMIT 1")
+    suspend fun byKey(key: String): NotificationRecordEntity?
+
+    @Query("DELETE FROM notification_records")
+    suspend fun deleteAll()
+}

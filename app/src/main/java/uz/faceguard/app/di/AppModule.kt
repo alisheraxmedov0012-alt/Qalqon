@@ -16,13 +16,18 @@ import uz.faceguard.app.data.db.ChildProfileDao
 import uz.faceguard.app.data.db.FaceGuardDatabase
 import uz.faceguard.app.data.db.MIGRATION_3_4
 import uz.faceguard.app.data.db.MIGRATION_4_5
+import uz.faceguard.app.data.db.MIGRATION_5_6
 import uz.faceguard.app.data.db.ParentProfileDao
+import uz.faceguard.app.data.db.NotificationRecordDao
+import uz.faceguard.app.data.db.ParentRequestDao
 import uz.faceguard.app.data.db.ProtectedAppDao
 import uz.faceguard.app.data.db.UserAccountDao
 import uz.faceguard.app.data.prefs.settingsDataStore
 import uz.faceguard.app.data.repository.AccountRepositoryImpl
 import uz.faceguard.app.data.repository.ActivityLogRepositoryImpl
 import uz.faceguard.app.data.repository.ChildAppPolicyRepositoryImpl
+import uz.faceguard.app.data.repository.NotificationRepositoryImpl
+import uz.faceguard.app.data.repository.ParentRequestRepositoryImpl
 import uz.faceguard.app.data.repository.PolicySettingsRepositoryImpl
 import uz.faceguard.app.data.repository.ResetRepositoryImpl
 import uz.faceguard.app.data.repository.ChildProfileRepositoryImpl
@@ -42,6 +47,16 @@ import uz.faceguard.app.domain.repository.ChildProfileRepository
 import uz.faceguard.app.domain.policy.ChildAppPolicyRepository
 import uz.faceguard.app.domain.policy.PolicyEvaluator
 import uz.faceguard.app.domain.policy.PolicySettingsRepository
+import uz.faceguard.app.domain.notification.AppNotificationDispatcher
+import uz.faceguard.app.domain.notification.DefaultNotificationPolicy
+import uz.faceguard.app.domain.notification.NotificationContentFactory
+import uz.faceguard.app.domain.notification.NotificationCoordinator
+import uz.faceguard.app.domain.notification.NotificationPolicy
+import uz.faceguard.app.domain.notification.NotificationRepository
+import uz.faceguard.app.domain.request.ParentRequestRepository
+import uz.faceguard.app.core.notification.AndroidNotificationContentFactory
+import uz.faceguard.app.core.notification.AppLabelResolver
+import uz.faceguard.app.core.notification.AndroidNotificationDispatcher
 import uz.faceguard.app.domain.repository.ParentProfileRepository
 import uz.faceguard.app.domain.repository.ProtectedAppsRepository
 import uz.faceguard.app.domain.repository.SettingsRepository
@@ -61,7 +76,7 @@ object AppModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): FaceGuardDatabase =
         Room.databaseBuilder(context, FaceGuardDatabase::class.java, "faceguard.db")
-            .addMigrations(MIGRATION_3_4, MIGRATION_4_5) // additive v3 -> v4 -> v5; keeps existing user data
+            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6) // additive v3 -> v6; keeps existing user data
             .build()
 
     @Provides fun provideUserAccountDao(db: FaceGuardDatabase): UserAccountDao = db.userAccountDao()
@@ -70,6 +85,8 @@ object AppModule {
     @Provides fun provideProtectedAppDao(db: FaceGuardDatabase): ProtectedAppDao = db.protectedAppDao()
     @Provides fun provideActivityEventDao(db: FaceGuardDatabase): ActivityEventDao = db.activityEventDao()
     @Provides fun provideChildAppPolicyDao(db: FaceGuardDatabase): ChildAppPolicyDao = db.childAppPolicyDao()
+    @Provides fun provideParentRequestDao(db: FaceGuardDatabase): ParentRequestDao = db.parentRequestDao()
+    @Provides fun provideNotificationRecordDao(db: FaceGuardDatabase): NotificationRecordDao = db.notificationRecordDao()
 
     @Provides
     @Singleton
@@ -147,6 +164,46 @@ object AppModule {
     @Provides
     @Singleton
     fun provideSyncCoordinator(coordinator: SyncCoordinator): SyncCoordinator = coordinator
+
+    // Phase 11: durable parent requests + notification dedup/delivery.
+    @Provides
+    @Singleton
+    fun provideParentRequestRepository(impl: ParentRequestRepositoryImpl): ParentRequestRepository = impl
+
+    @Provides
+    @Singleton
+    fun provideNotificationRepository(impl: NotificationRepositoryImpl): NotificationRepository = impl
+
+    @Provides
+    @Singleton
+    fun provideNotificationPolicy(): NotificationPolicy = DefaultNotificationPolicy()
+
+    @Provides
+    @Singleton
+    fun provideAppLabelResolver(
+        @ApplicationContext context: Context,
+    ): AppLabelResolver = AppLabelResolver(context)
+
+    @Provides
+    @Singleton
+    fun provideNotificationContentFactory(
+        @ApplicationContext context: Context,
+    ): NotificationContentFactory = AndroidNotificationContentFactory(context)
+
+    @Provides
+    @Singleton
+    fun provideNotificationDispatcher(
+        @ApplicationContext context: Context,
+    ): AppNotificationDispatcher = AndroidNotificationDispatcher(context)
+
+    @Provides
+    @Singleton
+    fun provideNotificationCoordinator(
+        policy: NotificationPolicy,
+        repository: NotificationRepository,
+        dispatcher: AppNotificationDispatcher,
+        contentFactory: NotificationContentFactory,
+    ): NotificationCoordinator = NotificationCoordinator(policy, repository, dispatcher, contentFactory)
 
     @Provides
     @Singleton

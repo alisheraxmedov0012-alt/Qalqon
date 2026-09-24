@@ -106,3 +106,59 @@ data class ChildAppPolicyEntity(
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
 )
+
+/**
+ * Phase 11: a durable parent request (currently: a child's extra-time request).
+ *
+ * `requestedDurationMinutes` is the child's ask and `approvedDurationMinutes` the
+ * parent's authorization; neither is *usage*. Added in DB v6 without touching any
+ * existing table, so v1-v5 user data survives (see MIGRATION_5_6). Column order
+ * matches the constructor because Room builds `CREATE TABLE` from it.
+ */
+@Entity(
+    tableName = "parent_requests",
+    indices = [
+        Index(value = ["accountId", "createdAt"]),
+        Index(value = ["accountId", "status", "createdAt"]),
+        Index(value = ["accountId", "childId", "status"]),
+        Index(value = ["accountId", "deduplicationKey", "status"]),
+    ],
+)
+data class ParentRequestEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val accountId: Long,
+    val childId: Long,
+    val targetPackageName: String,
+    val requestType: String,
+    val requestedDurationMinutes: Int,
+    val approvedDurationMinutes: Int? = null,
+    val status: String,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val expiresAt: Long? = null,
+    val resolvedAt: Long? = null,
+    val resolutionReason: String? = null,
+    val source: String,
+    val deduplicationKey: String,
+)
+
+/**
+ * Phase 11: durable notification deduplication + honest delivery status.
+ *
+ * The primary key *is* the dedup key, and inserts ignore conflicts, so repeated
+ * processing of the same event (duplicate emission, retry, process restart)
+ * cannot notify twice. Delivery status is stored separately from request state.
+ */
+@Entity(
+    tableName = "notification_records",
+    indices = [Index(value = ["accountId", "createdAt"])],
+)
+data class NotificationRecordEntity(
+    @PrimaryKey val deduplicationKey: String,
+    val accountId: Long,
+    val type: String,
+    val relatedRequestId: Long? = null,
+    val createdAt: Long,
+    val delivered: Boolean = false,
+    val deliveryAt: Long? = null,
+)

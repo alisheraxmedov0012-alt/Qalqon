@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
+import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import uz.faceguard.app.feature.auth.CreatePinScreen
@@ -22,6 +23,8 @@ import uz.faceguard.app.feature.privacy.PrivacyScreen
 import uz.faceguard.app.feature.parent.ParentProfileScreen
 import uz.faceguard.app.feature.policy.ChildPolicyScreen
 import uz.faceguard.app.feature.protection.ProtectionScreen
+import uz.faceguard.app.feature.requests.RequestsArgs
+import uz.faceguard.app.feature.requests.RequestsScreen
 import uz.faceguard.app.feature.recognition.RecognitionDebugScreen
 import uz.faceguard.app.feature.settings.SettingsScreen
 
@@ -41,11 +44,14 @@ object Routes {
     const val PRIVACY = "privacy"
     const val HELP = "help"
     const val ACTIVITY_LOG = "activity_log"
+    const val REQUESTS = "requests"
     const val PARENT_FACE_ENROLLMENT = "parent_face_enrollment"
     const val CHILD_FACE_ENROLLMENT = "child_face_enrollment/{childId}"
     const val CHILD_POLICY = "child_policy/{childId}"
     fun childFaceEnrollment(childId: Long) = "child_face_enrollment/$childId"
     fun childPolicy(childId: Long) = "child_policy/$childId"
+    fun requests(requestId: Long = -1L) =
+        if (requestId <= 0L) REQUESTS else "$REQUESTS?${RequestsArgs.REQUEST_ID}=$requestId"
 }
 
 /**
@@ -53,7 +59,23 @@ object Routes {
  * Logout (from Settings) clears session and returns to Welcome.
  */
 @Composable
-fun FaceGuardNavHost(navController: NavHostController) {
+fun FaceGuardNavHost(
+    navController: NavHostController,
+    /**
+     * Phase 11: destination requested by a notification click (see
+     * `NotificationNavigation`). Routed through the existing graph — no duplicate
+     * navigation architecture, and the destination validates ownership itself.
+     */
+    requestedDestination: String? = null,
+) {
+    // A notification click opens the app and asks for one destination. Routing is
+    // idempotent and safe for stale/invalid destinations (unknown routes simply
+    // do not resolve); ownership is validated by the destination's own queries.
+    LaunchedEffect(requestedDestination) {
+        val destination = requestedDestination?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
+        runCatching { navController.navigate(destination) }
+    }
+
     NavHost(navController = navController, startDestination = Routes.SPLASH) {
         composable(Routes.SPLASH) {
             SplashScreen(
@@ -101,6 +123,7 @@ fun FaceGuardNavHost(navController: NavHostController) {
                 onOpenHelp = { navController.navigate(Routes.HELP) },
                 onOpenActivity = { navController.navigate(Routes.ACTIVITY_LOG) },
                 onOpenChildPolicy = { childId -> navController.navigate(Routes.childPolicy(childId)) },
+                onOpenRequests = { navController.navigate(Routes.requests()) },
             )
         }
         composable(Routes.PARENT_PROFILE) {
@@ -146,6 +169,17 @@ fun FaceGuardNavHost(navController: NavHostController) {
                 onBack = { navController.popBackStack() },
                 onOpenChildren = { navController.navigate(Routes.CHILD_PROFILES) },
             )
+        }
+        composable(
+            route = "${Routes.REQUESTS}?${RequestsArgs.REQUEST_ID}={${RequestsArgs.REQUEST_ID}}",
+            arguments = listOf(
+                navArgument(RequestsArgs.REQUEST_ID) {
+                    type = NavType.LongType
+                    defaultValue = -1L
+                },
+            ),
+        ) {
+            RequestsScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.RECOGNITION_DEBUG) {
             RecognitionDebugScreen(onBack = { navController.popBackStack() })

@@ -116,12 +116,52 @@ class PolicyStringsLocalizationTest {
         "dashboard_usage_unavailable_hint",
         "dashboard_value_unknown",
     )
+
+    /** Phase 11 Notifications &amp; Requests strings. */
+    private val phase11Keys = setOf(
+        "dashboard_notifications_disabled",
+        "dashboard_requests_none",
+        "dashboard_requests_open",
+        "dashboard_requests_pending",
+        "notification_app_unknown",
+        "notification_channel_protection_description",
+        "notification_channel_protection_name",
+        "notification_channel_requests_description",
+        "notification_channel_requests_name",
+        "notification_protection_blocked_body",
+        "notification_protection_blocked_title",
+        "notification_protection_released_body",
+        "notification_protection_released_title",
+        "notification_request_created_body",
+        "notification_request_created_title",
+        "request_approve",
+        "request_approved_duration",
+        "request_back",
+        "request_child",
+        "request_duration",
+        "request_empty",
+        "request_error",
+        "request_extra_time",
+        "request_extra_time_sent",
+        "request_notifications_disabled",
+        "request_reject",
+        "request_resolved_note",
+        "request_retry",
+        "request_status",
+        "request_status_approved",
+        "request_status_cancelled",
+        "request_status_expired",
+        "request_status_pending",
+        "request_status_rejected",
+        "requests_subtitle",
+        "requests_title",
+    )
     @Test
     fun everyLocaleDeclaresEveryGroup4Key() {
         val problems = mutableListOf<String>()
         locales.forEach { locale ->
             val names = stringNames(stringsFile(locale))
-            val missing = (requiredKeys + dashboardKeys) - names
+            val missing = (requiredKeys + dashboardKeys + phase11Keys) - names
             if (missing.isNotEmpty()) problems += "$locale is missing $missing"
         }
         assertTrue(problems.joinToString("; "), problems.isEmpty())

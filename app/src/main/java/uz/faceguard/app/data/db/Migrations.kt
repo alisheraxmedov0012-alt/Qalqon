@@ -74,3 +74,65 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
         )
     }
 }
+
+/**
+ * v5 -> v6: adds durable parent requests and notification dedup records.
+ *
+ * Purely additive: no existing table is altered or dropped, so accounts,
+ * profiles, protected apps, policies and the activity log all survive the
+ * upgrade. Statements mirror Room's generated schema for [ParentRequestEntity]
+ * and [NotificationRecordEntity] (column order follows the constructor).
+ */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `parent_requests` (" +
+                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`accountId` INTEGER NOT NULL, " +
+                "`childId` INTEGER NOT NULL, " +
+                "`targetPackageName` TEXT NOT NULL, " +
+                "`requestType` TEXT NOT NULL, " +
+                "`requestedDurationMinutes` INTEGER NOT NULL, " +
+                "`approvedDurationMinutes` INTEGER, " +
+                "`status` TEXT NOT NULL, " +
+                "`createdAt` INTEGER NOT NULL, " +
+                "`updatedAt` INTEGER NOT NULL, " +
+                "`expiresAt` INTEGER, " +
+                "`resolvedAt` INTEGER, " +
+                "`resolutionReason` TEXT, " +
+                "`source` TEXT NOT NULL, " +
+                "`deduplicationKey` TEXT NOT NULL)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_parent_requests_accountId_createdAt` " +
+                "ON `parent_requests` (`accountId`, `createdAt`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_parent_requests_accountId_status_createdAt` " +
+                "ON `parent_requests` (`accountId`, `status`, `createdAt`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_parent_requests_accountId_childId_status` " +
+                "ON `parent_requests` (`accountId`, `childId`, `status`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_parent_requests_accountId_deduplicationKey_status` " +
+                "ON `parent_requests` (`accountId`, `deduplicationKey`, `status`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `notification_records` (" +
+                "`deduplicationKey` TEXT NOT NULL, " +
+                "`accountId` INTEGER NOT NULL, " +
+                "`type` TEXT NOT NULL, " +
+                "`relatedRequestId` INTEGER, " +
+                "`createdAt` INTEGER NOT NULL, " +
+                "`delivered` INTEGER NOT NULL, " +
+                "`deliveryAt` INTEGER, " +
+                "PRIMARY KEY(`deduplicationKey`))",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_notification_records_accountId_createdAt` " +
+                "ON `notification_records` (`accountId`, `createdAt`)",
+        )
+    }
+}

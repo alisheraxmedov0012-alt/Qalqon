@@ -71,6 +71,13 @@ data class DashboardUiState(
     val accessibilityEnabled: Boolean = false,
     val parentFaceEnrolled: Boolean = false,
     val protectedAppsCount: Int = 0,
+    /**
+     * Phase 11: durable pending requests for this account (real request rows, never
+     * a count of protection events).
+     */
+    val pendingRequestCount: Int = 0,
+    /** Phase 11: whether the OS would actually show our notifications. */
+    val notificationsEnabled: Boolean = true,
     val recentEvents: List<EventSummary> = emptyList(),
 ) {
     val hasChild: Boolean get() = child?.exists == true
@@ -85,6 +92,8 @@ data class DashboardUiState(
      * exist. The dashboard must say so rather than show a made-up figure.
      */
     val usageAvailable: Boolean get() = false
+
+    val hasPendingRequests: Boolean get() = pendingRequestCount > 0
 }
 
 // ---------------------------------------------------------------------------

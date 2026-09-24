@@ -61,6 +61,7 @@ import uz.faceguard.app.domain.repository.ChildProfileRepository
 import uz.faceguard.app.domain.repository.ParentProfileRepository
 import uz.faceguard.app.domain.repository.ProtectedAppsRepository
 import uz.faceguard.app.domain.repository.SettingsRepository
+import uz.faceguard.app.domain.request.ParentRequestRepository
 
 /**
  * Phase 10 Parent Dashboard.
@@ -79,6 +80,7 @@ class HomeViewModel @Inject constructor(
     protectedAppsRepository: ProtectedAppsRepository,
     activityLogRepository: ActivityLogRepository,
     settingsRepository: SettingsRepository,
+    requestRepository: ParentRequestRepository,
     runtime: ProtectionRuntime,
 ) : ViewModel() {
 
@@ -89,6 +91,7 @@ class HomeViewModel @Inject constructor(
         protectedAppsRepository = protectedAppsRepository,
         activityLogRepository = activityLogRepository,
         settingsRepository = settingsRepository,
+        requestRepository = requestRepository,
         runtimeState = runtime.state,
     )
 
@@ -131,6 +134,7 @@ fun HomeScreen(
     onOpenHelp: () -> Unit,
     onOpenActivity: () -> Unit,
     onOpenChildPolicy: (Long) -> Unit,
+    onOpenRequests: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val dashboard by viewModel.dashboard.collectAsStateWithLifecycle()
@@ -184,6 +188,7 @@ fun HomeScreen(
                         onOpenChildren = onOpenChildren,
                     )
                     ProtectedAppsSummaryCard(dashboard = dashboard, onOpenProtectedApps = onOpenProtectedApps)
+                    RequestsSummaryCard(dashboard = dashboard, onOpenRequests = onOpenRequests)
                     ChildProfileSummaryCard(dashboard, onOpenChildren = onOpenChildren)
                     RecentActivityCard(dashboard, onOpenActivity = onOpenActivity)
                     UsageCard()
@@ -771,6 +776,40 @@ private fun ForegroundDebugCard() {
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
+        }
+    }
+}
+
+/**
+ * Phase 11: pending parent requests (durable request rows — never a count of
+ * protection events) plus the honest notification-capability warning. A denied
+ * notification permission never hides or blocks a request, so this is only a
+ * warning about *delivery*.
+ */
+@Composable
+private fun RequestsSummaryCard(dashboard: DashboardUiState, onOpenRequests: () -> Unit) {
+    SectionCard(title = stringResource(R.string.requests_title)) {
+        if (dashboard.hasPendingRequests) {
+            Text(
+                stringResource(R.string.dashboard_requests_pending, dashboard.pendingRequestCount),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+        } else {
+            Text(
+                stringResource(R.string.dashboard_requests_none),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (!dashboard.notificationsEnabled) {
+            Text(
+                stringResource(R.string.dashboard_notifications_disabled),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        OutlinedButton(onClick = onOpenRequests, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.dashboard_requests_open))
         }
     }
 }

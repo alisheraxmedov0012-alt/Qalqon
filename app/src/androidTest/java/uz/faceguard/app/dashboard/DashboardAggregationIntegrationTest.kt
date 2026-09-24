@@ -27,6 +27,7 @@ import uz.faceguard.app.data.db.FaceGuardDatabase
 import uz.faceguard.app.data.repository.ActivityLogRepositoryImpl
 import uz.faceguard.app.data.repository.ChildAppPolicyRepositoryImpl
 import uz.faceguard.app.data.repository.ChildProfileRepositoryImpl
+import uz.faceguard.app.data.repository.ParentRequestRepositoryImpl
 import uz.faceguard.app.domain.model.ActivityEventType
 import uz.faceguard.app.domain.model.AppSettings
 import uz.faceguard.app.domain.model.BlockPolicy
@@ -58,6 +59,7 @@ class DashboardAggregationIntegrationTest {
     private lateinit var childRepository: ChildProfileRepositoryImpl
     private lateinit var policyRepository: ChildAppPolicyRepositoryImpl
     private lateinit var activityRepository: ActivityLogRepositoryImpl
+    private lateinit var requestRepository: ParentRequestRepositoryImpl
 
     private val accountId = MutableStateFlow<Long?>(null)
     private val settingsFlow = MutableStateFlow(AppSettings())
@@ -99,6 +101,7 @@ class DashboardAggregationIntegrationTest {
         childRepository = ChildProfileRepositoryImpl(db.childProfileDao())
         policyRepository = ChildAppPolicyRepositoryImpl(db.childAppPolicyDao())
         activityRepository = ActivityLogRepositoryImpl(db.activityEventDao())
+        requestRepository = ParentRequestRepositoryImpl(db.parentRequestDao(), childRepository)
     }
 
     @After
@@ -111,6 +114,7 @@ class DashboardAggregationIntegrationTest {
         protectedAppsRepository = patchedApps,
         activityLogRepository = activityRepository,
         settingsRepository = settingsRepository,
+        requestRepository = requestRepository,
         runtimeState = flow {
             emitAll(runtimeState)
         },

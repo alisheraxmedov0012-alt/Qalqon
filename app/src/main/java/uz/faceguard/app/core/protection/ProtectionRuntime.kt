@@ -24,12 +24,22 @@ import uz.faceguard.app.core.liveness.LivenessResult
 import uz.faceguard.app.core.monitor.ForegroundAppMonitor
 import uz.faceguard.app.core.recognition.Recognizer
 import uz.faceguard.app.core.scan.ScanScheduler
+import uz.faceguard.app.domain.model.ActivityEventType
 import uz.faceguard.app.domain.model.ChildProfile
 import uz.faceguard.app.domain.model.ParentProfile
 import uz.faceguard.app.domain.model.ScanMode
 import uz.faceguard.app.domain.policy.AppPolicy
 import uz.faceguard.app.domain.policy.ChildAppPolicyRepository
+import uz.faceguard.app.domain.notification.AppNotificationDispatcher
+import uz.faceguard.app.domain.notification.AppNotificationEvent
+import uz.faceguard.app.domain.notification.NotificationCoordinator
 import uz.faceguard.app.domain.policy.PolicyEvaluator
+import uz.faceguard.app.domain.request.ParentRequest
+import uz.faceguard.app.domain.request.ParentRequestRepository
+import uz.faceguard.app.domain.request.RequestCreationResult
+import uz.faceguard.app.domain.request.RequestDeduplication
+import uz.faceguard.app.domain.request.RequestLimits
+import uz.faceguard.app.domain.request.RequestType
 import uz.faceguard.app.domain.policy.PolicySettings
 import uz.faceguard.app.domain.policy.PolicySettingsRepository
 import uz.faceguard.app.domain.repository.AccountRepository
@@ -71,6 +81,11 @@ data class ProtectionRuntimeState(
     val scanning: Boolean = false,
     val cooldownRemainingMs: Long = 0L,
     val lastTrigger: String = "",
+    /**
+     * Phase 11: true when the OS would actually show our notifications. Request
+     * state is independent of this — a denied permission never blocks requests.
+     */
+    val notificationsEnabled: Boolean = true,
     val protectedCount: Int = 0,
     val parentFaceEnrolled: Boolean = false,
     val childCount: Int = 0,
@@ -118,10 +133,13 @@ class ProtectionRuntime @Inject constructor(
     private val childAppPolicyRepository: ChildAppPolicyRepository,
     private val policyEvaluator: PolicyEvaluator,
     private val serviceLauncher: ProtectionServiceLauncher,
+    private val requestRepository: ParentRequestRepository,
+    private val notificationCoordinator: NotificationCoordinator,
+    private val notificationDispatcher: AppNotificationDispatcher,
 ) {
 
     private val monitor = ForegroundAppMonitor(context)
-    private val overlay = OverlayControllerImpl(context)
+    private val overlay = OverlayControllerImpl(context, onRequestExtraTime = { requestExtraTime() })
     private val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val scheduler = ScanScheduler(context)
     private val engine = ProtectionEngine(
@@ -186,6 +204,13 @@ class ProtectionRuntime @Inject constructor(
                 scope.launch {
                     runCatching { activityLog.log(owner, type, detail) }
                         .onFailure { Log.w(TAG, "activity log write failed", it) }
+                }
+                // Phase 11: notification-worthy transitions only. The engine already
+                // collapses per-frame chatter into transitions (CHILD_BLOCKED once per
+                // block, PROTECTION_RELEASED once per recovery cycle), and the
+                // coordinator additionally deduplicates, so no event spam is possible.
+                notificationEventFor(type, owner)?.let { event ->
+                    scope.launch { runCatching { notificationCoordinator.onEvent(event) } }
                 }
             }
         }
@@ -345,6 +370,7 @@ class ProtectionRuntime @Inject constructor(
                 overlayGranted = overlay.hasPermission(),
                 usageAccessGranted = monitor.hasUsageAccess(),
                 accessibilityEnabled = AccessibilityCapability.isEnabled(context),
+                notificationsEnabled = runCatching { notificationDispatcher.areNotificationsEnabled() }.getOrDefault(true),
             )
         }
     }
@@ -396,6 +422,71 @@ class ProtectionRuntime @Inject constructor(
      */
     fun onLivenessChanged(result: LivenessResult?) {
         _state.update { it.copy(liveness = result) }
+    }
+
+    /**
+     * Phase 11: the child asked for more time on the app that was just blocked
+     * (overlay action). Creates a durable PENDING request — an *authorization
+     * record only*: no usage is measured and nothing is granted here (Phase 4 owns
+     * consumption), and the PolicyEvaluator is never bypassed.
+     */
+    fun requestExtraTime() {
+        val owner = accountId ?: return
+        val packageName = engine.blockedApp.value ?: return
+        val childId = engine.identity.value?.childId ?: return
+        scope.launch {
+            val now = System.currentTimeMillis()
+            val request = ParentRequest(
+                accountId = owner,
+                childId = childId,
+                targetPackageName = packageName,
+                requestType = RequestType.EXTRA_TIME,
+                requestedDurationMinutes = RequestLimits.DEFAULT_REQUEST_MINUTES,
+                createdAt = now,
+                updatedAt = now,
+                deduplicationKey = RequestDeduplication.keyFor(
+                    accountId = owner,
+                    childId = childId,
+                    requestType = RequestType.EXTRA_TIME,
+                    targetPackageName = packageName,
+                ),
+            )
+            when (val result = requestRepository.create(request)) {
+                is RequestCreationResult.Created -> notificationCoordinator.onEvent(
+                    AppNotificationEvent.ParentRequestCreated(
+                        accountId = owner,
+                        requestId = result.request.id,
+                        childId = childId,
+                        targetPackageName = packageName,
+                        requestedDurationMinutes = result.request.requestedDurationMinutes,
+                        at = now,
+                    ),
+                )
+
+                // Already pending: a repeated tap must not create a second request.
+                is RequestCreationResult.Duplicate -> Unit
+
+                is RequestCreationResult.Rejected ->
+                    Log.w(TAG, "extra-time request rejected: ${result.reason}")
+            }
+        }
+    }
+
+    /** Protection transitions that deserve a parent notification (nothing else). */
+    private fun notificationEventFor(type: ActivityEventType, owner: Long): AppNotificationEvent? {
+        val now = System.currentTimeMillis()
+        return when (type) {
+            ActivityEventType.CHILD_BLOCKED -> AppNotificationEvent.ProtectionBlocked(
+                accountId = owner,
+                childId = engine.identity.value?.childId,
+                targetPackageName = engine.blockedApp.value,
+                at = now,
+            )
+
+            ActivityEventType.PROTECTION_RELEASED -> AppNotificationEvent.ProtectionReleased(owner, now)
+
+            else -> null
+        }
     }
 
     fun usageAccessIntent(): Intent = monitor.usageAccessIntent()

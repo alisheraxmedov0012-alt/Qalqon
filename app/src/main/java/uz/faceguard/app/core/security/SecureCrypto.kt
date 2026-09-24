@@ -3,7 +3,6 @@ package uz.faceguard.app.core.security
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import java.security.KeyStore
-import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -58,16 +57,17 @@ fun interface SecureKeyProvider {
  */
 class AesGcmSecureCrypto(
     private val keyProvider: SecureKeyProvider,
-    private val random: SecureRandom = SecureRandom(),
 ) : SecureCrypto {
 
     override fun encrypt(plaintext: ByteArray): CryptoResult {
         val key = keyProvider.key() ?: return CryptoResult.KeyUnavailable
         return try {
-            val iv = ByteArray(IV_LENGTH_BYTES)
-            random.nextBytes(iv)
             val cipher = Cipher.getInstance(TRANSFORMATION)
-            cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(TAG_LENGTH_BITS, iv))
+            // AndroidKeyStore AES/GCM keys require randomized encryption: the
+            // platform generates a fresh nonce (Java's SunJCE does the same), so the
+            // nonce is always random and never caller-chosen.
+            cipher.init(Cipher.ENCRYPT_MODE, key)
+            val iv = cipher.iv ?: return CryptoResult.KeyUnavailable
             val ciphertext = cipher.doFinal(plaintext)
 
             val out = ByteArray(MAGIC.size + 3 + iv.size + ciphertext.size)

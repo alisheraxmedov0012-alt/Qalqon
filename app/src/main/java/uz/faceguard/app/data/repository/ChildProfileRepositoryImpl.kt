@@ -42,8 +42,14 @@ class ChildProfileRepositoryImpl @Inject constructor(
         dao.clearFaceData(childId, accountId, System.currentTimeMillis())
     }
 
-    override suspend fun saveFaceEnrollment(accountId: Long, childId: Long, templateRef: String) =
-        dao.saveFaceEnrollment(childId, accountId, templateRef, EnrollmentStatus.ENROLLED.name, System.currentTimeMillis())
+    /**
+     * Phase 12: encrypted before persistence, scoped by account + child. A missing
+     * key writes nothing (fail closed) instead of storing plaintext.
+     */
+    override suspend fun saveFaceEnrollment(accountId: Long, childId: Long, templateRef: String) {
+        val protectedRef = templateCipher.protect(templateRef) ?: return
+        dao.saveFaceEnrollment(childId, accountId, protectedRef, EnrollmentStatus.ENROLLED.name, System.currentTimeMillis())
+    }
 
     private fun ChildProfileEntity.toDomain() = ChildProfile(
         id = id,

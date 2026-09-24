@@ -57,6 +57,7 @@ import uz.faceguard.app.core.pipeline.FaceCaptureController
 import uz.faceguard.app.core.protection.ProtectionRuntime
 import uz.faceguard.app.core.protection.ProtectionRuntimeState
 import uz.faceguard.app.core.protection.ProtectionState
+import uz.faceguard.app.core.security.SecurityState
 import uz.faceguard.app.core.recognition.Recognizer
 import uz.faceguard.app.domain.model.AppSettings
 import uz.faceguard.app.domain.model.ScanMode
@@ -196,6 +197,20 @@ fun ProtectionScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+
+            val securityWarningRes = when (state.securityState) {
+                SecurityState.RECOVERY_REQUIRED, SecurityState.CORRUPTED ->
+                    R.string.security_recovery_required
+
+                else -> null
+            }
+            securityWarningRes?.let { warning ->
+                Text(
+                    stringResource(warning),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
 
             TechnicalSection(
                 state = state,

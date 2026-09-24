@@ -15,6 +15,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import uz.faceguard.app.security.PassthroughTemplateCipher
+import uz.faceguard.app.data.prefs.PinAttemptStore
 import uz.faceguard.app.core.ui.UiState
 import uz.faceguard.app.data.db.FaceGuardDatabase
 import uz.faceguard.app.data.prefs.SessionManager
@@ -61,8 +63,8 @@ class ChildPolicyViewModelTest {
         db = Room.inMemoryDatabaseBuilder(context, FaceGuardDatabase::class.java)
             .allowMainThreadQueries()
             .build()
-        accountRepository = AccountRepositoryImpl(db.userAccountDao(), sessionManager)
-        childRepository = ChildProfileRepositoryImpl(db.childProfileDao())
+        accountRepository = AccountRepositoryImpl(db.userAccountDao(), sessionManager, PinAttemptStore(context)) { System.currentTimeMillis() }
+        childRepository = ChildProfileRepositoryImpl(db.childProfileDao(), PassthroughTemplateCipher)
         appPolicyRepository = ChildAppPolicyRepositoryImpl(db.childAppPolicyDao())
         protectedApps = FakeProtectedAppsRepository()
 

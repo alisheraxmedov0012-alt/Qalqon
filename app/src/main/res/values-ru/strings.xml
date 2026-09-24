@@ -404,4 +404,7 @@
     <string name="notification_request_created_title">Новый запрос</string>
     <string name="notification_request_created_body">%1$s — запрошено %2$d мин</string>
     <string name="notification_app_unknown">Неизвестное приложение</string>
+
+    <string name="auth_locked_out">Слишком много попыток. Попробуйте ещё раз немного позже.</string>
+    <string name="security_recovery_required">Не удалось расшифровать данные лица. Пожалуйста, зарегистрируйте лицо заново.</string>
 </resources>

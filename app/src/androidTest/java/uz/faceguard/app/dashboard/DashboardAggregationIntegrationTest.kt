@@ -22,6 +22,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import uz.faceguard.app.security.PassthroughTemplateCipher
 import uz.faceguard.app.core.protection.ProtectionRuntimeState
 import uz.faceguard.app.data.db.FaceGuardDatabase
 import uz.faceguard.app.data.repository.ActivityLogRepositoryImpl
@@ -98,7 +99,7 @@ class DashboardAggregationIntegrationTest {
             InstrumentationRegistry.getInstrumentation().targetContext,
             FaceGuardDatabase::class.java,
         ).allowMainThreadQueries().build()
-        childRepository = ChildProfileRepositoryImpl(db.childProfileDao())
+        childRepository = ChildProfileRepositoryImpl(db.childProfileDao(), PassthroughTemplateCipher)
         policyRepository = ChildAppPolicyRepositoryImpl(db.childAppPolicyDao())
         activityRepository = ActivityLogRepositoryImpl(db.activityEventDao())
         requestRepository = ParentRequestRepositoryImpl(db.parentRequestDao(), childRepository)

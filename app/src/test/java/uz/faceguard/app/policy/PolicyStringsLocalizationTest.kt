@@ -156,12 +156,18 @@ class PolicyStringsLocalizationTest {
         "requests_subtitle",
         "requests_title",
     )
+
+    /** Phase 12 security strings. */
+    private val phase12Keys = setOf(
+        "auth_locked_out",
+        "security_recovery_required",
+    )
     @Test
     fun everyLocaleDeclaresEveryGroup4Key() {
         val problems = mutableListOf<String>()
         locales.forEach { locale ->
             val names = stringNames(stringsFile(locale))
-            val missing = (requiredKeys + dashboardKeys + phase11Keys) - names
+            val missing = (requiredKeys + dashboardKeys + phase11Keys + phase12Keys) - names
             if (missing.isNotEmpty()) problems += "$locale is missing $missing"
         }
         assertTrue(problems.joinToString("; "), problems.isEmpty())

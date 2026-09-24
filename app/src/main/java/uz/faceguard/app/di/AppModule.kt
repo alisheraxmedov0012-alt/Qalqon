@@ -56,6 +56,13 @@ import uz.faceguard.app.domain.notification.NotificationRepository
 import uz.faceguard.app.domain.request.ParentRequestRepository
 import uz.faceguard.app.core.notification.AndroidNotificationContentFactory
 import uz.faceguard.app.core.notification.AppLabelResolver
+import uz.faceguard.app.core.security.AesGcmSecureCrypto
+import uz.faceguard.app.core.security.AndroidKeystoreKeyProvider
+import uz.faceguard.app.core.security.KeystoreBiometricTemplateCipher
+import uz.faceguard.app.core.security.SecureCrypto
+import uz.faceguard.app.core.security.SecureKeyProvider
+import uz.faceguard.app.core.security.SecurityStateHolder
+import uz.faceguard.app.domain.security.BiometricTemplateCipher
 import uz.faceguard.app.core.notification.AndroidNotificationDispatcher
 import uz.faceguard.app.domain.repository.ParentProfileRepository
 import uz.faceguard.app.domain.repository.ProtectedAppsRepository
@@ -177,6 +184,35 @@ object AppModule {
     @Provides
     @Singleton
     fun provideNotificationPolicy(): NotificationPolicy = DefaultNotificationPolicy()
+
+    /** Phase 12: injectable wall clock (PIN lockout timing is testable). */
+    @Provides
+    @Singleton
+    fun provideClock(): () -> Long = { System.currentTimeMillis() }
+
+    // Phase 12: Keystore-backed biometric-at-rest protection.
+    @Provides
+    @Singleton
+    fun provideAndroidKeystoreKeyProvider(): AndroidKeystoreKeyProvider = AndroidKeystoreKeyProvider()
+
+    @Provides
+    @Singleton
+    fun provideSecureKeyProvider(impl: AndroidKeystoreKeyProvider): SecureKeyProvider = impl
+
+    @Provides
+    @Singleton
+    fun provideSecurityStateHolder(): SecurityStateHolder = SecurityStateHolder()
+
+    @Provides
+    @Singleton
+    fun provideSecureCrypto(keyProvider: SecureKeyProvider): SecureCrypto = AesGcmSecureCrypto(keyProvider)
+
+    @Provides
+    @Singleton
+    fun provideBiometricTemplateCipher(
+        crypto: SecureCrypto,
+        securityState: SecurityStateHolder,
+    ): BiometricTemplateCipher = KeystoreBiometricTemplateCipher(crypto, securityState)
 
     @Provides
     @Singleton

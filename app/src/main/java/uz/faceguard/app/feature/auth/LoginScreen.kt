@@ -84,7 +84,13 @@ class LoginViewModel @Inject constructor(
                 is AuthResult.Failure ->
                     _ui.update {
                         it.copy(
-                            state = UiState.Error(R.string.error_invalid_credentials),
+                            state = UiState.Error(
+                                when (result.reason) {
+                                    AuthResult.Reason.LOCKED_OUT -> R.string.auth_locked_out
+                                    // Identical message for wrong phone/PIN: no enumeration.
+                                    else -> R.string.error_invalid_credentials
+                                },
+                            ),
                             pin = "",
                         )
                     }

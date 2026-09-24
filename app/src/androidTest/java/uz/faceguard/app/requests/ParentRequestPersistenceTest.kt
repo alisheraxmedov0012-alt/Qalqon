@@ -13,6 +13,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import uz.faceguard.app.security.PassthroughTemplateCipher
 import uz.faceguard.app.data.db.FaceGuardDatabase
 import uz.faceguard.app.data.repository.ChildProfileRepositoryImpl
 import uz.faceguard.app.data.repository.ParentRequestRepositoryImpl
@@ -44,9 +45,9 @@ class ParentRequestPersistenceTest {
         ).allowMainThreadQueries().build()
         repository = ParentRequestRepositoryImpl(
             dao = db.parentRequestDao(),
-            childProfileRepository = ChildProfileRepositoryImpl(db.childProfileDao()),
+            childProfileRepository = ChildProfileRepositoryImpl(db.childProfileDao(), PassthroughTemplateCipher),
         )
-        childId = ChildProfileRepositoryImpl(db.childProfileDao())
+        childId = ChildProfileRepositoryImpl(db.childProfileDao(), PassthroughTemplateCipher)
             .addChild(1L, "Vali", RestrictionLevel.HIGH)
     }
 
@@ -183,7 +184,7 @@ class ParentRequestPersistenceTest {
     @Test
     fun requestsAreAccountIsolated() = runBlocking {
         created(request(accountId = 1L, createdAt = 1_000L))
-        val otherChild = ChildProfileRepositoryImpl(db.childProfileDao()).addChild(2L, "Ali", RestrictionLevel.LOW)
+        val otherChild = ChildProfileRepositoryImpl(db.childProfileDao(), PassthroughTemplateCipher).addChild(2L, "Ali", RestrictionLevel.LOW)
         assertTrue(otherChild > 0)
         val other = repository.create(
             request(accountId = 2L, child = otherChild, createdAt = 1_000L),
@@ -205,7 +206,7 @@ class ParentRequestPersistenceTest {
 
     @Test
     fun requestsAreChildIsolatedForTheSameApp() = runBlocking {
-        val second = ChildProfileRepositoryImpl(db.childProfileDao()).addChild(1L, "Ali", RestrictionLevel.LOW)
+        val second = ChildProfileRepositoryImpl(db.childProfileDao(), PassthroughTemplateCipher).addChild(1L, "Ali", RestrictionLevel.LOW)
         assertTrue(second > 0)
 
         created(request(child = childId, createdAt = 1_000L))
@@ -236,7 +237,7 @@ class ParentRequestPersistenceTest {
     @Test
     fun aDeletedChildLeavesStaleRequestsUntouchedButUnresolvableForNewOnes() = runBlocking {
         val pending = created(request(createdAt = 1_000L))
-        ChildProfileRepositoryImpl(db.childProfileDao()).deleteChild(1L, childId)
+        ChildProfileRepositoryImpl(db.childProfileDao(), PassthroughTemplateCipher).deleteChild(1L, childId)
 
         // The existing request is preserved (history), but no new request can be made.
         assertNotNull(repository.byId(1L, pending.id))

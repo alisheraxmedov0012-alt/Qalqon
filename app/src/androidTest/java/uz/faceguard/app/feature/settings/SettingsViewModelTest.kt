@@ -20,6 +20,9 @@ import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import uz.faceguard.app.core.security.AndroidKeystoreKeyProvider
+import uz.faceguard.app.security.PassthroughTemplateCipher
+import uz.faceguard.app.data.prefs.PinAttemptStore
 import uz.faceguard.app.data.db.FaceGuardDatabase
 import uz.faceguard.app.data.prefs.SessionManager
 import uz.faceguard.app.data.prefs.SettingsStore
@@ -77,11 +80,11 @@ class SettingsViewModelTest {
         db = Room.inMemoryDatabaseBuilder(context, FaceGuardDatabase::class.java)
             .allowMainThreadQueries()
             .build()
-        accountRepository = AccountRepositoryImpl(db.userAccountDao(), sessionManager)
-        parentProfileRepository = ParentProfileRepositoryImpl(db.parentProfileDao())
-        childRepository = ChildProfileRepositoryImpl(db.childProfileDao())
+        accountRepository = AccountRepositoryImpl(db.userAccountDao(), sessionManager, PinAttemptStore(context)) { System.currentTimeMillis() }
+        parentProfileRepository = ParentProfileRepositoryImpl(db.parentProfileDao(), PassthroughTemplateCipher)
+        childRepository = ChildProfileRepositoryImpl(db.childProfileDao(), PassthroughTemplateCipher)
         protectedAppsRepository = FakeProtectedAppsRepository()
-        resetRepository = ResetRepositoryImpl(db, store, sessionManager)
+        resetRepository = ResetRepositoryImpl(db, store, sessionManager, PinAttemptStore(context), AndroidKeystoreKeyProvider())
 
         val result = accountRepository.register("Parent", "901234567", "1234")
         @Suppress("UNUSED_VARIABLE")

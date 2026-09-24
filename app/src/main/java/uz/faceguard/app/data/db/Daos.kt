@@ -19,6 +19,10 @@ interface UserAccountDao {
     @Query("SELECT * FROM user_accounts WHERE phoneNumber = :phoneNumber LIMIT 1")
     suspend fun getByPhone(phoneNumber: String): UserAccountEntity?
 
+    /** Phase 12: upgrades a legacy PIN hash in place (no schema change). */
+    @Query("UPDATE user_accounts SET pinHash = :pinHash, pinSalt = :pinSalt WHERE id = :id")
+    suspend fun updatePinHash(id: Long, pinHash: String, pinSalt: String)
+
     @Query("DELETE FROM user_accounts")
     suspend fun deleteAll()
 }
@@ -46,6 +50,10 @@ interface ParentProfileDao {
     @Query("UPDATE parent_profiles SET isFaceEnrolled = 0, faceTemplateRef = NULL, enrollmentStatus = 'NONE', enrollmentVersion = enrollmentVersion + 1, lastEnrollmentAt = NULL, updatedAt = :updatedAt WHERE accountId = :accountId")
     suspend fun clearFaceData(accountId: Long, updatedAt: Long)
 
+    /** Phase 12: rows for the biometric encryption sweep. */
+    @Query("SELECT * FROM parent_profiles")
+    suspend fun all(): List<ParentProfileEntity>
+
     @Query("DELETE FROM parent_profiles")
     suspend fun deleteAll()
 }
@@ -72,6 +80,10 @@ interface ChildProfileDao {
     /** Clears face enrollment metadata without deleting the child profile. */
     @Query("UPDATE child_profiles SET isFaceEnrolled = 0, faceTemplateRef = NULL, enrollmentStatus = 'NONE', enrollmentVersion = enrollmentVersion + 1, lastEnrollmentAt = NULL, updatedAt = :updatedAt WHERE id = :id AND accountId = :accountId")
     suspend fun clearFaceData(id: Long, accountId: Long, updatedAt: Long)
+
+    /** Phase 12: rows for the biometric encryption sweep. */
+    @Query("SELECT * FROM child_profiles")
+    suspend fun all(): List<ChildProfileEntity>
 
     @Query("DELETE FROM child_profiles")
     suspend fun deleteAll()

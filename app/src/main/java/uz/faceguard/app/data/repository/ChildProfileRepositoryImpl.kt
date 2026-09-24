@@ -10,10 +10,13 @@ import uz.faceguard.app.domain.model.ChildProfile
 import uz.faceguard.app.domain.model.EnrollmentStatus
 import uz.faceguard.app.domain.model.RestrictionLevel
 import uz.faceguard.app.domain.repository.ChildProfileRepository
+import uz.faceguard.app.domain.security.BiometricTemplateCipher
+import uz.faceguard.app.domain.security.TemplateRecovery
 
 @Singleton
 class ChildProfileRepositoryImpl @Inject constructor(
     private val dao: ChildProfileDao,
+    private val templateCipher: BiometricTemplateCipher,
 ) : ChildProfileRepository {
 
     override fun observeChildren(accountId: Long): Flow<List<ChildProfile>> =
@@ -47,7 +50,7 @@ class ChildProfileRepositoryImpl @Inject constructor(
         accountId = accountId,
         childName = childName,
         isFaceEnrolled = isFaceEnrolled,
-        faceTemplateRef = faceTemplateRef,
+        faceTemplateRef = recoverTemplateRef(faceTemplateRef),
         restrictionLevel = runCatching { RestrictionLevel.valueOf(restrictionLevel) }
             .getOrDefault(RestrictionLevel.MEDIUM),
         enrollmentStatus = runCatching { EnrollmentStatus.valueOf(enrollmentStatus) }
@@ -57,4 +60,11 @@ class ChildProfileRepositoryImpl @Inject constructor(
         createdAt = createdAt,
         updatedAt = updatedAt,
     )
+
+    /** Decrypts for transient use; null when unreadable (no plaintext fallback). */
+    private fun recoverTemplateRef(stored: String?): String? = when (val recovery = stored?.let { templateCipher.recover(it) }) {
+        is TemplateRecovery.Recovered -> recovery.plainRef
+        is TemplateRecovery.LegacyPlaintext -> recovery.plainRef
+        else -> null
+    }
 }

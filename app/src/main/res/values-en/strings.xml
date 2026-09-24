@@ -404,4 +404,7 @@
     <string name="notification_request_created_title">New request</string>
     <string name="notification_request_created_body">%1$s — %2$d min requested</string>
     <string name="notification_app_unknown">Unknown app</string>
+
+    <string name="auth_locked_out">Too many attempts. Please try again a little later.</string>
+    <string name="security_recovery_required">Your face data could not be unlocked. Please enroll the face again.</string>
 </resources>

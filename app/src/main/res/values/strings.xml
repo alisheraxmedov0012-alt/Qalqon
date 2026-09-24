@@ -405,4 +405,7 @@
     <string name="notification_request_created_title">Yangi so\'rov</string>
     <string name="notification_request_created_body">%1$s — %2$d daqiqa so\'raldi</string>
     <string name="notification_app_unknown">Noma\'lum ilova</string>
+
+    <string name="auth_locked_out">Juda ko\'p urinish. Birozdan so\'ng qayta urinib ko\'ring.</string>
+    <string name="security_recovery_required">Yuz ma\'lumotlarini ochib bo\'lmadi. Iltimos, yuzni qayta ro\'yxatdan o\'tkazing.</string>
 </resources>

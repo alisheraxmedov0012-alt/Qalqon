@@ -21,6 +21,8 @@ import kotlinx.coroutines.launch
 import uz.faceguard.app.core.accessibility.AccessibilityCapability
 import uz.faceguard.app.core.accessibility.AccessibilityForegroundTracker
 import uz.faceguard.app.core.liveness.LivenessResult
+import uz.faceguard.app.core.security.SecurityState
+import uz.faceguard.app.core.security.SecurityStateHolder
 import uz.faceguard.app.core.monitor.ForegroundAppMonitor
 import uz.faceguard.app.core.recognition.Recognizer
 import uz.faceguard.app.core.scan.ScanScheduler
@@ -86,6 +88,12 @@ data class ProtectionRuntimeState(
      * state is independent of this — a denied permission never blocks requests.
      */
     val notificationsEnabled: Boolean = true,
+    /**
+     * Phase 12: at-rest security state. RECOVERY_REQUIRED/CORRUPTED means stored
+     * biometric data could not be decrypted (fail closed: recognition treats the
+     * template as unavailable and the parent is told re-enrollment is needed).
+     */
+    val securityState: SecurityState = SecurityState.SECURE,
     val protectedCount: Int = 0,
     val parentFaceEnrolled: Boolean = false,
     val childCount: Int = 0,
@@ -136,6 +144,7 @@ class ProtectionRuntime @Inject constructor(
     private val requestRepository: ParentRequestRepository,
     private val notificationCoordinator: NotificationCoordinator,
     private val notificationDispatcher: AppNotificationDispatcher,
+    private val securityStateHolder: SecurityStateHolder,
 ) {
 
     private val monitor = ForegroundAppMonitor(context)
@@ -284,6 +293,10 @@ class ProtectionRuntime @Inject constructor(
         // Phase 9: the app the current protection cycle is holding.
         scope.launch { engine.blockedApp.collect { pkg -> _state.update { it.copy(blockedApp = pkg) } } }
         scope.launch { monitor.current.collect { value -> _state.update { it.copy(foregroundApp = value) } } }
+        // Phase 12: surface the at-rest security state (no secrets, no technical detail).
+        scope.launch {
+            securityStateHolder.state.collect { value -> _state.update { it.copy(securityState = value) } }
+        }
         scope.launch { scheduler.scanning.collect { value -> _state.update { it.copy(scanning = value) } } }
         scope.launch {
             scheduler.cooldownRemaining.collect { value -> _state.update { it.copy(cooldownRemainingMs = value) } }
@@ -371,6 +384,7 @@ class ProtectionRuntime @Inject constructor(
                 usageAccessGranted = monitor.hasUsageAccess(),
                 accessibilityEnabled = AccessibilityCapability.isEnabled(context),
                 notificationsEnabled = runCatching { notificationDispatcher.areNotificationsEnabled() }.getOrDefault(true),
+                securityState = securityStateHolder.state.value,
             )
         }
     }

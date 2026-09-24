@@ -265,3 +265,115 @@ interface NotificationRecordDao {
     @Query("DELETE FROM notification_records")
     suspend fun deleteAll()
 }
+
+/**
+ * Phase 4: screen-time usage. Every statement is account + child scoped and the
+ * increment is a single SQL statement (`usedMs = usedMs + :deltaMs`) so concurrent
+ * increments accumulate instead of losing updates.
+ */
+@Dao
+interface DailyAppUsageDao {
+
+    @Query(
+        "SELECT * FROM daily_app_usage WHERE accountId = :accountId AND childId = :childId " +
+            "AND dateKey = :dateKey ORDER BY packageName ASC",
+    )
+    fun observeDay(accountId: Long, childId: Long, dateKey: String): Flow<List<DailyAppUsageEntity>>
+
+    @Query(
+        "SELECT * FROM daily_app_usage WHERE accountId = :accountId AND childId = :childId " +
+            "AND dateKey = :dateKey ORDER BY packageName ASC",
+    )
+    suspend fun dayUsage(accountId: Long, childId: Long, dateKey: String): List<DailyAppUsageEntity>
+
+    @Query(
+        "SELECT * FROM daily_app_usage WHERE accountId = :accountId AND childId = :childId " +
+            "AND dateKey = :dateKey AND packageName = :packageName LIMIT 1",
+    )
+    suspend fun packageUsage(accountId: Long, childId: Long, dateKey: String, packageName: String): DailyAppUsageEntity?
+
+    @Query(
+        "SELECT SUM(usedMs) FROM daily_app_usage WHERE accountId = :accountId AND childId = :childId " +
+            "AND dateKey = :dateKey AND category = :category",
+    )
+    suspend fun categoryUsedMs(accountId: Long, childId: Long, dateKey: String, category: String): Long?
+
+    @Query(
+        "SELECT SUM(usedMs) FROM daily_app_usage WHERE accountId = :accountId AND childId = :childId " +
+            "AND dateKey = :dateKey",
+    )
+    suspend fun totalUsedMs(accountId: Long, childId: Long, dateKey: String): Long?
+
+    /** Atomic accumulate; returns the number of rows updated (0 when the row is absent). */
+    @Query(
+        "UPDATE daily_app_usage SET usedMs = usedMs + :deltaMs, updatedAt = :now " +
+            "WHERE accountId = :accountId AND childId = :childId AND dateKey = :dateKey " +
+            "AND packageName = :packageName AND usedMs + :deltaMs >= 0",
+    )
+    suspend fun incrementUsage(
+        accountId: Long,
+        childId: Long,
+        dateKey: String,
+        packageName: String,
+        deltaMs: Long,
+        now: Long,
+    ): Int
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertIfAbsent(row: DailyAppUsageEntity): Long
+
+    @Query(
+        "DELETE FROM daily_app_usage WHERE accountId = :accountId AND childId = :childId AND dateKey = :dateKey",
+    )
+    suspend fun deleteDay(accountId: Long, childId: Long, dateKey: String)
+
+    @Query("DELETE FROM daily_app_usage WHERE accountId = :accountId AND childId = :childId")
+    suspend fun deleteChildUsage(accountId: Long, childId: Long)
+
+    @Query("DELETE FROM daily_app_usage WHERE accountId = :accountId")
+    suspend fun deleteAccountUsage(accountId: Long)
+
+    @Query("DELETE FROM daily_app_usage")
+    suspend fun deleteAll()
+}
+
+/** Phase 4: TOTAL / CATEGORY limits (per-app limits stay in child_app_policies). */
+@Dao
+interface ChildScreenTimeLimitDao {
+
+    @Query(
+        "SELECT * FROM child_screen_time_limits WHERE accountId = :accountId AND childId = :childId " +
+            "ORDER BY scope ASC, category ASC",
+    )
+    fun observeLimits(accountId: Long, childId: Long): Flow<List<ChildScreenTimeLimitEntity>>
+
+    @Query(
+        "SELECT * FROM child_screen_time_limits WHERE accountId = :accountId AND childId = :childId " +
+            "ORDER BY scope ASC, category ASC",
+    )
+    suspend fun limits(accountId: Long, childId: Long): List<ChildScreenTimeLimitEntity>
+
+    @Query(
+        "SELECT * FROM child_screen_time_limits WHERE accountId = :accountId AND childId = :childId " +
+            "AND scope = :scope AND category = :category LIMIT 1",
+    )
+    suspend fun limit(accountId: Long, childId: Long, scope: String, category: String): ChildScreenTimeLimitEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(limit: ChildScreenTimeLimitEntity)
+
+    @Query(
+        "DELETE FROM child_screen_time_limits WHERE accountId = :accountId AND childId = :childId " +
+            "AND scope = :scope AND category = :category",
+    )
+    suspend fun delete(accountId: Long, childId: Long, scope: String, category: String)
+
+    @Query("DELETE FROM child_screen_time_limits WHERE accountId = :accountId AND childId = :childId")
+    suspend fun deleteChildLimits(accountId: Long, childId: Long)
+
+    @Query("DELETE FROM child_screen_time_limits WHERE accountId = :accountId")
+    suspend fun deleteAccountLimits(accountId: Long)
+
+    @Query("DELETE FROM child_screen_time_limits")
+    suspend fun deleteAll()
+}

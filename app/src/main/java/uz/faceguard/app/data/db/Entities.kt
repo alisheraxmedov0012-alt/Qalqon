@@ -162,3 +162,58 @@ data class NotificationRecordEntity(
     val delivered: Boolean = false,
     val deliveryAt: Long? = null,
 )
+
+/**
+ * Phase 4: daily per-app screen-time usage.
+ *
+ * The composite key (accountId, childId, dateKey, packageName) is the accounting
+ * identity: every millisecond belongs to exactly one account + child + local day +
+ * package bucket, so usage can never cross accounts, children or days. `usedMs`
+ * only changes through SQL-atomic increments and is never negative.
+ */
+@Entity(
+    tableName = "daily_app_usage",
+    primaryKeys = ["accountId", "childId", "dateKey", "packageName"],
+    indices = [
+        Index(value = ["accountId", "childId", "dateKey"]),
+        Index(value = ["accountId", "childId", "dateKey", "category"]),
+    ],
+)
+data class DailyAppUsageEntity(
+    val accountId: Long,
+    val childId: Long,
+    /** Local calendar day, `yyyy-MM-dd` (see UsageDateKey). */
+    val dateKey: String,
+    val packageName: String,
+    /** Exact accumulated duration in milliseconds; never negative. */
+    val usedMs: Long,
+    /** AppCategory.name, resolved once at write time. */
+    val category: String,
+    val updatedAt: Long,
+)
+
+/**
+ * Phase 4: child screen-time limits for the scopes not already covered by
+ * `child_app_policies.dailyLimitMinutes` (which stays the per-app source).
+ *
+ * `scope` is LimitScope.name (TOTAL / CATEGORY). `category` holds the
+ * AppCategory name for CATEGORY and "" for TOTAL, because SQLite treats NULL
+ * primary-key columns as distinct - "" is what actually enforces "at most one
+ * TOTAL limit per child".
+ */
+@Entity(
+    tableName = "child_screen_time_limits",
+    primaryKeys = ["accountId", "childId", "scope", "category"],
+    indices = [Index(value = ["accountId", "childId"])],
+)
+data class ChildScreenTimeLimitEntity(
+    val accountId: Long,
+    val childId: Long,
+    /** LimitScope.name */
+    val scope: String,
+    /** AppCategory.name, or "" for TOTAL. */
+    val category: String,
+    /** null = unlimited, 0 = immediately exceeded, 1..1440 = daily quota (minutes). */
+    val limitMinutes: Int?,
+    val updatedAt: Long,
+)

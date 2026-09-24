@@ -308,7 +308,7 @@ interface DailyAppUsageDao {
     @Query(
         "UPDATE daily_app_usage SET usedMs = usedMs + :deltaMs, updatedAt = :now " +
             "WHERE accountId = :accountId AND childId = :childId AND dateKey = :dateKey " +
-            "AND packageName = :packageName AND usedMs + :deltaMs >= 0",
+            "AND packageName = :packageName AND :deltaMs >= 0 AND usedMs + :deltaMs >= 0",
     )
     suspend fun incrementUsage(
         accountId: Long,

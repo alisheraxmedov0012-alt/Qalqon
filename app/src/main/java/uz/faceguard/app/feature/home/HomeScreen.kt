@@ -1,5 +1,6 @@
 package uz.faceguard.app.feature.home
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,11 +13,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -38,72 +41,82 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uz.faceguard.app.R
 import uz.faceguard.app.core.debug.DebugFlags
 import uz.faceguard.app.core.monitor.ForegroundAppMonitor
-import uz.faceguard.app.core.ui.UiState
+import uz.faceguard.app.core.protection.ProtectionRuntime
+import uz.faceguard.app.core.protection.ProtectionState
+import uz.faceguard.app.core.ui.SectionCard
 import uz.faceguard.app.domain.model.AppSettings
-import uz.faceguard.app.domain.model.ChildProfile
 import uz.faceguard.app.domain.model.ParentProfile
 import uz.faceguard.app.domain.model.UserAccount
+import uz.faceguard.app.domain.policy.ChildAppPolicyRepository
 import uz.faceguard.app.domain.repository.AccountRepository
+import uz.faceguard.app.domain.repository.ActivityLogRepository
 import uz.faceguard.app.domain.repository.ChildProfileRepository
 import uz.faceguard.app.domain.repository.ParentProfileRepository
 import uz.faceguard.app.domain.repository.ProtectedAppsRepository
 import uz.faceguard.app.domain.repository.SettingsRepository
 
-data class HomeUiState(
-    val state: UiState = UiState.Idle,
-    val account: UserAccount? = null,
-    val parentProfile: ParentProfile? = null,
-    val children: List<ChildProfile> = emptyList(),
-    val protectedCount: Int = 0,
-)
-
+/**
+ * Phase 10 Parent Dashboard.
+ *
+ * A read-only aggregation over existing application data (profiles, per-child
+ * policies, protected apps, activity events, protection runtime). No metric is
+ * invented: screen-time usage does not exist yet, so the dashboard says so
+ * rather than showing a fabricated figure.
+ */
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
     private val parentProfileRepository: ParentProfileRepository,
-    private val childRepository: ChildProfileRepository,
-    private val settingsRepository: SettingsRepository,
+    childRepository: ChildProfileRepository,
+    policyRepository: ChildAppPolicyRepository,
     protectedAppsRepository: ProtectedAppsRepository,
+    activityLogRepository: ActivityLogRepository,
+    settingsRepository: SettingsRepository,
+    runtime: ProtectionRuntime,
 ) : ViewModel() {
 
-    private val _ui = MutableStateFlow(HomeUiState(state = UiState.Loading))
-    val ui: StateFlow<HomeUiState> = _ui
+    private val aggregator = DashboardAggregator(
+        accountRepository = accountRepository,
+        childRepository = childRepository,
+        policyRepository = policyRepository,
+        protectedAppsRepository = protectedAppsRepository,
+        activityLogRepository = activityLogRepository,
+        settingsRepository = settingsRepository,
+        runtimeState = runtime.state,
+    )
 
-    val settings = settingsRepository.settings
+    val dashboard: StateFlow<DashboardUiState> = aggregator.observe(viewModelScope)
+
+    val settings: StateFlow<AppSettings> = settingsRepository.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppSettings())
+
+    private val _account = MutableStateFlow<UserAccount?>(null)
+    val account: StateFlow<UserAccount?> = _account
+
+    val parentProfile: StateFlow<ParentProfile?> = accountRepository.currentAccountId
+        .flatMapLatest { id ->
+            if (id == null) flowOf(null) else parentProfileRepository.observe(id)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     init {
         viewModelScope.launch {
-            val account = accountRepository.getCurrentAccount()
-            if (account == null) {
-                _ui.update { it.copy(state = UiState.Error(R.string.error_invalid_credentials)) }
-            } else {
-                _ui.update { it.copy(account = account, state = UiState.Success) }
-                launch {
-                    childRepository.observeChildren(account.id).collect { children ->
-                        _ui.update { it.copy(children = children) }
-                    }
-                }
-                launch {
-                    parentProfileRepository.observe(account.id).collect { profile ->
-                        _ui.update { it.copy(parentProfile = profile) }
-                    }
-                }
-                launch {
-                    protectedAppsRepository.protectedApps.collect { apps ->
-                        _ui.update { it.copy(protectedCount = apps.count { a -> a.isProtected }) }
-                    }
-                }
+            accountRepository.currentAccountId.collect { id ->
+                _account.value = if (id == null) null else accountRepository.getCurrentAccount()
             }
         }
     }
 
+    fun selectChild(childId: Long?) = aggregator.selectChild(childId)
+
+    fun retry() = aggregator.retry()
 }
 
 @Composable
@@ -117,10 +130,13 @@ fun HomeScreen(
     onOpenPrivacy: () -> Unit,
     onOpenHelp: () -> Unit,
     onOpenActivity: () -> Unit,
+    onOpenChildPolicy: (Long) -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
-    val ui by viewModel.ui.collectAsStateWithLifecycle()
+    val dashboard by viewModel.dashboard.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val account by viewModel.account.collectAsStateWithLifecycle()
+    val parentProfile by viewModel.parentProfile.collectAsStateWithLifecycle()
 
     var showMore by remember { mutableStateOf(false) }
     var showDeveloperTools by remember { mutableStateOf(false) }
@@ -136,83 +152,468 @@ fun HomeScreen(
         ) {
             Text(stringResource(R.string.home_title), style = MaterialTheme.typography.headlineMedium)
             Text(
-                stringResource(R.string.home_subtitle),
+                stringResource(R.string.dashboard_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            when (ui.state) {
-                is UiState.Loading -> Text(stringResource(R.string.state_loading))
-                is UiState.Error -> Text(
-                    stringResource((ui.state as UiState.Error).messageRes),
-                    color = MaterialTheme.colorScheme.error,
+            when (dashboard.status) {
+                DashboardStatus.LOADING -> Text(
+                    stringResource(R.string.state_loading),
+                    style = MaterialTheme.typography.bodyMedium,
                 )
-                else -> {
-                    ui.account?.let { account ->
-                        ProfileSummaryCard(
-                            account = account,
-                            protectionEnabled = settings.protectionEnabled,
-                        )
-                    }
 
-                    SetupChecklistCard(ui, settings)
+                DashboardStatus.ERROR -> ErrorCard(onRetry = viewModel::retry)
 
-                    MainActionsCard(
-                        onOpenProtection = onOpenProtection,
-                        onOpenParent = onOpenParent,
+                DashboardStatus.NO_ACCOUNT -> SectionCard(
+                    title = stringResource(R.string.dashboard_no_account),
+                    subtitle = stringResource(R.string.dashboard_no_account_hint),
+                ) {}
+
+                DashboardStatus.READY -> {
+                    ChildContextCard(
+                        dashboard = dashboard,
+                        onSelectChild = viewModel::selectChild,
                         onOpenChildren = onOpenChildren,
-                        onOpenProtectedApps = onOpenProtectedApps,
-                        onOpenSettings = onOpenSettings,
-                        protectedCount = ui.protectedCount,
                     )
-
-                    AdditionalSection(
-                        expanded = showMore,
-                        onToggle = { showMore = !showMore },
-                        onOpenActivity = onOpenActivity,
-                        onOpenPrivacy = onOpenPrivacy,
-                        onOpenHelp = onOpenHelp,
+                    ProtectionStatusCard(dashboard = dashboard, onOpenProtection = onOpenProtection)
+                    ActiveProtectionCard(dashboard)
+                    ChildPolicySummaryCard(
+                        dashboard = dashboard,
+                        onOpenChildPolicy = onOpenChildPolicy,
+                        onOpenChildren = onOpenChildren,
                     )
-
-                    if (DebugFlags.DEBUG_SCREENS_ENABLED) {
-                        DeveloperSection(
-                            expanded = showDeveloperTools,
-                            onToggle = { showDeveloperTools = !showDeveloperTools },
-                            onOpenRecognition = onOpenRecognition,
-                        )
-                    }
+                    ProtectedAppsSummaryCard(dashboard = dashboard, onOpenProtectedApps = onOpenProtectedApps)
+                    ChildProfileSummaryCard(dashboard, onOpenChildren = onOpenChildren)
+                    RecentActivityCard(dashboard, onOpenActivity = onOpenActivity)
+                    UsageCard()
                 }
+            }
+
+            SetupChecklistCard(
+                account = account,
+                parentProfile = parentProfile,
+                dashboard = dashboard,
+                settings = settings,
+            )
+
+            MainActionsCard(
+                onOpenProtection = onOpenProtection,
+                onOpenParent = onOpenParent,
+                onOpenChildren = onOpenChildren,
+                onOpenProtectedApps = onOpenProtectedApps,
+                onOpenSettings = onOpenSettings,
+                protectedCount = dashboard.protectedAppsCount,
+            )
+
+            AdditionalSection(
+                expanded = showMore,
+                onToggle = { showMore = !showMore },
+                onOpenActivity = onOpenActivity,
+                onOpenPrivacy = onOpenPrivacy,
+                onOpenHelp = onOpenHelp,
+            )
+
+            if (DebugFlags.DEBUG_SCREENS_ENABLED) {
+                DeveloperSection(
+                    expanded = showDeveloperTools,
+                    onToggle = { showDeveloperTools = !showDeveloperTools },
+                    onOpenRecognition = onOpenRecognition,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun ProfileSummaryCard(
-    account: UserAccount,
-    protectionEnabled: Boolean,
-) {
+private fun ErrorCard(onRetry: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(stringResource(R.string.home_profile_title), style = MaterialTheme.typography.titleMedium)
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                stringResource(R.string.home_profile_name, account.fullName),
-                style = MaterialTheme.typography.bodyLarge,
+                stringResource(R.string.dashboard_error),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.error,
             )
             Text(
-                stringResource(R.string.home_profile_phone, account.phoneNumber),
+                stringResource(R.string.dashboard_error_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedButton(onClick = onRetry, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.dashboard_retry))
+            }
+        }
+    }
+}
+
+/** A. Which child's data is on screen, and how to switch. */
+@Composable
+private fun ChildContextCard(
+    dashboard: DashboardUiState,
+    onSelectChild: (Long?) -> Unit,
+    onOpenChildren: () -> Unit,
+) {
+    SectionCard(
+        title = stringResource(R.string.dashboard_child_title),
+        subtitle = if (dashboard.hasChild) {
+            stringResource(R.string.dashboard_child_selected, dashboard.child?.name.orEmpty())
+        } else {
+            stringResource(R.string.dashboard_child_none)
+        },
+    ) {
+        if (!dashboard.hasChild) {
+            Text(
+                stringResource(R.string.dashboard_child_none_hint),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Button(onClick = onOpenChildren, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.dashboard_child_add))
+            }
+            return@SectionCard
+        }
+
+        if (dashboard.hasMultipleChildren) {
+            Text(
+                stringResource(R.string.dashboard_child_switch),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                dashboard.children.forEach { child ->
+                    FilterChip(
+                        selected = child.id == dashboard.selectedChildId,
+                        onClick = { onSelectChild(child.id) },
+                        label = { Text(child.childName) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** B. Protection enabled/off plus the real capability state. */
+@Composable
+private fun ProtectionStatusCard(dashboard: DashboardUiState, onOpenProtection: () -> Unit) {
+    SectionCard(title = stringResource(R.string.dashboard_protection_title)) {
+        Text(
+            stringResource(
+                if (dashboard.protectionEnabled) R.string.dashboard_protection_on
+                else R.string.dashboard_protection_off,
+            ),
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        Text(
+            stringResource(
+                if (dashboard.runtimeActive) R.string.dashboard_protection_active
+                else R.string.dashboard_protection_inactive,
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        if (dashboard.protectionEnabled && !dashboard.enforcementReady) {
+            // Protection is on but a prerequisite is missing: never present this
+            // as "everything is protected".
+            Text(
+                stringResource(R.string.dashboard_capability_missing),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+            CapabilityLine(dashboard.overlayGranted, R.string.protection_req_overlay)
+            CapabilityLine(dashboard.usageAccessGranted, R.string.protection_req_usage)
+            CapabilityLine(dashboard.accessibilityEnabled, R.string.protection_req_accessibility)
+            CapabilityLine(dashboard.parentFaceEnrolled, R.string.protection_req_parent_face)
+            OutlinedButton(onClick = onOpenProtection, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.dashboard_capability_open))
+            }
+        } else if (dashboard.enforcementReady) {
+            Text(
+                stringResource(R.string.dashboard_capability_ok),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CapabilityLine(satisfied: Boolean, labelRes: Int) {
+    val label = stringResource(labelRes)
+    Text(
+        text = stringResource(
+            if (satisfied) R.string.dashboard_capability_ready else R.string.dashboard_capability_needed,
+            label,
+        ),
+        style = MaterialTheme.typography.bodySmall,
+        color = if (satisfied) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+    )
+}
+
+/** C. The current runtime cycle (authoritative current state, never from events). */
+@Composable
+private fun ActiveProtectionCard(dashboard: DashboardUiState) {
+    SectionCard(title = stringResource(R.string.dashboard_active_title)) {
+        Text(stringResource(activeStatusLabelRes(dashboard)), style = MaterialTheme.typography.bodyLarge)
+
+        livenessLabelRes(dashboard.liveness)?.let { res ->
+            Text(
+                stringResource(res),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        dashboard.blockedApp?.let { pkg ->
+            Text(
+                stringResource(R.string.dashboard_active_app, pkg),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+
+        if (dashboard.protectionState == ProtectionState.RECOVERING) {
+            Text(
+                stringResource(R.string.dashboard_active_recovering),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+/**
+ * The current-state line: the live identity when the runtime knows one, else the
+ * protection state, else the neutral "nothing active" text. Domain -> resource
+ * mapping lives in [DashboardState], not scattered through the UI.
+ */
+private fun activeStatusLabelRes(dashboard: DashboardUiState): Int = when {
+    dashboard.identity != null -> identityLabelRes(dashboard.identity)
+    dashboard.protectionState == ProtectionState.UNPROTECTED -> R.string.dashboard_active_none
+    else -> protectionStateLabelRes(dashboard.protectionState)
+}
+
+/** D. Per-child policy summary + configured limits (no usage). */
+@Composable
+private fun ChildPolicySummaryCard(
+    dashboard: DashboardUiState,
+    onOpenChildPolicy: (Long) -> Unit,
+    onOpenChildren: () -> Unit,
+) {
+    val child = dashboard.child ?: return
+    SectionCard(title = stringResource(R.string.dashboard_policy_title)) {
+        if (child.policiesLoading) {
+            Text(stringResource(R.string.dashboard_policy_loading), style = MaterialTheme.typography.bodyMedium)
+            return@SectionCard
+        }
+
+        if (child.policies.total == 0) {
+            Text(
+                stringResource(R.string.dashboard_policy_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
             Text(
                 stringResource(
-                    R.string.home_profile_protection,
-                    stringResource(
-                        if (protectionEnabled) R.string.home_status_on else R.string.home_status_off,
-                    ),
+                    R.string.dashboard_policy_counts,
+                    child.policies.total,
+                    child.policies.allow,
+                    child.policies.limit,
+                    child.policies.block,
                 ),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
             )
+        }
+
+        if (child.limits.isNotEmpty()) {
+            Text(
+                stringResource(R.string.dashboard_policy_limits_title),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            child.limits.forEach { limit ->
+                Text(
+                    text = if (limit.dailyLimitMinutes != null) {
+                        stringResource(R.string.dashboard_policy_limit_line, limit.packageName, limit.dailyLimitMinutes)
+                    } else {
+                        stringResource(R.string.dashboard_policy_limit_line_unknown, limit.packageName)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            // Phase 4 (usage accounting) does not exist: say so honestly instead of
+            // showing a fabricated remaining/used figure.
+            Text(
+                stringResource(R.string.dashboard_policy_no_usage),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        OutlinedButton(
+            onClick = { child.childId?.let(onOpenChildPolicy) ?: onOpenChildren() },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.dashboard_policy_open))
+        }
+    }
+}
+
+/** F. Global protected-app catalog summary. */
+@Composable
+private fun ProtectedAppsSummaryCard(dashboard: DashboardUiState, onOpenProtectedApps: () -> Unit) {
+    SectionCard(title = stringResource(R.string.dashboard_apps_title)) {
+        Text(
+            stringResource(R.string.dashboard_apps_count, dashboard.protectedAppsCount),
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        if (dashboard.protectedAppsCount == 0) {
+            Text(
+                stringResource(R.string.dashboard_apps_none_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        OutlinedButton(onClick = onOpenProtectedApps, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.dashboard_apps_open))
+        }
+    }
+}
+
+/** G. Child profile metadata (no biometric data). */
+@Composable
+private fun ChildProfileSummaryCard(dashboard: DashboardUiState, onOpenChildren: () -> Unit) {
+    val child = dashboard.child ?: return
+    SectionCard(title = stringResource(R.string.dashboard_profile_title)) {
+        Text(
+            child.name ?: stringResource(R.string.dashboard_value_unknown),
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        Text(
+            stringResource(
+                if (child.faceEnrolled) R.string.dashboard_child_face_on
+                else R.string.dashboard_child_face_off,
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            stringResource(R.string.children_level_label, stringResource(restrictionLevelLabelRes(child.level))),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedButton(onClick = onOpenChildren, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.dashboard_profile_open))
+        }
+    }
+}
+
+/** E. Historical events only - never used to infer the current runtime state. */
+@Composable
+private fun RecentActivityCard(dashboard: DashboardUiState, onOpenActivity: () -> Unit) {
+    SectionCard(title = stringResource(R.string.dashboard_activity_title)) {
+        if (dashboard.recentEvents.isEmpty()) {
+            Text(
+                stringResource(R.string.dashboard_activity_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            dashboard.recentEvents.forEach { event ->
+                val label = stringResource(eventLabelRes(event.type))
+                Text(
+                    text = event.detail?.let { "$label · $it" } ?: label,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+        TextButton(onClick = onOpenActivity, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.dashboard_activity_open))
+        }
+    }
+}
+
+/** Section 6: usage is not tracked yet, and the dashboard says so. */
+@Composable
+private fun UsageCard() {
+    SectionCard(
+        title = stringResource(R.string.dashboard_usage_title),
+        subtitle = stringResource(R.string.dashboard_usage_unavailable),
+    ) {
+        Text(
+            stringResource(R.string.dashboard_usage_unavailable_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** Seven-step readiness checklist with a simple progress indicator. */
+@Composable
+private fun SetupChecklistCard(
+    account: UserAccount?,
+    parentProfile: ParentProfile?,
+    dashboard: DashboardUiState,
+    settings: AppSettings,
+) {
+    val items = listOf(
+        (account != null) to R.string.setup_account,
+        (parentProfile != null) to R.string.setup_parent_profile,
+        (parentProfile?.isFaceEnrolled == true) to R.string.setup_parent_face,
+        dashboard.children.isNotEmpty() to R.string.setup_child_added,
+        dashboard.children.any { it.isFaceEnrolled } to R.string.setup_child_face,
+        (dashboard.protectedAppsCount > 0) to R.string.setup_protected_apps,
+        settings.protectionEnabled to R.string.setup_protection_enabled,
+    )
+    val completed = items.count { it.first }
+    val total = items.size
+    val allDone = completed == total
+    val nextStep = items.firstOrNull { !it.first }?.second
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.setup_title), style = MaterialTheme.typography.titleMedium)
+
+            if (allDone) {
+                Text(
+                    stringResource(R.string.setup_all_done),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            } else {
+                Text(
+                    stringResource(R.string.home_setup_progress, completed, total),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                LinearProgressIndicator(
+                    progress = { completed.toFloat() / total.toFloat() },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                nextStep?.let { label ->
+                    Text(
+                        stringResource(R.string.setup_next_step, stringResource(label)),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                items.forEach { (done, labelRes) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = stringResource(if (done) R.string.setup_done_mark else R.string.setup_todo_mark),
+                            color = if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            text = stringResource(labelRes),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -251,69 +652,6 @@ private fun MainActionsCard(
             )
             OutlinedButton(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.home_menu_settings))
-            }
-        }
-    }
-}
-
-/** Seven-step readiness checklist with a simple progress indicator. */
-@Composable
-private fun SetupChecklistCard(ui: HomeUiState, settings: AppSettings) {
-    val items = listOf(
-        (ui.account != null) to R.string.setup_account,
-        (ui.parentProfile != null) to R.string.setup_parent_profile,
-        (ui.parentProfile?.isFaceEnrolled == true) to R.string.setup_parent_face,
-        (ui.children.isNotEmpty()) to R.string.setup_child_added,
-        (ui.children.any { it.isFaceEnrolled }) to R.string.setup_child_face,
-        (ui.protectedCount > 0) to R.string.setup_protected_apps,
-        settings.protectionEnabled to R.string.setup_protection_enabled,
-    )
-    val completed = items.count { it.first }
-    val total = items.size
-    val allDone = completed == total
-    val nextStep = items.firstOrNull { !it.first }?.second
-
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.setup_title), style = MaterialTheme.typography.titleMedium)
-
-            if (allDone) {
-                Text(
-                    stringResource(R.string.setup_all_done),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            } else {
-                Text(
-                    stringResource(R.string.home_setup_progress, completed, total),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                LinearProgressIndicator(
-                    progress = { completed.toFloat() / total.toFloat() },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                nextStep?.let { label ->
-                    Text(
-                        stringResource(R.string.setup_next_step, stringResource(label)),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-
-                items.forEach { (done, labelRes) ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = stringResource(if (done) R.string.setup_done_mark else R.string.setup_todo_mark),
-                            color = if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        Text(
-                            text = stringResource(labelRes),
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(start = 8.dp),
-                        )
-                    }
-                }
             }
         }
     }

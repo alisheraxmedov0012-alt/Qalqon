@@ -100,6 +100,7 @@ fun FaceGuardNavHost(navController: NavHostController) {
                 onOpenPrivacy = { navController.navigate(Routes.PRIVACY) },
                 onOpenHelp = { navController.navigate(Routes.HELP) },
                 onOpenActivity = { navController.navigate(Routes.ACTIVITY_LOG) },
+                onOpenChildPolicy = { childId -> navController.navigate(Routes.childPolicy(childId)) },
             )
         }
         composable(Routes.PARENT_PROFILE) {

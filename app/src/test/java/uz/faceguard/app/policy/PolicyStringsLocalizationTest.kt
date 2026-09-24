@@ -54,12 +54,74 @@ class PolicyStringsLocalizationTest {
         "protection_req_accessibility",
     )
 
+
+    /** Phase 10 Parent Dashboard strings. */
+    private val dashboardKeys = setOf(
+        "dashboard_active_app",
+        "dashboard_active_none",
+        "dashboard_active_recovering",
+        "dashboard_active_title",
+        "dashboard_activity_empty",
+        "dashboard_activity_open",
+        "dashboard_activity_title",
+        "dashboard_apps_count",
+        "dashboard_apps_none_hint",
+        "dashboard_apps_open",
+        "dashboard_apps_title",
+        "dashboard_capability_missing",
+        "dashboard_capability_needed",
+        "dashboard_capability_ok",
+        "dashboard_capability_open",
+        "dashboard_capability_ready",
+        "dashboard_child_add",
+        "dashboard_child_face_off",
+        "dashboard_child_face_on",
+        "dashboard_child_none",
+        "dashboard_child_none_hint",
+        "dashboard_child_selected",
+        "dashboard_child_switch",
+        "dashboard_child_title",
+        "dashboard_error",
+        "dashboard_error_hint",
+        "dashboard_identity_child",
+        "dashboard_identity_no_face",
+        "dashboard_identity_none",
+        "dashboard_identity_obstructed",
+        "dashboard_identity_parent",
+        "dashboard_identity_unknown",
+        "dashboard_liveness_live",
+        "dashboard_liveness_spoof",
+        "dashboard_no_account",
+        "dashboard_no_account_hint",
+        "dashboard_policy_counts",
+        "dashboard_policy_empty",
+        "dashboard_policy_limit_line",
+        "dashboard_policy_limit_line_unknown",
+        "dashboard_policy_limits_title",
+        "dashboard_policy_loading",
+        "dashboard_policy_no_usage",
+        "dashboard_policy_open",
+        "dashboard_policy_title",
+        "dashboard_profile_open",
+        "dashboard_profile_title",
+        "dashboard_protection_active",
+        "dashboard_protection_inactive",
+        "dashboard_protection_off",
+        "dashboard_protection_on",
+        "dashboard_protection_title",
+        "dashboard_retry",
+        "dashboard_subtitle",
+        "dashboard_usage_title",
+        "dashboard_usage_unavailable",
+        "dashboard_usage_unavailable_hint",
+        "dashboard_value_unknown",
+    )
     @Test
     fun everyLocaleDeclaresEveryGroup4Key() {
         val problems = mutableListOf<String>()
         locales.forEach { locale ->
             val names = stringNames(stringsFile(locale))
-            val missing = requiredKeys - names
+            val missing = (requiredKeys + dashboardKeys) - names
             if (missing.isNotEmpty()) problems += "$locale is missing $missing"
         }
         assertTrue(problems.joinToString("; "), problems.isEmpty())

@@ -86,7 +86,9 @@ class ScreenTimeDaoTest {
     @Test
     fun anAbsentRowIsNullAndZeroNotAnError() = runBlocking {
         assertNull(usage.packageUsage(1L, 10L, day, youtube))
-        assertEquals(0L, usage.totalUsedMs(1L, 10L, day))
+        // SQL SUM() over no rows is NULL, not 0: the DAO mirrors SQL honestly and the
+        // repository layer (Step 1B) coalesces this to 0 for the domain.
+        assertNull(usage.totalUsedMs(1L, 10L, day))
         assertTrue(usage.dayUsage(1L, 10L, day).isEmpty())
     }
 

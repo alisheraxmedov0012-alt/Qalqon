@@ -15,6 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -66,10 +67,16 @@ class ScreenTimeTargetViewModelTest {
     private lateinit var activeChild: ScreenTimeActiveChildRepositoryImpl
     private val accounts = FakeAccountSession()
 
+    /**
+     * Keeps a subscriber on each ViewModel's target flow for the length of a test, exactly
+     * as the screen does while it is visible: the flow is shared `WhileSubscribed`, so
+     * without a collector the upstream never runs and the state would never leave loading.
+     */
+    private val collectors = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
     @Before
     fun setUp() {
         sessionManager = SessionManager(context)
-        runBlocking { sessionManager.clearSession() }
         file = File(context.cacheDir, "target-vm-test-${System.nanoTime()}.preferences_pb")
         dataStore = PreferenceDataStoreFactory.create(scope = scope, produceFile = { file })
         settingsStore = SettingsStore(dataStore, sessionManager)
@@ -84,10 +91,10 @@ class ScreenTimeTargetViewModelTest {
 
     @After
     fun tearDown() {
+        collectors.cancel()
         db.close()
         scope.cancel()
         file.delete()
-        runBlocking { sessionManager.clearSession() }
     }
 
     /** The signed-in account, controllable like a real session switch. */
@@ -113,7 +120,7 @@ class ScreenTimeTargetViewModelTest {
         override suspend fun verifyPin(pin: String): Boolean = false
     }
 
-    private fun viewModel() = HomeViewModel(
+    private fun viewModel(): HomeViewModel = HomeViewModel(
         accountRepository = accounts,
         parentProfileRepository = ParentProfileRepositoryImpl(db.parentProfileDao(), PassthroughTemplateCipher),
         childRepository = children,
@@ -124,7 +131,10 @@ class ScreenTimeTargetViewModelTest {
         requestRepository = ParentRequestRepositoryImpl(db.parentRequestDao(), children),
         screenTimeActiveChildRepository = activeChild,
         runtime = app.protectionRuntime,
-    )
+    ).also { viewModel ->
+        // Subscribe as the screen does, so the shared flow is actually running.
+        collectors.launch { viewModel.screenTimeTarget.collect {} }
+    }
 
     private suspend fun addChild(accountId: Long, name: String): Long =
         children.addChild(accountId, name, RestrictionLevel.MEDIUM)

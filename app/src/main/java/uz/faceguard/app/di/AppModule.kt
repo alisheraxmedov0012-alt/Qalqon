@@ -9,6 +9,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import java.time.ZoneId
 import javax.inject.Singleton
 import uz.faceguard.app.data.db.ActivityEventDao
 import uz.faceguard.app.data.db.ChildAppPolicyDao
@@ -38,6 +39,7 @@ import uz.faceguard.app.data.repository.ProtectedAppsRepositoryImpl
 import uz.faceguard.app.data.repository.ScreenTimeUsageRepositoryImpl
 import uz.faceguard.app.core.embed.FaceEmbeddingModel
 import uz.faceguard.app.core.embed.TfLiteMobileFaceNet
+import uz.faceguard.app.core.time.SystemElapsedTimeSource
 import uz.faceguard.app.core.policy.DefaultPolicyEvaluator
 import uz.faceguard.app.core.protection.AndroidProtectionServiceLauncher
 import uz.faceguard.app.core.protection.ProtectionServiceLauncher
@@ -57,6 +59,7 @@ import uz.faceguard.app.domain.notification.NotificationCoordinator
 import uz.faceguard.app.domain.notification.NotificationPolicy
 import uz.faceguard.app.domain.notification.NotificationRepository
 import uz.faceguard.app.domain.request.ParentRequestRepository
+import uz.faceguard.app.domain.screentime.ElapsedTimeSource
 import uz.faceguard.app.domain.screentime.ScreenTimeUsageRepository
 import uz.faceguard.app.core.notification.AndroidNotificationContentFactory
 import uz.faceguard.app.core.notification.AppLabelResolver
@@ -165,6 +168,17 @@ object AppModule {
     fun provideScreenTimeUsageRepository(
         impl: ScreenTimeUsageRepositoryImpl,
     ): ScreenTimeUsageRepository = impl
+
+    // Phase 4 Step 1B-3: what the accounting layer measures and dates against.
+    // The device's own zone is what "today" means to the user (see UsageDateKey).
+    @Provides
+    @Singleton
+    fun provideZoneId(): ZoneId = ZoneId.systemDefault()
+
+    // Durations are measured against the monotonic clock, never the wall clock.
+    @Provides
+    @Singleton
+    fun provideElapsedTimeSource(impl: SystemElapsedTimeSource): ElapsedTimeSource = impl
 
     // Future backend sync: bound to offline no-ops by default; swap these
     // bindings to enable sync without touching any call site.

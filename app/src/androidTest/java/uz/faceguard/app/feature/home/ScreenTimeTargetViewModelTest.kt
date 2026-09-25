@@ -237,7 +237,10 @@ class ScreenTimeTargetViewModelTest {
         children.deleteChild(1L, ali)
         activeChild.clearActiveChildId(1L)
 
-        val state = awaitTarget(viewModel) { it.children.size == 1 }
+        // Wait for both effects the assertions below depend on: the child list shrinking and
+        // the cleared target. They propagate on independent flows, so waiting only on the
+        // list could observe the target before the clear has been published.
+        val state = awaitTarget(viewModel) { it.children.size == 1 && it.activeChildId == null }
         assertNull("no other child may inherit the target", state.activeChildId)
         assertFalse("Vali must not become the target", state.activeChild?.childName == "Vali")
         assertTrue("and the parent is asked to choose again", state.needsSelection)

@@ -17,6 +17,7 @@ import uz.faceguard.app.data.db.ChildScreenTimeLimitEntity
 import uz.faceguard.app.data.db.FaceGuardDatabase
 import uz.faceguard.app.domain.policy.AppPolicy
 import uz.faceguard.app.domain.policy.AppPolicyMode
+import uz.faceguard.app.domain.screentime.AppCategories
 import uz.faceguard.app.domain.screentime.AppCategory
 import uz.faceguard.app.domain.screentime.LimitScope
 import uz.faceguard.app.domain.screentime.ScreenTimeLimit
@@ -67,9 +68,22 @@ class ScreenTimeLimitEvaluatorInstrumentedTest {
     @After
     fun tearDown() = db.close()
 
-    /** Writes usage through the real repository, so rows land in the real table. */
+    /**
+     * Writes usage through the real repository, so rows land in the real table.
+     *
+     * The category is resolved with the same classifier production uses
+     * ([AppCategories.categoryFor]) because the stored `category` column is authoritative:
+     * the category is fixed when the row is written, not re-derived when it is read.
+     */
     private suspend fun use(accountId: Long, childId: Long, dateKey: String, packageName: String, usedMs: Long) {
-        usage.addUsage(accountId, childId, dateKey, packageName, AppCategory.OTHER, usedMs)
+        usage.addUsage(
+            accountId,
+            childId,
+            dateKey,
+            packageName,
+            AppCategories.categoryFor(packageName),
+            usedMs,
+        )
     }
 
     /** Writes limits exactly as the storage convention expects (""-category for TOTAL). */

@@ -5,8 +5,12 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import uz.faceguard.app.domain.screentime.PackageUsageDelta
+import uz.faceguard.app.domain.screentime.PersistentUsageSnapshotRecorder
 import uz.faceguard.app.domain.screentime.ScreenTimeUsageAccounting
+import uz.faceguard.app.domain.screentime.UsageAccountingTransaction
 import uz.faceguard.app.domain.screentime.UsageSnapshot
+import uz.faceguard.app.domain.screentime.UsageSnapshotCheckpoint
+import uz.faceguard.app.domain.screentime.UsageSnapshotCheckpointRepository
 import uz.faceguard.app.domain.screentime.UsageSnapshotComparison
 import uz.faceguard.app.domain.screentime.UsageSnapshotDeltaEngine
 import uz.faceguard.app.domain.screentime.UsageSnapshotRecorder
@@ -33,6 +37,11 @@ class UsageSnapshotSeparationTest {
         UsageSnapshotComparison.Compared::class.java,
         UsageSnapshotComparison.DifferentObservationWindow::class.java,
         ScreenTimeUsageAccounting::class.java,
+        // Step 1B-6
+        UsageSnapshotCheckpoint::class.java,
+        UsageSnapshotCheckpointRepository::class.java,
+        UsageAccountingTransaction::class.java,
+        PersistentUsageSnapshotRecorder::class.java,
     )
 
     private fun referencedTypeNames(clazz: Class<*>): String = buildString {

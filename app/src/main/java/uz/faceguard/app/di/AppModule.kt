@@ -20,11 +20,13 @@ import uz.faceguard.app.data.db.MIGRATION_3_4
 import uz.faceguard.app.data.db.MIGRATION_4_5
 import uz.faceguard.app.data.db.MIGRATION_5_6
 import uz.faceguard.app.data.db.MIGRATION_6_7
+import uz.faceguard.app.data.db.MIGRATION_7_8
 import uz.faceguard.app.data.db.ParentProfileDao
 import uz.faceguard.app.data.db.NotificationRecordDao
 import uz.faceguard.app.data.db.ParentRequestDao
 import uz.faceguard.app.data.db.ProtectedAppDao
 import uz.faceguard.app.data.db.UserAccountDao
+import uz.faceguard.app.data.db.UsageSnapshotCheckpointDao
 import uz.faceguard.app.data.prefs.settingsDataStore
 import uz.faceguard.app.data.repository.AccountRepositoryImpl
 import uz.faceguard.app.data.repository.ActivityLogRepositoryImpl
@@ -37,6 +39,8 @@ import uz.faceguard.app.data.repository.ChildProfileRepositoryImpl
 import uz.faceguard.app.data.repository.ParentProfileRepositoryImpl
 import uz.faceguard.app.data.repository.ProtectedAppsRepositoryImpl
 import uz.faceguard.app.data.repository.ScreenTimeUsageRepositoryImpl
+import uz.faceguard.app.data.repository.RoomUsageAccountingTransaction
+import uz.faceguard.app.data.repository.UsageSnapshotCheckpointRepositoryImpl
 import uz.faceguard.app.core.embed.FaceEmbeddingModel
 import uz.faceguard.app.core.embed.TfLiteMobileFaceNet
 import uz.faceguard.app.core.usage.UsageStatsAppUsageSource
@@ -63,6 +67,9 @@ import uz.faceguard.app.domain.request.ParentRequestRepository
 import uz.faceguard.app.domain.screentime.AppUsageSource
 import uz.faceguard.app.domain.screentime.ElapsedTimeSource
 import uz.faceguard.app.domain.screentime.ScreenTimeUsageRepository
+import uz.faceguard.app.domain.screentime.UsageAccountingTransaction
+import uz.faceguard.app.domain.screentime.UsageSnapshotCheckpointRepository
+import uz.faceguard.app.domain.screentime.UsageSourceId
 import uz.faceguard.app.core.notification.AndroidNotificationContentFactory
 import uz.faceguard.app.core.notification.AppLabelResolver
 import uz.faceguard.app.core.security.AesGcmSecureCrypto
@@ -92,7 +99,7 @@ object AppModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): FaceGuardDatabase =
         Room.databaseBuilder(context, FaceGuardDatabase::class.java, "faceguard.db")
-            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7) // additive v3 -> v7; keeps existing user data
+            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8) // additive v3 -> v8; keeps existing user data
             .build()
 
     @Provides fun provideUserAccountDao(db: FaceGuardDatabase): UserAccountDao = db.userAccountDao()
@@ -104,6 +111,7 @@ object AppModule {
     @Provides fun provideParentRequestDao(db: FaceGuardDatabase): ParentRequestDao = db.parentRequestDao()
     @Provides fun provideNotificationRecordDao(db: FaceGuardDatabase): NotificationRecordDao = db.notificationRecordDao()
     @Provides fun provideDailyAppUsageDao(db: FaceGuardDatabase): DailyAppUsageDao = db.dailyAppUsageDao()
+    @Provides fun provideUsageSnapshotCheckpointDao(db: FaceGuardDatabase): UsageSnapshotCheckpointDao = db.usageSnapshotCheckpointDao()
 
     @Provides
     @Singleton
@@ -188,6 +196,27 @@ object AppModule {
     @Singleton
     fun provideAppUsageSource(@ApplicationContext context: Context): AppUsageSource =
         UsageStatsAppUsageSource(context)
+
+    // Phase 4 Step 1B-6: the baselines that let a snapshot become a delta after a restart.
+    // The source identity is fixed next to the source binding above, so a baseline can never
+    // be filed under the wrong source.
+    @Provides
+    @Singleton
+    fun provideUsageSourceId(): UsageSourceId = UsageSourceId.USAGE_STATS
+
+    @Provides
+    @Singleton
+    fun provideUsageSnapshotCheckpointRepository(
+        impl: UsageSnapshotCheckpointRepositoryImpl,
+    ): UsageSnapshotCheckpointRepository = impl
+
+    // Both checkpoint and usage writes go through this one transaction, so the pair cannot
+    // be observed half-applied.
+    @Provides
+    @Singleton
+    fun provideUsageAccountingTransaction(
+        impl: RoomUsageAccountingTransaction,
+    ): UsageAccountingTransaction = impl
 
     // Future backend sync: bound to offline no-ops by default; swap these
     // bindings to enable sync without touching any call site.

@@ -31,6 +31,9 @@ class ResetRepositoryImpl @Inject constructor(
         db.childProfileDao().deleteAll()
         db.parentProfileDao().deleteAll()
         db.userAccountDao().deleteAll()
+        // Phase 4 Step 1B-6: a snapshot baseline is meaningless without the account it
+        // belongs to, so it goes with the rest of the wipe.
+        db.usageSnapshotCheckpointDao().deleteAll()
         settingsStore.clearAll()
         pinAttemptStore.clearAll()
         sessionManager.clearSession()

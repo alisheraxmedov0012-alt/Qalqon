@@ -183,3 +183,30 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
         )
     }
 }
+
+/**
+ * v7 -> v8: adds the usage snapshot checkpoints (Phase 4 Step 1B-6).
+ *
+ * Purely additive: no existing table is altered or dropped, so accounts, profiles,
+ * protected apps, policies, activity events, parent requests, notification records,
+ * screen-time usage and limits all survive the upgrade. The statement mirrors Room's
+ * generated schema for [UsageSnapshotCheckpointEntity] (column order follows the
+ * constructor). `packageName` is the last primary-key column so the "every checkpoint of
+ * this window" lookup is a primary-key prefix and needs no separate index.
+ */
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `usage_snapshot_checkpoints` (" +
+                "`accountId` INTEGER NOT NULL, " +
+                "`childId` INTEGER NOT NULL, " +
+                "`source` TEXT NOT NULL, " +
+                "`windowStartMs` INTEGER NOT NULL, " +
+                "`windowEndMs` INTEGER NOT NULL, " +
+                "`packageName` TEXT NOT NULL, " +
+                "`cumulativeForegroundMs` INTEGER NOT NULL, " +
+                "`observedAtMs` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`accountId`, `childId`, `source`, `windowStartMs`, `windowEndMs`, `packageName`))",
+        )
+    }
+}

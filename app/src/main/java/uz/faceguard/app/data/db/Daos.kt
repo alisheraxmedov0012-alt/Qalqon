@@ -377,3 +377,70 @@ interface ChildScreenTimeLimitDao {
     @Query("DELETE FROM child_screen_time_limits")
     suspend fun deleteAll()
 }
+
+/**
+ * Phase 4 Step 1B-6: the snapshot checkpoints used to turn a UsageStats counter into a
+ * delta. Every query is account + child scoped, so one account's (or child's) baseline can
+ * never be read or overwritten by another.
+ */
+@Dao
+interface UsageSnapshotCheckpointDao {
+
+    @Query(
+        "SELECT * FROM usage_snapshot_checkpoints WHERE accountId = :accountId " +
+            "AND childId = :childId AND source = :source AND windowStartMs = :windowStartMs " +
+            "AND windowEndMs = :windowEndMs AND packageName = :packageName LIMIT 1",
+    )
+    suspend fun checkpoint(
+        accountId: Long,
+        childId: Long,
+        source: String,
+        windowStartMs: Long,
+        windowEndMs: Long,
+        packageName: String,
+    ): UsageSnapshotCheckpointEntity?
+
+    /** Every checkpoint of one window: that is the previous snapshot for the window. */
+    @Query(
+        "SELECT * FROM usage_snapshot_checkpoints WHERE accountId = :accountId " +
+            "AND childId = :childId AND source = :source AND windowStartMs = :windowStartMs " +
+            "AND windowEndMs = :windowEndMs ORDER BY packageName ASC",
+    )
+    suspend fun checkpointsForWindow(
+        accountId: Long,
+        childId: Long,
+        source: String,
+        windowStartMs: Long,
+        windowEndMs: Long,
+    ): List<UsageSnapshotCheckpointEntity>
+
+    /** Overwrites the row with exactly this identity; never touches another key. */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(checkpoint: UsageSnapshotCheckpointEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(checkpoints: List<UsageSnapshotCheckpointEntity>)
+
+    @Query(
+        "DELETE FROM usage_snapshot_checkpoints WHERE accountId = :accountId " +
+            "AND childId = :childId AND source = :source AND windowStartMs = :windowStartMs " +
+            "AND windowEndMs = :windowEndMs AND packageName = :packageName",
+    )
+    suspend fun delete(
+        accountId: Long,
+        childId: Long,
+        source: String,
+        windowStartMs: Long,
+        windowEndMs: Long,
+        packageName: String,
+    )
+
+    @Query("DELETE FROM usage_snapshot_checkpoints WHERE accountId = :accountId AND childId = :childId")
+    suspend fun deleteForChild(accountId: Long, childId: Long)
+
+    @Query("DELETE FROM usage_snapshot_checkpoints WHERE accountId = :accountId")
+    suspend fun deleteForAccount(accountId: Long)
+
+    @Query("DELETE FROM usage_snapshot_checkpoints")
+    suspend fun deleteAll()
+}

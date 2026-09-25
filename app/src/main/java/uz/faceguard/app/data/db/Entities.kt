@@ -217,3 +217,36 @@ data class ChildScreenTimeLimitEntity(
     val limitMinutes: Int?,
     val updatedAt: Long,
 )
+
+/**
+ * Phase 4 Step 1B-6: the last observed usage counter for one package in one observation
+ * window, kept so a snapshot can still become a delta after a process restart.
+ *
+ * This is deliberately **not** consumed screen time: `daily_app_usage.usedMs` accumulates
+ * what the child actually spent, while `cumulativeForegroundMs` here is the platform's
+ * `totalTimeInForeground` for the window — a counter that only ever serves as a baseline.
+ * Storing one in the other would corrupt every usage aggregate, which is why this is its
+ * own table and never shares a column with `daily_app_usage`.
+ *
+ * The identity is (accountId, childId, source, windowStartMs, windowEndMs, packageName), so
+ * a checkpoint cannot leak across accounts, children, packages, observation windows or
+ * sources. `packageName` is last on purpose: then "every checkpoint of this window" is a
+ * prefix of the primary key and needs no extra index.
+ */
+@Entity(
+    tableName = "usage_snapshot_checkpoints",
+    primaryKeys = ["accountId", "childId", "source", "windowStartMs", "windowEndMs", "packageName"],
+)
+data class UsageSnapshotCheckpointEntity(
+    val accountId: Long,
+    val childId: Long,
+    /** UsageSourceId.name */
+    val source: String,
+    val windowStartMs: Long,
+    val windowEndMs: Long,
+    val packageName: String,
+    /** Platform cumulative foreground ms for the window; never consumed usage. */
+    val cumulativeForegroundMs: Long,
+    /** Wall-clock time this counter was observed; unrelated to its value. */
+    val observedAtMs: Long,
+)

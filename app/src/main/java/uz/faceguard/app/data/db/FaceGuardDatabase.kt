@@ -15,8 +15,9 @@ import androidx.room.RoomDatabase
         NotificationRecordEntity::class,
         DailyAppUsageEntity::class,
         ChildScreenTimeLimitEntity::class,
+        UsageSnapshotCheckpointEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = false,
 )
 abstract class FaceGuardDatabase : RoomDatabase() {
@@ -30,4 +31,5 @@ abstract class FaceGuardDatabase : RoomDatabase() {
     abstract fun notificationRecordDao(): NotificationRecordDao
     abstract fun dailyAppUsageDao(): DailyAppUsageDao
     abstract fun childScreenTimeLimitDao(): ChildScreenTimeLimitDao
+    abstract fun usageSnapshotCheckpointDao(): UsageSnapshotCheckpointDao
 }

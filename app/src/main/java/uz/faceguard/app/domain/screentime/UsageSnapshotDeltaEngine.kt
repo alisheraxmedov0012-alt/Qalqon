@@ -33,7 +33,7 @@ class UsageSnapshotDeltaEngine @Inject constructor(private val zone: ZoneId) {
      *   calendar day, i.e. when the delta could not be attributed to exactly one day.
      */
     fun compare(previous: UsageSnapshot?, current: UsageSnapshot): UsageSnapshotComparison {
-        val dateKey = dateKeyForAttributableDay(current.range)
+        val dateKey = attributableDateKey(current.range)
 
         if (previous != null && previous.range != current.range) {
             // A different window measures a different quantity; subtracting would be a
@@ -77,8 +77,14 @@ class UsageSnapshotDeltaEngine @Inject constructor(private val zone: ZoneId) {
      * Half-open `[start, end)`: the last instant observed is `end - 1`, so a window ending
      * exactly at midnight still belongs entirely to the day it started in. The key comes
      * from the existing [UsageDateKey], so no second date format exists.
+     *
+     * Public because the same rule governs what may be checkpointed: a snapshot whose window
+     * is not attributable to one day has no day to store a baseline for, and this is the one
+     * place that rule is decided (Step 1B-6 §10/§11 — no second range validator).
+     *
+     * @throws IllegalArgumentException when [range] spans more than one local calendar day.
      */
-    private fun dateKeyForAttributableDay(range: UsageRange): String {
+    fun attributableDateKey(range: UsageRange): String {
         val startDay = Instant.ofEpochMilli(range.startTimeMs).atZone(zone).toLocalDate()
         val lastInstantDay = Instant.ofEpochMilli(range.endTimeMs - 1L).atZone(zone).toLocalDate()
         require(startDay == lastInstantDay) {

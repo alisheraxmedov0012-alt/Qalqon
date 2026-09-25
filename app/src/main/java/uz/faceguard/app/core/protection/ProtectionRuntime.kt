@@ -26,6 +26,7 @@ import uz.faceguard.app.core.security.SecurityStateHolder
 import uz.faceguard.app.core.monitor.ForegroundAppMonitor
 import uz.faceguard.app.core.recognition.Recognizer
 import uz.faceguard.app.core.scan.ScanScheduler
+import uz.faceguard.app.core.screentime.ScreenTimeUsageCollectionRunner
 import uz.faceguard.app.domain.model.ActivityEventType
 import uz.faceguard.app.domain.model.ChildProfile
 import uz.faceguard.app.domain.model.ParentProfile
@@ -145,6 +146,11 @@ class ProtectionRuntime @Inject constructor(
     private val notificationCoordinator: NotificationCoordinator,
     private val notificationDispatcher: AppNotificationDispatcher,
     private val securityStateHolder: SecurityStateHolder,
+    /**
+     * Phase 4 Step 1B-7: production screen-time collection. Injected (rather than built
+     * here) so it is the single shared instance and its interval stays owned by DI.
+     */
+    private val screenTimeCollection: ScreenTimeUsageCollectionRunner,
 ) {
 
     private val monitor = ForegroundAppMonitor(context)
@@ -337,6 +343,9 @@ class ProtectionRuntime @Inject constructor(
         syncContext()
         monitor.start(scope)
         engine.start(scope)
+        // Phase 4 Step 1B-7: screen-time accounting runs only while protection does.
+        // Idempotent, so a repeated activate cannot stack collectors.
+        screenTimeCollection.start(scope)
         // Keep the process alive so the session survives Qalqon being backgrounded.
         serviceLauncher.start()
     }
@@ -346,6 +355,8 @@ class ProtectionRuntime @Inject constructor(
         engine.stop()
         scheduler.detach()
         monitor.stop()
+        // Phase 4 Step 1B-7: stop collecting with the session; no leaked loop.
+        screenTimeCollection.stop()
         overlay.hide()
         serviceLauncher.stop()
         // Group 8: a stopped session holds no identity state.
@@ -362,6 +373,9 @@ class ProtectionRuntime @Inject constructor(
      */
     fun stop() {
         if (active) deactivate()
+        // Phase 4 Step 1B-7: an explicit stop always ends collection, even if the session
+        // had already gone inactive. Idempotent, so it cannot cancel a newer loop.
+        screenTimeCollection.stop()
         // Phase 9: an explicit stop always drops any pending recovery.
         engine.cancelRecovery()
         _state.update { it.copy(active = false) }

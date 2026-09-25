@@ -69,6 +69,31 @@ class SettingsStore @Inject constructor(
     suspend fun setRecoveryDelayMs(delayMs: Long) =
         writeLong(KEY_RECOVERY_DELAY_MS, validRecoveryDelayMs(delayMs))
 
+    // ------------------------------------------------- Phase 4 screen time
+
+    /**
+     * The child this device's screen time is accounted against, or `null` when none is
+     * selected.
+     *
+     * Account-scoped like every other setting, but read/written by an **explicit**
+     * account id rather than the signed-in session: the background collector resolves
+     * the account itself, and must never fall back to another account's selection.
+     * There is deliberately no default and no fallback to "the first child" — an
+     * absent value means "no target", not "pick one".
+     */
+    suspend fun activeChildId(accountId: Long): Long? =
+        store.data.first()[scopedLongKey(accountId, KEY_ACTIVE_CHILD_ID.name)]
+
+    /** Sets the screen-time target for [accountId]. */
+    suspend fun setActiveChildId(accountId: Long, childId: Long) {
+        store.edit { it[scopedLongKey(accountId, KEY_ACTIVE_CHILD_ID.name)] = childId }
+    }
+
+    /** Forgets the screen-time target for [accountId]; other accounts are untouched. */
+    suspend fun clearActiveChildId(accountId: Long) {
+        store.edit { it.remove(scopedLongKey(accountId, KEY_ACTIVE_CHILD_ID.name)) }
+    }
+
     /** Wipes every preference (all accounts); used by the full reset tool. */
     suspend fun clearAll() {
         store.edit { it.clear() }
@@ -185,6 +210,13 @@ class SettingsStore @Inject constructor(
         val KEY_UNKNOWN_POLICY = stringPreferencesKey("unknown_user_policy")
         val KEY_NO_FACE_POLICY = stringPreferencesKey("no_face_policy")
         val KEY_LOW_BATTERY_BEHAVIOR = booleanPreferencesKey("low_battery_behavior")
+
+        /**
+         * Phase 4 Step 1B-7: account-scoped screen-time target. Deliberately absent from
+         * [LEGACY_KEYS] — it has no pre-multi-account counterpart, so there is nothing to
+         * claim and nothing that could leak from a legacy value.
+         */
+        val KEY_ACTIVE_CHILD_ID = longPreferencesKey("active_child_id")
 
         val LEGACY_KEYS: List<Preferences.Key<*>> = listOf(
             KEY_PROTECTION_ENABLED,

@@ -113,6 +113,24 @@ object UsageDateKey {
      */
     fun isValid(dateKey: String): Boolean =
         runCatching { LocalDate.parse(dateKey).toString() == dateKey }.getOrDefault(false)
+
+    /**
+     * The half-open local-day window `[00:00, next 00:00)` containing [wallClockMillis].
+     *
+     * Phase 4 Step 1B-7: the collection window. Built with `atStartOfDay(zone)` rather
+     * than a fixed 24h offset, so a day on which the local clock shifts still starts and
+     * ends exactly at midnight, and it is always a *single* day — which is what the
+     * accounting contract requires, because a snapshot total cannot be split across days.
+     * The zone is the device's by default (product-local semantics) and is never a
+     * hard-coded UTC or region.
+     */
+    fun dayRange(wallClockMillis: Long, zone: ZoneId = ZoneId.systemDefault()): UsageRange {
+        val day = Instant.ofEpochMilli(wallClockMillis).atZone(zone).toLocalDate()
+        return UsageRange(
+            startTimeMs = day.atStartOfDay(zone).toInstant().toEpochMilli(),
+            endTimeMs = day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli(),
+        )
+    }
 }
 
 /** Usage of one app on one day. */

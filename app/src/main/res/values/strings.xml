@@ -365,9 +365,6 @@
     <string name="dashboard_activity_title">So\'nggi faoliyat</string>
     <string name="dashboard_activity_empty">Hozircha himoya hodisalari yo\'q</string>
     <string name="dashboard_activity_open">Faoliyat jurnalini ochish</string>
-    <string name="dashboard_usage_title">Bugungi foydalanish</string>
-    <string name="dashboard_usage_unavailable">Foydalanish vaqti hali mavjud emas</string>
-    <string name="dashboard_usage_unavailable_hint">Ekran vaqti hisobi keyingi bosqichda qo\'shiladi</string>
 
     <string name="requests_title">So\'rovlar</string>
     <string name="requests_subtitle">Farzandingiz so\'rovlarini ko\'rib chiqing</string>
@@ -408,4 +405,14 @@
 
     <string name="auth_locked_out">Juda ko\'p urinish. Birozdan so\'ng qayta urinib ko\'ring.</string>
     <string name="security_recovery_required">Yuz ma\'lumotlarini ochib bo\'lmadi. Iltimos, yuzni qayta ro\'yxatdan o\'tkazing.</string>
+    <string name="screentime_target_title">Ekran vaqti qaysi bola uchun</string>
+    <string name="screentime_target_subtitle">Qurilmadagi foydalanish shu bolaga yoziladi. Bu yuz orqali aniqlash emas — tanlovni siz belgilaysiz.</string>
+    <string name="screentime_target_none_selected">Hozircha ekran vaqti uchun bola tanlanmagan</string>
+    <string name="screentime_target_choose_hint">Ekran vaqti yozilishi uchun bitta bolani tanlang</string>
+    <string name="screentime_target_active_hint">%1$s hozir ekran vaqti uchun tanlangan</string>
+    <string name="screentime_target_no_children">Avval bola qo\'shing, keyin ekran vaqti uchun uni tanlashingiz mumkin</string>
+    <string name="screentime_target_missing">Tanlangan bola topilmadi. Iltimos, boshqa bolani tanlang</string>
+    <string name="screentime_target_error_load">Tanlovni yuklab bo\'lmadi</string>
+    <string name="screentime_target_error_save">Tanlovni saqlab bo\'lmadi. Iltimos, qayta urinib ko\'ring</string>
+
 </resources>

@@ -2,6 +2,7 @@ package uz.faceguard.app.data.repository
 
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.Flow
 import uz.faceguard.app.data.prefs.SettingsStore
 import uz.faceguard.app.domain.screentime.ScreenTimeActiveChildRepository
 
@@ -19,6 +20,9 @@ class ScreenTimeActiveChildRepositoryImpl @Inject constructor(
 ) : ScreenTimeActiveChildRepository {
 
     override suspend fun activeChildId(accountId: Long): Long? = settingsStore.activeChildId(accountId)
+
+    override fun observeActiveChildId(accountId: Long): Flow<Long?> =
+        settingsStore.observeActiveChildId(accountId)
 
     override suspend fun setActiveChildId(accountId: Long, childId: Long) =
         settingsStore.setActiveChildId(accountId, childId)

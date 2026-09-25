@@ -174,4 +174,21 @@ class ActiveChildAccountScopeTest {
 
         assertNull("a reset must not leave a stale screen-time target", repository.activeChildId(1L))
     }
+
+    @Test
+    fun theTargetIsObservableSoAScreenNeedsNoPolling() = runBlocking {
+        assertEquals(null, repository.observeActiveChildId(1L).first())
+
+        repository.setActiveChildId(1L, 10L)
+
+        assertEquals(10L, repository.observeActiveChildId(1L).first())
+    }
+
+    @Test
+    fun theObservableTargetIsAccountScoped() = runBlocking {
+        repository.setActiveChildId(1L, 10L)
+
+        assertEquals(10L, repository.observeActiveChildId(1L).first())
+        assertNull("another account observes nothing of its own", repository.observeActiveChildId(2L).first())
+    }
 }

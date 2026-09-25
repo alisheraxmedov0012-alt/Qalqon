@@ -364,9 +364,6 @@
     <string name="dashboard_activity_title">Последняя активность</string>
     <string name="dashboard_activity_empty">Событий защиты пока не зафиксировано</string>
     <string name="dashboard_activity_open">Открыть журнал активности</string>
-    <string name="dashboard_usage_title">Использование сегодня</string>
-    <string name="dashboard_usage_unavailable">Учёт времени пока недоступен</string>
-    <string name="dashboard_usage_unavailable_hint">Учёт экранного времени появится на следующем этапе</string>
 
     <string name="requests_title">Запросы</string>
     <string name="requests_subtitle">Просмотрите запросы ребёнка</string>
@@ -407,4 +404,14 @@
 
     <string name="auth_locked_out">Слишком много попыток. Попробуйте ещё раз немного позже.</string>
     <string name="security_recovery_required">Не удалось расшифровать данные лица. Пожалуйста, зарегистрируйте лицо заново.</string>
+    <string name="screentime_target_title">Ребёнок для экранного времени</string>
+    <string name="screentime_target_subtitle">Использование на этом устройстве записывается для этого ребёнка. Это не распознавание лица — ребёнка выбираете вы.</string>
+    <string name="screentime_target_none_selected">Ребёнок для экранного времени пока не выбран</string>
+    <string name="screentime_target_choose_hint">Выберите одного ребёнка, чтобы вести учёт экранного времени</string>
+    <string name="screentime_target_active_hint">%1$s сейчас выбран для экранного времени</string>
+    <string name="screentime_target_no_children">Сначала добавьте ребёнка, затем сможете выбрать его для экранного времени</string>
+    <string name="screentime_target_missing">Выбранный ребёнок не найден. Пожалуйста, выберите другого ребёнка</string>
+    <string name="screentime_target_error_load">Не удалось загрузить выбор</string>
+    <string name="screentime_target_error_save">Не удалось сохранить выбор. Попробуйте ещё раз</string>
+
 </resources>

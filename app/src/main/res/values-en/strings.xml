@@ -364,9 +364,6 @@
     <string name="dashboard_activity_title">Recent activity</string>
     <string name="dashboard_activity_empty">No protection events recorded yet</string>
     <string name="dashboard_activity_open">Open activity log</string>
-    <string name="dashboard_usage_title">Today\'s usage</string>
-    <string name="dashboard_usage_unavailable">Usage tracking is not available yet</string>
-    <string name="dashboard_usage_unavailable_hint">Screen-time accounting is planned for a later phase</string>
 
     <string name="requests_title">Requests</string>
     <string name="requests_subtitle">Review your child\'s requests</string>
@@ -407,4 +404,14 @@
 
     <string name="auth_locked_out">Too many attempts. Please try again a little later.</string>
     <string name="security_recovery_required">Your face data could not be unlocked. Please enroll the face again.</string>
+    <string name="screentime_target_title">Screen time child</string>
+    <string name="screentime_target_subtitle">Usage on this device is recorded for this child. This is not face recognition — you choose the child.</string>
+    <string name="screentime_target_none_selected">No child is selected for screen time yet</string>
+    <string name="screentime_target_choose_hint">Select one child so screen time can be recorded</string>
+    <string name="screentime_target_active_hint">%1$s is currently selected for screen time</string>
+    <string name="screentime_target_no_children">Add a child first, then you can select them for screen time</string>
+    <string name="screentime_target_missing">The selected child no longer exists. Please choose another child</string>
+    <string name="screentime_target_error_load">Could not load the selection</string>
+    <string name="screentime_target_error_save">Could not save the selection. Please try again</string>
+
 </resources>

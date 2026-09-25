@@ -1,5 +1,7 @@
 package uz.faceguard.app.domain.screentime
 
+import kotlinx.coroutines.flow.Flow
+
 /**
  * Phase 4 Step 1B-7: the account-scoped screen-time target ("active child").
  *
@@ -24,6 +26,12 @@ interface ScreenTimeActiveChildRepository {
 
     /** The stored target for [accountId], or `null` when none is set. */
     suspend fun activeChildId(accountId: Long): Long?
+
+    /**
+     * The stored target as an observable stream, for screens that must show the current
+     * selection without polling. Emits `null` when none is set.
+     */
+    fun observeActiveChildId(accountId: Long): Flow<Long?>
 
     suspend fun setActiveChildId(accountId: Long, childId: Long)
 

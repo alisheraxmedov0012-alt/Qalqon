@@ -111,9 +111,18 @@ class PolicyStringsLocalizationTest {
         "dashboard_protection_title",
         "dashboard_retry",
         "dashboard_subtitle",
-        "dashboard_usage_title",
-        "dashboard_usage_unavailable",
-        "dashboard_usage_unavailable_hint",
+        // Phase 4 Step 1B-8: the screen-time target card replaced the old
+        // "dashboard_usage_*" placeholder, so those three keys are gone and these are the
+        // card's keys instead.
+        "screentime_target_title",
+        "screentime_target_subtitle",
+        "screentime_target_none_selected",
+        "screentime_target_choose_hint",
+        "screentime_target_active_hint",
+        "screentime_target_no_children",
+        "screentime_target_missing",
+        "screentime_target_error_load",
+        "screentime_target_error_save",
         "dashboard_value_unknown",
     )
 

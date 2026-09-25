@@ -84,6 +84,15 @@ class SettingsStore @Inject constructor(
     suspend fun activeChildId(accountId: Long): Long? =
         store.data.first()[scopedLongKey(accountId, KEY_ACTIVE_CHILD_ID.name)]
 
+    /**
+     * [activeChildId] as an observable stream, so a screen reflects the selection without
+     * polling or re-reading on every recomposition. Emits `null` while nothing is selected
+     * — including right after an account switch, so a previous account's choice is never
+     * shown as if it were the new one's.
+     */
+    fun observeActiveChildId(accountId: Long): Flow<Long?> =
+        store.data.map { it[scopedLongKey(accountId, KEY_ACTIVE_CHILD_ID.name)] }
+
     /** Sets the screen-time target for [accountId]. */
     suspend fun setActiveChildId(accountId: Long, childId: Long) {
         store.edit { it[scopedLongKey(accountId, KEY_ACTIVE_CHILD_ID.name)] = childId }

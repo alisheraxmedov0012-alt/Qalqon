@@ -53,6 +53,7 @@ import uz.faceguard.app.domain.model.ChildProfile
 import uz.faceguard.app.domain.model.RestrictionLevel
 import uz.faceguard.app.domain.repository.AccountRepository
 import uz.faceguard.app.domain.repository.ChildProfileRepository
+import uz.faceguard.app.domain.screentime.ScreenTimeActiveChildRepository
 
 data class ChildDialogState(
     val visible: Boolean = false,
@@ -80,6 +81,8 @@ data class ChildUiState(
 class ChildProfilesViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
     private val childRepository: ChildProfileRepository,
+    /** Phase 4 Step 1B-8: the screen-time target is cleared with the child it points at. */
+    private val screenTimeActiveChildRepository: ScreenTimeActiveChildRepository,
 ) : ViewModel() {
 
     private val _ui = MutableStateFlow(ChildUiState(state = UiState.Loading))
@@ -139,11 +142,22 @@ class ChildProfilesViewModel @Inject constructor(
 
     fun cancelDelete() = _ui.update { it.copy(deleteConfirm = DeleteConfirm()) }
 
+    /**
+     * Phase 4 Step 1B-8: deleting a child also clears the device's screen-time target when
+     * it pointed at that child, so the stored configuration cannot dangle. No other child
+     * is substituted — the collector already refuses an unowned id, and the parent chooses
+     * the next target themselves.
+     */
     fun confirmDelete() {
         val id = accountId ?: return
         val childId = _ui.value.deleteConfirm.childId
         _ui.update { it.copy(deleteConfirm = DeleteConfirm()) }
-        viewModelScope.launch { childRepository.deleteChild(id, childId) }
+        viewModelScope.launch {
+            childRepository.deleteChild(id, childId)
+            if (screenTimeActiveChildRepository.activeChildId(id) == childId) {
+                screenTimeActiveChildRepository.clearActiveChildId(id)
+            }
+        }
     }
 }
 

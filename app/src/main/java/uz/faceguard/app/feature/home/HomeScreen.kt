@@ -1,10 +1,12 @@
 package uz.faceguard.app.feature.home
 
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,6 +19,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -29,6 +32,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -41,9 +45,13 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uz.faceguard.app.R
 import uz.faceguard.app.core.debug.DebugFlags
@@ -61,6 +69,7 @@ import uz.faceguard.app.domain.repository.ChildProfileRepository
 import uz.faceguard.app.domain.repository.ParentProfileRepository
 import uz.faceguard.app.domain.repository.ProtectedAppsRepository
 import uz.faceguard.app.domain.repository.SettingsRepository
+import uz.faceguard.app.domain.screentime.ScreenTimeActiveChildRepository
 import uz.faceguard.app.domain.request.ParentRequestRepository
 
 /**
@@ -75,12 +84,13 @@ import uz.faceguard.app.domain.request.ParentRequestRepository
 class HomeViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
     private val parentProfileRepository: ParentProfileRepository,
-    childRepository: ChildProfileRepository,
+    private val childRepository: ChildProfileRepository,
     policyRepository: ChildAppPolicyRepository,
     protectedAppsRepository: ProtectedAppsRepository,
     activityLogRepository: ActivityLogRepository,
     settingsRepository: SettingsRepository,
     requestRepository: ParentRequestRepository,
+    private val screenTimeActiveChildRepository: ScreenTimeActiveChildRepository,
     runtime: ProtectionRuntime,
 ) : ViewModel() {
 
@@ -120,6 +130,65 @@ class HomeViewModel @Inject constructor(
     fun selectChild(childId: Long?) = aggregator.selectChild(childId)
 
     fun retry() = aggregator.retry()
+
+    // ------------------------------------------------- Phase 4 screen-time target
+
+    private val _screenTimeTarget = MutableStateFlow(ScreenTimeTargetUiState())
+
+    /**
+     * Phase 4 Step 1B-8: the device's screen-time target, read reactively from the persisted
+     * (account-scoped) value. Re-created per account, so a previous account's choice can
+     * never appear as the new account's.
+     */
+    val screenTimeTarget: StateFlow<ScreenTimeTargetUiState> = accountRepository.currentAccountId
+        .flatMapLatest { accountId ->
+            if (accountId == null) {
+                flowOf(ScreenTimeTargetUiState(status = ScreenTimeTargetStatus.NO_ACCOUNT))
+            } else {
+                combine(
+                    childRepository.observeChildren(accountId),
+                    screenTimeActiveChildRepository.observeActiveChildId(accountId),
+                ) { children, activeChildId ->
+                    ScreenTimeTargetUiState(
+                        status = ScreenTimeTargetStatus.READY,
+                        children = children,
+                        activeChildId = activeChildId,
+                    )
+                }.catch {
+                    // A read failure must not invent a selection: report it and offer retry.
+                    emit(ScreenTimeTargetUiState(status = ScreenTimeTargetStatus.ERROR))
+                }
+            }
+        }
+        // Local UI progress (saving / a failed write) is layered on the persisted value.
+        .combine(_screenTimeTarget) { persisted, local ->
+            persisted.copy(saving = local.saving, errorMessageRes = local.errorMessageRes)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ScreenTimeTargetUiState())
+
+    /**
+     * Persists [childId] as this device's screen-time target.
+     *
+     * The child must belong to the signed-in account: the id is validated against the
+     * account's own children before it is written, so a stale or forged id can never be
+     * stored. A no-op re-selection writes nothing.
+     */
+    fun selectScreenTimeChild(childId: Long) {
+        viewModelScope.launch {
+            val accountId = accountRepository.currentAccountId.first() ?: return@launch
+            val owned = childRepository.observeChildren(accountId).first().any { it.id == childId }
+            if (!owned) {
+                _screenTimeTarget.update { it.copy(errorMessageRes = R.string.screentime_target_error_save) }
+                return@launch
+            }
+            if (screenTimeActiveChildRepository.activeChildId(accountId) == childId) return@launch
+
+            _screenTimeTarget.update { it.copy(saving = true, errorMessageRes = null) }
+            runCatching { screenTimeActiveChildRepository.setActiveChildId(accountId, childId) }
+                .onFailure { _screenTimeTarget.update { state -> state.copy(errorMessageRes = R.string.screentime_target_error_save) } }
+            _screenTimeTarget.update { it.copy(saving = false) }
+        }
+    }
 }
 
 @Composable
@@ -141,6 +210,7 @@ fun HomeScreen(
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val account by viewModel.account.collectAsStateWithLifecycle()
     val parentProfile by viewModel.parentProfile.collectAsStateWithLifecycle()
+    val screenTimeTarget by viewModel.screenTimeTarget.collectAsStateWithLifecycle()
 
     var showMore by remember { mutableStateOf(false) }
     var showDeveloperTools by remember { mutableStateOf(false) }
@@ -191,7 +261,11 @@ fun HomeScreen(
                     RequestsSummaryCard(dashboard = dashboard, onOpenRequests = onOpenRequests)
                     ChildProfileSummaryCard(dashboard, onOpenChildren = onOpenChildren)
                     RecentActivityCard(dashboard, onOpenActivity = onOpenActivity)
-                    UsageCard()
+                    UsageCard(
+                        target = screenTimeTarget,
+                        onSelectChild = viewModel::selectScreenTimeChild,
+                        onOpenChildren = onOpenChildren,
+                    )
                 }
             }
 
@@ -541,18 +615,118 @@ private fun RecentActivityCard(dashboard: DashboardUiState, onOpenActivity: () -
     }
 }
 
-/** Section 6: usage is not tracked yet, and the dashboard says so. */
+/**
+ * Phase 4 Step 1B-8: which child this device's screen time is tracked for.
+ *
+ * Deliberately worded as a *configuration* choice ("screen-time child"), never as
+ * recognition: this is not "who is holding the phone", which is what the protection engine
+ * decides from faces. No child is pre-selected — until the parent chooses, the background
+ * collector attributes nothing.
+ */
 @Composable
-private fun UsageCard() {
+private fun UsageCard(
+    target: ScreenTimeTargetUiState,
+    onSelectChild: (Long) -> Unit,
+    onOpenChildren: () -> Unit,
+) {
     SectionCard(
-        title = stringResource(R.string.dashboard_usage_title),
-        subtitle = stringResource(R.string.dashboard_usage_unavailable),
+        title = stringResource(R.string.screentime_target_title),
+        subtitle = stringResource(R.string.screentime_target_subtitle),
     ) {
-        Text(
-            stringResource(R.string.dashboard_usage_unavailable_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        when {
+            target.status == ScreenTimeTargetStatus.LOADING -> Text(
+                stringResource(R.string.state_loading),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            target.status == ScreenTimeTargetStatus.ERROR -> Text(
+                stringResource(R.string.screentime_target_error_load),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+
+            // No account: nothing to configure on a signed-out device.
+            target.status == ScreenTimeTargetStatus.NO_ACCOUNT -> Text(
+                stringResource(R.string.dashboard_no_account_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            target.noChildren -> {
+                Text(
+                    stringResource(R.string.screentime_target_no_children),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(onClick = onOpenChildren, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.dashboard_child_add))
+                }
+            }
+
+            else -> {
+                // The parent must choose: no child is marked until they do.
+                if (target.needsSelection) {
+                    Text(
+                        stringResource(R.string.screentime_target_none_selected),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                if (target.activeChildMissing) {
+                    Text(
+                        stringResource(R.string.screentime_target_missing),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+
+                target.children.forEach { child ->
+                    val selected = child.id == target.activeChildId
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(
+                                selected = selected,
+                                enabled = !target.saving,
+                                role = Role.RadioButton,
+                                onClick = { onSelectChild(child.id) },
+                            )
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(
+                            selected = selected,
+                            onClick = null, // the whole row is the target
+                            enabled = !target.saving,
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            text = child.childName,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
+
+                Text(
+                    text = if (target.activeChild != null) {
+                        stringResource(R.string.screentime_target_active_hint, target.activeChild!!.childName)
+                    } else {
+                        stringResource(R.string.screentime_target_choose_hint)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                if (target.errorMessageRes != null) {
+                    Text(
+                        stringResource(target.errorMessageRes),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        }
     }
 }
 

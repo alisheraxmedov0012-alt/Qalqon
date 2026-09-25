@@ -3,6 +3,8 @@ package uz.faceguard.app.screentime
 import java.time.ZoneOffset
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.flowOf
 import uz.faceguard.app.domain.model.AuthResult
 import uz.faceguard.app.domain.model.ChildProfile
@@ -205,16 +207,19 @@ internal class FakeAccounts(accountId: Long? = 1L) : AccountRepository {
 /** The screen-time target, per account — exactly like the persisted store. */
 internal class FakeActiveChild : ScreenTimeActiveChildRepository {
 
-    private val byAccount = mutableMapOf<Long, Long>()
+    private val state = MutableStateFlow<Map<Long, Long>>(emptyMap())
 
-    override suspend fun activeChildId(accountId: Long): Long? = byAccount[accountId]
+    override suspend fun activeChildId(accountId: Long): Long? = state.value[accountId]
+
+    override fun observeActiveChildId(accountId: Long): Flow<Long?> =
+        state.map { it[accountId] }
 
     override suspend fun setActiveChildId(accountId: Long, childId: Long) {
-        byAccount[accountId] = childId
+        state.update { it + (accountId to childId) }
     }
 
     override suspend fun clearActiveChildId(accountId: Long) {
-        byAccount.remove(accountId)
+        state.update { it - accountId }
     }
 }
 

@@ -339,8 +339,11 @@ class ScreenTimeUsageCollectionInstrumentedTest {
         activeChild.setActiveChildId(1L, second)
         collect()
 
-        assertEquals(20_000L, usage.getTotalUsageMs(1L, first, dateKey))
+        // The targeted child accrued two per-package deltas: youtube 10000->30000 = +20000
+        // and tiktok 1000->5000 = +4000, so its day total is their sum.
+        assertEquals(20_000L, usage.getAppUsageMs(1L, first, dateKey, youtube))
         assertEquals(4_000L, usage.getAppUsageMs(1L, first, dateKey, tiktok))
+        assertEquals(24_000L, usage.getTotalUsageMs(1L, first, dateKey))
         assertEquals("the newly targeted child sees no history", 0L, usage.getTotalUsageMs(1L, second, dateKey))
     }
 }

@@ -40,6 +40,7 @@ import uz.faceguard.app.data.repository.ParentProfileRepositoryImpl
 import uz.faceguard.app.data.repository.ProtectedAppsRepositoryImpl
 import uz.faceguard.app.data.repository.ScreenTimeUsageRepositoryImpl
 import uz.faceguard.app.data.repository.ScreenTimeActiveChildRepositoryImpl
+import uz.faceguard.app.data.repository.ScreenTimeLimitRepositoryImpl
 import uz.faceguard.app.data.repository.RoomUsageAccountingTransaction
 import uz.faceguard.app.data.repository.UsageSnapshotCheckpointRepositoryImpl
 import uz.faceguard.app.core.embed.FaceEmbeddingModel
@@ -69,6 +70,7 @@ import uz.faceguard.app.domain.screentime.AppUsageSource
 import uz.faceguard.app.domain.screentime.ElapsedTimeSource
 import uz.faceguard.app.domain.screentime.ScreenTimeUsageRepository
 import uz.faceguard.app.domain.screentime.ScreenTimeActiveChildRepository
+import uz.faceguard.app.domain.screentime.ScreenTimeLimitRepository
 import uz.faceguard.app.domain.screentime.UsageAccountingTransaction
 import uz.faceguard.app.domain.screentime.UsageSnapshotCheckpointRepository
 import uz.faceguard.app.domain.screentime.UsageSourceId
@@ -227,6 +229,14 @@ object AppModule {
     fun provideScreenTimeActiveChildRepository(
         impl: ScreenTimeActiveChildRepositoryImpl,
     ): ScreenTimeActiveChildRepository = impl
+
+    // Phase 4 Step 1C: reads the TOTAL/CATEGORY limits Step 1A already stores, so the
+    // evaluator never touches Room directly.
+    @Provides
+    @Singleton
+    fun provideScreenTimeLimitRepository(
+        impl: ScreenTimeLimitRepositoryImpl,
+    ): ScreenTimeLimitRepository = impl
 
     // Future backend sync: bound to offline no-ops by default; swap these
     // bindings to enable sync without touching any call site.

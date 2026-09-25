@@ -1,6 +1,7 @@
 package uz.faceguard.app.domain.screentime
 
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 
 /**
@@ -104,6 +105,14 @@ object UsageDateKey {
         Instant.ofEpochMilli(wallClockMillis).atZone(zone).toLocalDate().toString()
 
     fun zoneOf(wallClockMillis: Long): ZoneId = ZoneId.systemDefault()
+
+    /**
+     * True when [dateKey] is exactly the canonical `yyyy-MM-dd` form [of] produces
+     * (so `2026-1-1` and `01.01.2026` are rejected). Callers supply the key; this
+     * keeps every accepted key fileable under the same day as [of] would produce.
+     */
+    fun isValid(dateKey: String): Boolean =
+        runCatching { LocalDate.parse(dateKey).toString() == dateKey }.getOrDefault(false)
 }
 
 /** Usage of one app on one day. */

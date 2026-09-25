@@ -13,6 +13,7 @@ import javax.inject.Singleton
 import uz.faceguard.app.data.db.ActivityEventDao
 import uz.faceguard.app.data.db.ChildAppPolicyDao
 import uz.faceguard.app.data.db.ChildProfileDao
+import uz.faceguard.app.data.db.DailyAppUsageDao
 import uz.faceguard.app.data.db.FaceGuardDatabase
 import uz.faceguard.app.data.db.MIGRATION_3_4
 import uz.faceguard.app.data.db.MIGRATION_4_5
@@ -34,6 +35,7 @@ import uz.faceguard.app.data.repository.ResetRepositoryImpl
 import uz.faceguard.app.data.repository.ChildProfileRepositoryImpl
 import uz.faceguard.app.data.repository.ParentProfileRepositoryImpl
 import uz.faceguard.app.data.repository.ProtectedAppsRepositoryImpl
+import uz.faceguard.app.data.repository.ScreenTimeUsageRepositoryImpl
 import uz.faceguard.app.core.embed.FaceEmbeddingModel
 import uz.faceguard.app.core.embed.TfLiteMobileFaceNet
 import uz.faceguard.app.core.policy.DefaultPolicyEvaluator
@@ -55,6 +57,7 @@ import uz.faceguard.app.domain.notification.NotificationCoordinator
 import uz.faceguard.app.domain.notification.NotificationPolicy
 import uz.faceguard.app.domain.notification.NotificationRepository
 import uz.faceguard.app.domain.request.ParentRequestRepository
+import uz.faceguard.app.domain.screentime.ScreenTimeUsageRepository
 import uz.faceguard.app.core.notification.AndroidNotificationContentFactory
 import uz.faceguard.app.core.notification.AppLabelResolver
 import uz.faceguard.app.core.security.AesGcmSecureCrypto
@@ -95,6 +98,7 @@ object AppModule {
     @Provides fun provideChildAppPolicyDao(db: FaceGuardDatabase): ChildAppPolicyDao = db.childAppPolicyDao()
     @Provides fun provideParentRequestDao(db: FaceGuardDatabase): ParentRequestDao = db.parentRequestDao()
     @Provides fun provideNotificationRecordDao(db: FaceGuardDatabase): NotificationRecordDao = db.notificationRecordDao()
+    @Provides fun provideDailyAppUsageDao(db: FaceGuardDatabase): DailyAppUsageDao = db.dailyAppUsageDao()
 
     @Provides
     @Singleton
@@ -154,6 +158,13 @@ object AppModule {
     @Provides
     @Singleton
     fun provideResetRepository(impl: ResetRepositoryImpl): ResetRepository = impl
+
+    // Phase 4 Step 1B-2: screen-time usage accounting over the v7 database.
+    @Provides
+    @Singleton
+    fun provideScreenTimeUsageRepository(
+        impl: ScreenTimeUsageRepositoryImpl,
+    ): ScreenTimeUsageRepository = impl
 
     // Future backend sync: bound to offline no-ops by default; swap these
     // bindings to enable sync without touching any call site.

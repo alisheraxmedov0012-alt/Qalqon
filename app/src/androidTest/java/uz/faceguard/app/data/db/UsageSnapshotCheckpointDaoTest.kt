@@ -102,7 +102,7 @@ class UsageSnapshotCheckpointDaoTest {
         dao.upsertAll(listOf(checkpoint(pkg = youtube, cumulative = 1_000L), checkpoint(pkg = tiktok, cumulative = 2_000L)))
 
         val window = dao.checkpointsForWindow(1L, 10L, source, dayStart, dayEnd)
-        assertEquals(listOf(tiktok, youtube), window.map { it.packageName })
+        assertEquals(listOf(youtube, tiktok), window.map { it.packageName })
     }
 
     // ---- isolation ----------------------------------------------------------

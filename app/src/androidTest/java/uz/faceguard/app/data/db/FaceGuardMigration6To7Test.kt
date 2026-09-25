@@ -185,7 +185,7 @@ class FaceGuardMigration6To7Test {
 
         val db = openLatest()
 
-        assertEquals("the database is now v7", 7, db.openHelper.writableDatabase.version)
+        assertEquals("the database is opened at the latest version", 8, db.openHelper.writableDatabase.version)
         assertNotNull(db.userAccountDao().getById(1L))
         assertNotNull(db.parentProfileDao().get(1L))
         val children = db.childProfileDao().observeAll(1L).first()

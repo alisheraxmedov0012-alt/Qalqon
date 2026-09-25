@@ -57,6 +57,23 @@ class ScreenTimeUsageAccounting @Inject constructor(
         intervals: List<UsageInterval>,
     ): List<UsageDelta> {
         val deltas = planDeltas(intervals)
+        return recordDeltas(accountId, childId, deltas)
+    }
+
+    /**
+     * Accounts for already day-attributed [deltas] (for example produced by
+     * [UsageSnapshotDeltaEngine] from two usage snapshots).
+     *
+     * The deltas carry their own day key, so this writes exactly what it is given and adds
+     * nothing: every entry is positive by construction ([UsageDelta] rejects `0` and
+     * negatives), so no phantom row and no negative usage can reach the repository.
+     * Returns the deltas written.
+     */
+    suspend fun recordDeltas(
+        accountId: Long,
+        childId: Long,
+        deltas: List<UsageDelta>,
+    ): List<UsageDelta> {
         for (delta in deltas) {
             repository.addUsage(
                 accountId = accountId,

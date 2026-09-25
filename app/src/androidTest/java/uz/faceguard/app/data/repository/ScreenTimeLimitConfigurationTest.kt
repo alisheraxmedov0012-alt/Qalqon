@@ -180,6 +180,7 @@ class ScreenTimeLimitConfigurationTest {
         assertThrows(IllegalArgumentException::class.java) {
             runBlocking { limits.upsert(1L, 10L, LimitScope.APP, limitMinutes = 30) }
         }
+        assertEquals("per-app limits stay in the policy store", emptyList<ScreenTimeLimit>(), limits.limits(1L, 10L))
     }
 
     @Test
@@ -190,6 +191,7 @@ class ScreenTimeLimitConfigurationTest {
         assertThrows(IllegalArgumentException::class.java) {
             runBlocking { limits.upsert(1L, -1L, LimitScope.TOTAL, limitMinutes = 30) }
         }
+        assertEquals("nothing was stored for the invalid target", emptyList<ScreenTimeLimit>(), limits.limits(1L, 10L))
     }
 
     // ---- account isolation --------------------------------------------------

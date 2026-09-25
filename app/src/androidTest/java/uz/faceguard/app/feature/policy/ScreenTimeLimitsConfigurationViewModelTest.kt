@@ -28,6 +28,7 @@ import uz.faceguard.app.domain.model.RestrictionLevel
 import uz.faceguard.app.domain.policy.AppPolicyMode
 import uz.faceguard.app.domain.screentime.AppCategory
 import uz.faceguard.app.domain.screentime.LimitScope
+import uz.faceguard.app.domain.screentime.ScreenTimeLimit
 import uz.faceguard.app.domain.screentime.ScreenTimeLimitRepository
 import uz.faceguard.app.security.PassthroughTemplateCipher
 import uz.faceguard.app.testing.FakeProtectedAppsRepository
@@ -51,6 +52,9 @@ class ScreenTimeLimitsConfigurationViewModelTest {
     private lateinit var screenTimeLimitRepository: ScreenTimeLimitRepository
 
     private var accountId = 0L
+
+    /** Generous enough for a local Room write plus a flow round-trip on an emulator. */
+    private val AWAIT_MS = 10_000L
 
     @Before
     fun setUp() = runBlocking {
@@ -91,7 +95,19 @@ class ScreenTimeLimitsConfigurationViewModelTest {
         viewModel: ChildPolicyViewModel,
         predicate: (ScreenTimeLimitsUiState) -> Boolean,
     ): ScreenTimeLimitsUiState =
-        withTimeout(5_000) { viewModel.screenTimeLimits.first(predicate) }
+        withTimeout(AWAIT_MS) { viewModel.screenTimeLimits.first(predicate) }
+
+    /**
+     * Waits until the ViewModel has selected [childId].
+     *
+     * This is the readiness gate the save/remove tests need: the ViewModel resolves its
+     * account in `init` and only then selects a child, and `setTotalLimit` and friends do
+     * nothing until both are known. Waiting on the limits state's `loading` flag would not
+     * work — its initial value already has `loading = false`.
+     */
+    private suspend fun awaitChildSelected(viewModel: ChildPolicyViewModel, childId: Long) {
+        withTimeout(AWAIT_MS) { viewModel.ui.first { it.selectedChildId == childId } }
+    }
 
     private suspend fun addChild(name: String): Long =
         childRepository.addChild(accountId, name, RestrictionLevel.MEDIUM)
@@ -102,7 +118,7 @@ class ScreenTimeLimitsConfigurationViewModelTest {
     fun aSavedTotalLimitIsPersistedAndShown() = runBlocking {
         val child = addChild("Ali")
         val viewModel = viewModel(child)
-        awaitLimits(viewModel) { !it.loading }
+        awaitChildSelected(viewModel, child)
 
         viewModel.setTotalLimit(120)
 
@@ -115,7 +131,7 @@ class ScreenTimeLimitsConfigurationViewModelTest {
     fun aSavedCategoryLimitIsPersistedAndShown() = runBlocking {
         val child = addChild("Ali")
         val viewModel = viewModel(child)
-        awaitLimits(viewModel) { !it.loading }
+        awaitChildSelected(viewModel, child)
 
         viewModel.setCategoryLimit(AppCategory.GAMES, 45)
 
@@ -128,7 +144,7 @@ class ScreenTimeLimitsConfigurationViewModelTest {
     fun changingALimitReplacesTheStoredValue() = runBlocking {
         val child = addChild("Ali")
         val viewModel = viewModel(child)
-        awaitLimits(viewModel) { !it.loading }
+        awaitChildSelected(viewModel, child)
         viewModel.setTotalLimit(120)
         awaitLimits(viewModel) { it.totalMinutes == 120 }
 
@@ -142,7 +158,7 @@ class ScreenTimeLimitsConfigurationViewModelTest {
     fun aSavedLimitSurvivesReopeningTheScreen() = runBlocking {
         val child = addChild("Ali")
         val first = viewModel(child)
-        awaitLimits(first) { !it.loading }
+        awaitChildSelected(first, child)
         first.setTotalLimit(90)
         awaitLimits(first) { it.totalMinutes == 90 }
 
@@ -156,6 +172,7 @@ class ScreenTimeLimitsConfigurationViewModelTest {
     fun everyCategoryIsOfferedSoEachCanBeConfigured() = runBlocking {
         val child = addChild("Ali")
         val viewModel = viewModel(child)
+        awaitChildSelected(viewModel, child)
 
         val state = awaitLimits(viewModel) { !it.loading }
 
@@ -168,18 +185,20 @@ class ScreenTimeLimitsConfigurationViewModelTest {
     fun aChildStartsWithNoLimitsAtAll() = runBlocking {
         val child = addChild("Ali")
         val viewModel = viewModel(child)
+        awaitChildSelected(viewModel, child)
 
         val state = awaitLimits(viewModel) { !it.loading }
 
         assertNull("no limit configured means null, not 0", state.totalMinutes)
         assertTrue(state.categoryMinutes.values.none { it != null })
+        assertEquals("and the store really holds nothing", emptyList<ScreenTimeLimit>(), screenTimeLimitRepository.limits(accountId, child))
     }
 
     @Test
     fun aZeroLimitIsStoredAsARealValueNotAsNoLimit() = runBlocking {
         val child = addChild("Ali")
         val viewModel = viewModel(child)
-        awaitLimits(viewModel) { !it.loading }
+        awaitChildSelected(viewModel, child)
 
         viewModel.setTotalLimit(0)
 
@@ -194,7 +213,7 @@ class ScreenTimeLimitsConfigurationViewModelTest {
     fun removingTheTotalLimitReturnsToNoLimit() = runBlocking {
         val child = addChild("Ali")
         val viewModel = viewModel(child)
-        awaitLimits(viewModel) { !it.loading }
+        awaitChildSelected(viewModel, child)
         viewModel.setTotalLimit(120)
         awaitLimits(viewModel) { it.totalMinutes == 120 }
 
@@ -208,7 +227,7 @@ class ScreenTimeLimitsConfigurationViewModelTest {
     fun removingOneCategoryLeavesTheOthersAndTheTotal() = runBlocking {
         val child = addChild("Ali")
         val viewModel = viewModel(child)
-        awaitLimits(viewModel) { !it.loading }
+        awaitChildSelected(viewModel, child)
         viewModel.setTotalLimit(120)
         viewModel.setCategoryLimit(AppCategory.GAMES, 30)
         viewModel.setCategoryLimit(AppCategory.EDUCATION, 60)
@@ -227,7 +246,7 @@ class ScreenTimeLimitsConfigurationViewModelTest {
     fun anInvalidLimitIsRejectedAndChangesNothing() = runBlocking {
         val child = addChild("Ali")
         val viewModel = viewModel(child)
-        awaitLimits(viewModel) { !it.loading }
+        awaitChildSelected(viewModel, child)
         viewModel.setTotalLimit(60)
         awaitLimits(viewModel) { it.totalMinutes == 60 }
 
@@ -277,32 +296,47 @@ class ScreenTimeLimitsConfigurationViewModelTest {
     fun switchingAccountLoadsThatAccountsOwnLimits() = runBlocking {
         val firstAccountChild = addChild("Ali")
         screenTimeLimitRepository.upsert(accountId, firstAccountChild, LimitScope.TOTAL, limitMinutes = 120)
+        val firstAccountId = accountId
+        // Open the first account's screen while it is still the signed-in account.
+        val firstView = viewModel(firstAccountChild)
+        assertEquals(120, awaitLimits(firstView) { it.totalMinutes == 120 }.totalMinutes)
 
-        // A second account with its own child and its own limit for the same child id space.
+        // A second account with its own child and its own limit. Registering signs it in,
+        // which is what makes the screen resolve the second account when it is reopened.
         val second = accountRepository.register("Other", "902345678", "5678") as AuthResult.Success
-        val secondAccountId = second.account.id
-        val secondChild = childRepository.addChild(secondAccountId, "Bek", RestrictionLevel.MEDIUM)
-        screenTimeLimitRepository.upsert(secondAccountId, secondChild, LimitScope.TOTAL, limitMinutes = 30)
-
-        // The screen resolves the signed-in account when it is opened, so a new ViewModel
-        // after the switch is the correct way to observe the second account's values.
-        assertEquals(120, awaitLimits(viewModel(firstAccountChild)) { !it.loading }.totalMinutes)
+        val secondChild = childRepository.addChild(second.account.id, "Bek", RestrictionLevel.MEDIUM)
+        screenTimeLimitRepository.upsert(second.account.id, secondChild, LimitScope.TOTAL, limitMinutes = 30)
 
         val switched = viewModel(secondChild)
         assertEquals(30, awaitLimits(switched) { it.totalMinutes == 30 }.totalMinutes)
+
+        // And the first account's value is still its own.
+        runBlocking { sessionManager.setCurrentAccountId(firstAccountId) }
+        assertEquals(120, screenTimeLimitRepository.limit(firstAccountId, firstAccountChild, LimitScope.TOTAL)?.limitMinutes)
     }
 
     @Test
     fun oneAccountsLimitsAreNeverShownForAnothers() = runBlocking {
         val firstAccountChild = addChild("Ali")
-        screenTimeLimitRepository.upsert(accountId, firstAccountChild, LimitScope.TOTAL, limitMinutes = 120)
+        val firstAccountId = accountId
+        screenTimeLimitRepository.upsert(firstAccountId, firstAccountChild, LimitScope.TOTAL, limitMinutes = 120)
+
         val second = accountRepository.register("Other", "902345678", "5678") as AuthResult.Success
         val secondChild = childRepository.addChild(second.account.id, "Bek", RestrictionLevel.MEDIUM)
 
-        // The second account's child has no limit, and must not inherit the first's.
-        val state = awaitLimits(viewModel(secondChild)) { !it.loading }
+        // The second account's child has no limit of its own and must not inherit the first's.
+        val secondView = viewModel(secondChild)
+        awaitChildSelected(secondView, secondChild)
+        val state = awaitLimits(secondView) { !it.loading }
+        assertNull("no inherited limit", state.totalMinutes)
+        assertEquals(
+            "and the second account's child really has no row of its own",
+            emptyList<ScreenTimeLimit>(),
+            screenTimeLimitRepository.limits(second.account.id, secondChild),
+        )
 
-        assertNull(state.totalMinutes)
+        // The first account's configuration is still exactly where it was left.
+        assertEquals(120, screenTimeLimitRepository.limit(firstAccountId, firstAccountChild, LimitScope.TOTAL)?.limitMinutes)
     }
 
     // ---- the saved value is the one the evaluator reads ---------------------
@@ -311,7 +345,7 @@ class ScreenTimeLimitsConfigurationViewModelTest {
     fun theSavedLimitIsTheRowTheEvaluatorWouldRead() = runBlocking {
         val child = addChild("Ali")
         val viewModel = viewModel(child)
-        awaitLimits(viewModel) { !it.loading }
+        awaitChildSelected(viewModel, child)
 
         viewModel.setTotalLimit(75)
         awaitLimits(viewModel) { it.totalMinutes == 75 }
@@ -327,7 +361,7 @@ class ScreenTimeLimitsConfigurationViewModelTest {
     fun removingTheLimitMakesTheEvaluatorSeeUnlimited() = runBlocking {
         val child = addChild("Ali")
         val viewModel = viewModel(child)
-        awaitLimits(viewModel) { !it.loading }
+        awaitChildSelected(viewModel, child)
         viewModel.setTotalLimit(30)
         awaitLimits(viewModel) { it.totalMinutes == 30 }
 
@@ -346,7 +380,7 @@ class ScreenTimeLimitsConfigurationViewModelTest {
         // The per-app limit path still works exactly as before, alongside the new section.
         val child = addChild("Ali")
         val viewModel = viewModel(child)
-        awaitLimits(viewModel) { !it.loading }
+        awaitChildSelected(viewModel, child)
 
         viewModel.setPolicy("com.example.youtube", AppPolicyMode.LIMIT, 30)
 

@@ -1,8 +1,6 @@
 package uz.faceguard.app.data.db
 
-import androidx.room.Database
 import androidx.room.Room
-import androidx.room.RoomDatabase
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.flow.first
@@ -17,27 +15,17 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Phase 4 Step 1A: real Room tests for the screen-time entities and DAOs.
+ * Phase 4 Step 1A/1B-1: real Room tests for the screen-time entities and DAOs.
  *
- * A test-only database is used deliberately: the production database version stays
- * at v6 until Step 1B registers the entities with MIGRATION_6_7, so this commit
- * cannot change anything on an existing install.
+ * These run against the production [FaceGuardDatabase] (now v7 with the screen-time
+ * tables registered), so the DAOs are exercised on the same schema that ships.
  */
-@Database(
-    entities = [DailyAppUsageEntity::class, ChildScreenTimeLimitEntity::class],
-    version = 1,
-    exportSchema = false,
-)
-abstract class ScreenTimeTestDatabase : RoomDatabase() {
-    abstract fun usageDao(): DailyAppUsageDao
-    abstract fun limitDao(): ChildScreenTimeLimitDao
-}
 
 @RunWith(AndroidJUnit4::class)
 class ScreenTimeDaoTest {
 
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
-    private lateinit var db: ScreenTimeTestDatabase
+    private lateinit var db: FaceGuardDatabase
     private lateinit var usage: DailyAppUsageDao
     private lateinit var limits: ChildScreenTimeLimitDao
 
@@ -48,10 +36,10 @@ class ScreenTimeDaoTest {
 
     @Before
     fun setUp() {
-        db = Room.inMemoryDatabaseBuilder(context, ScreenTimeTestDatabase::class.java)
+        db = Room.inMemoryDatabaseBuilder(context, FaceGuardDatabase::class.java)
             .allowMainThreadQueries().build()
-        usage = db.usageDao()
-        limits = db.limitDao()
+        usage = db.dailyAppUsageDao()
+        limits = db.childScreenTimeLimitDao()
     }
 
     @After

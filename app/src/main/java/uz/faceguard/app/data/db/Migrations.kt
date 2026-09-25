@@ -136,3 +136,50 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
         )
     }
 }
+
+/**
+ * v6 -> v7: adds Phase 4 screen-time persistence.
+ *
+ * Purely additive: no existing table is altered or dropped, so accounts,
+ * profiles, protected apps, policies, activity events, parent requests,
+ * notification records and all Phase 12 security data survive the upgrade.
+ * Statements mirror Room's generated schema for [DailyAppUsageEntity] and
+ * [ChildScreenTimeLimitEntity] (column order follows the constructor).
+ */
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `daily_app_usage` (" +
+                "`accountId` INTEGER NOT NULL, " +
+                "`childId` INTEGER NOT NULL, " +
+                "`dateKey` TEXT NOT NULL, " +
+                "`packageName` TEXT NOT NULL, " +
+                "`usedMs` INTEGER NOT NULL, " +
+                "`category` TEXT NOT NULL, " +
+                "`updatedAt` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`accountId`, `childId`, `dateKey`, `packageName`))",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_daily_app_usage_accountId_childId_dateKey` " +
+                "ON `daily_app_usage` (`accountId`, `childId`, `dateKey`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_daily_app_usage_accountId_childId_dateKey_category` " +
+                "ON `daily_app_usage` (`accountId`, `childId`, `dateKey`, `category`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `child_screen_time_limits` (" +
+                "`accountId` INTEGER NOT NULL, " +
+                "`childId` INTEGER NOT NULL, " +
+                "`scope` TEXT NOT NULL, " +
+                "`category` TEXT NOT NULL, " +
+                "`limitMinutes` INTEGER, " +
+                "`updatedAt` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`accountId`, `childId`, `scope`, `category`))",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_child_screen_time_limits_accountId_childId` " +
+                "ON `child_screen_time_limits` (`accountId`, `childId`)",
+        )
+    }
+}

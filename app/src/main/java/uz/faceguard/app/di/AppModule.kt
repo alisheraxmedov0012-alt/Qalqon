@@ -39,6 +39,7 @@ import uz.faceguard.app.data.repository.ProtectedAppsRepositoryImpl
 import uz.faceguard.app.data.repository.ScreenTimeUsageRepositoryImpl
 import uz.faceguard.app.core.embed.FaceEmbeddingModel
 import uz.faceguard.app.core.embed.TfLiteMobileFaceNet
+import uz.faceguard.app.core.usage.UsageStatsAppUsageSource
 import uz.faceguard.app.core.time.SystemElapsedTimeSource
 import uz.faceguard.app.core.policy.DefaultPolicyEvaluator
 import uz.faceguard.app.core.protection.AndroidProtectionServiceLauncher
@@ -59,6 +60,7 @@ import uz.faceguard.app.domain.notification.NotificationCoordinator
 import uz.faceguard.app.domain.notification.NotificationPolicy
 import uz.faceguard.app.domain.notification.NotificationRepository
 import uz.faceguard.app.domain.request.ParentRequestRepository
+import uz.faceguard.app.domain.screentime.AppUsageSource
 import uz.faceguard.app.domain.screentime.ElapsedTimeSource
 import uz.faceguard.app.domain.screentime.ScreenTimeUsageRepository
 import uz.faceguard.app.core.notification.AndroidNotificationContentFactory
@@ -179,6 +181,13 @@ object AppModule {
     @Provides
     @Singleton
     fun provideElapsedTimeSource(impl: SystemElapsedTimeSource): ElapsedTimeSource = impl
+
+    // Phase 4 Step 1B-4: the device's aggregate usage, behind a domain seam. It reads
+    // nothing until asked and persists nothing; accounting stays in ScreenTimeUsageAccounting.
+    @Provides
+    @Singleton
+    fun provideAppUsageSource(@ApplicationContext context: Context): AppUsageSource =
+        UsageStatsAppUsageSource(context)
 
     // Future backend sync: bound to offline no-ops by default; swap these
     // bindings to enable sync without touching any call site.

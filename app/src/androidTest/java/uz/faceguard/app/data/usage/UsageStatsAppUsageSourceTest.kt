@@ -103,25 +103,38 @@ class UsageStatsAppUsageSourceTest {
 
     @Test
     fun outputIsAggregatedAndDeterministic() = runBlocking {
-        // A broad window that includes "now": only invariants are asserted, never
-        // specific durations, so a concurrently busy device cannot make this flaky.
+        // A broad window that includes "now". Usage Access is a user-granted app-op that
+        // a test cannot grant, so this asserts the contract in whichever state the device
+        // is in rather than assuming a grant; only invariants are checked, never specific
+        // durations, so a concurrently busy device cannot make this flaky.
         val now = System.currentTimeMillis()
         val result = source.queryUsage(UsageRange(now - 24 * 60 * 60_000L, now))
 
-        assertTrue(result is AppUsageQueryResult.Available)
-        val samples = (result as AppUsageQueryResult.Available).samples
+        when (source.usageAccess()) {
+            UsageAccessState.UNAVAILABLE -> assertEquals(
+                "without access a broad window must also report Unavailable",
+                AppUsageQueryResult.Unavailable,
+                result,
+            )
 
-        assertEquals(
-            "one entry per package",
-            samples.map { it.packageName }.distinct().size,
-            samples.size,
-        )
-        assertEquals(
-            "ordered by package name",
-            samples.map { it.packageName }.sorted(),
-            samples.map { it.packageName },
-        )
-        assertTrue("no zero or negative durations", samples.all { it.foregroundMs > 0L })
+            UsageAccessState.AVAILABLE -> {
+                assertTrue("granted access must yield samples, got $result", result is AppUsageQueryResult.Available)
+                val samples = (result as AppUsageQueryResult.Available).samples
+
+                assertEquals(
+                    "one entry per package",
+                    samples.map { it.packageName }.distinct().size,
+                    samples.size,
+                )
+                assertEquals(
+                    "ordered by package name",
+                    samples.map { it.packageName }.sorted(),
+                    samples.map { it.packageName },
+                )
+                assertTrue("blank packages must be filtered out", samples.none { it.packageName.isBlank() })
+                assertTrue("no zero or negative durations", samples.all { it.foregroundMs > 0L })
+            }
+        }
     }
 
     // ---- separation ---------------------------------------------------------

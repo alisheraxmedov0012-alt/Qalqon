@@ -243,4 +243,69 @@ class FaceGuardMigration6To7Test {
         assertEquals(1, db.childScreenTimeLimitDao().limits(1L, 10L).size)
         assertTrue(db.childScreenTimeLimitDao().limit(1L, 10L, "CATEGORY", "") == null)
     }
+
+    @Test
+    fun theMigratedSchemaHasTheExpectedKeysAndIndices() {
+        createV6Database()
+        val db = openLatest()
+
+        assertTrue("daily_app_usage must exist", tableExists(db, "daily_app_usage"))
+        assertTrue("child_screen_time_limits must exist", tableExists(db, "child_screen_time_limits"))
+
+        assertEquals(
+            "daily_app_usage is keyed by account + child + day + package",
+            setOf("accountId", "childId", "dateKey", "packageName"),
+            primaryKeyColumns(db, "daily_app_usage"),
+        )
+        assertEquals(
+            "child_screen_time_limits is keyed by account + child + scope + category",
+            setOf("accountId", "childId", "scope", "category"),
+            primaryKeyColumns(db, "child_screen_time_limits"),
+        )
+
+        val usageIndices = indexNames(db, "daily_app_usage")
+        assertTrue(
+            "missing day index, found $usageIndices",
+            usageIndices.contains("index_daily_app_usage_accountId_childId_dateKey"),
+        )
+        assertTrue(
+            "missing category index, found $usageIndices",
+            usageIndices.contains("index_daily_app_usage_accountId_childId_dateKey_category"),
+        )
+
+        val limitIndices = indexNames(db, "child_screen_time_limits")
+        assertTrue(
+            "missing child index, found $limitIndices",
+            limitIndices.contains("index_child_screen_time_limits_accountId_childId"),
+        )
+    }
+
+    private fun tableExists(db: FaceGuardDatabase, table: String): Boolean =
+        db.openHelper.readableDatabase.query(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+            arrayOf(table),
+        ).use { it.moveToFirst() }
+
+    private fun primaryKeyColumns(db: FaceGuardDatabase, table: String): Set<String> =
+        db.openHelper.readableDatabase.query("PRAGMA table_info(`$table`)").use { cursor ->
+            val nameIndex = cursor.getColumnIndexOrThrow("name")
+            val pkIndex = cursor.getColumnIndexOrThrow("pk")
+            val columns = mutableSetOf<String>()
+            while (cursor.moveToNext()) {
+                if (cursor.getInt(pkIndex) > 0) columns += cursor.getString(nameIndex)
+            }
+            columns
+        }
+
+    private fun indexNames(db: FaceGuardDatabase, table: String): Set<String> =
+        db.openHelper.readableDatabase.query("PRAGMA index_list(`$table`)").use { cursor ->
+            val nameIndex = cursor.getColumnIndexOrThrow("name")
+            val names = mutableSetOf<String>()
+            while (cursor.moveToNext()) names += cursor.getString(nameIndex)
+            names
+        }
+
+    private companion object {
+        const val DB_NAME = "migration-6-7-test.db"
+    }
 }

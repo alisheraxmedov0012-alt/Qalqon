@@ -22,6 +22,7 @@ import uz.faceguard.app.data.db.FaceGuardDatabase
 import uz.faceguard.app.data.prefs.SessionManager
 import uz.faceguard.app.data.repository.AccountRepositoryImpl
 import uz.faceguard.app.data.repository.ChildAppPolicyRepositoryImpl
+import uz.faceguard.app.data.repository.ScreenTimeLimitRepositoryImpl
 import uz.faceguard.app.data.repository.ChildProfileRepositoryImpl
 import uz.faceguard.app.domain.model.AuthResult
 import uz.faceguard.app.domain.model.ProtectedApp
@@ -86,6 +87,9 @@ class ChildPolicyViewModelTest {
         childRepository = childRepository,
         childAppPolicyRepository = appPolicyRepository,
         protectedAppsRepository = protectedApps,
+        // The real implementation over the same database, so the screen-time limits the
+        // ViewModel reads are the rows the evaluator would read.
+        screenTimeLimitRepository = ScreenTimeLimitRepositoryImpl(db.childScreenTimeLimitDao()) { 1L },
         savedStateHandle = SavedStateHandle(mapOf(ChildPolicyArgs.CHILD_ID to childId)),
     )
 

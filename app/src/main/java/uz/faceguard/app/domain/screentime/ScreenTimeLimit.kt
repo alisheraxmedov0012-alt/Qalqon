@@ -1,5 +1,7 @@
 package uz.faceguard.app.domain.screentime
 
+import kotlinx.coroutines.flow.Flow
+
 /**
  * Phase 4 Step 1C: a configured screen-time limit, as the evaluator sees it.
  *
@@ -41,15 +43,23 @@ data class ScreenTimeLimit(
 }
 
 /**
- * Reads configured TOTAL / CATEGORY screen-time limits.
+ * Reads and writes configured TOTAL / CATEGORY screen-time limits.
  *
- * Every method is account + child scoped, so one child's limits can never be read as
- * another's. Read-only on purpose: this step evaluates limits, it does not configure them.
+ * Every method is account + child scoped, so one child's limits can never be read as, or
+ * written as, another's. Per-app limits are deliberately absent: they live in
+ * `child_app_policies` and are managed through `ChildAppPolicyRepository`, so there is
+ * exactly one place each kind of limit can be edited.
  */
 interface ScreenTimeLimitRepository {
 
     /** Every configured limit for one child; empty means "nothing configured at all". */
     suspend fun limits(accountId: Long, childId: Long): List<ScreenTimeLimit>
+
+    /**
+     * [limits] as an observable stream, so a screen reflects a saved change without
+     * re-reading on every recomposition and without polling.
+     */
+    fun observeLimits(accountId: Long, childId: Long): Flow<List<ScreenTimeLimit>>
 
     /** The limit for one scope, or `null` when that scope has no configured limit. */
     suspend fun limit(
@@ -58,4 +68,38 @@ interface ScreenTimeLimitRepository {
         scope: LimitScope,
         category: AppCategory? = null,
     ): ScreenTimeLimit?
+
+    /**
+     * Stores a limit for one scope, replacing any previous value for it.
+     *
+     * [limitMinutes] is non-null on purpose: "no limit" is the *absence* of a row (see
+     * [delete]), never a stored sentinel. `0` is a real configuration meaning "immediately
+     * exceeded", so it is stored as given rather than read as unlimited.
+     *
+     * The value is validated here with the existing [ScreenTimeLimits.isAccepted] rule, so
+     * the domain stays authoritative even if a caller's input layer lets something invalid
+     * through: a negative or above-a-day value is rejected instead of being persisted.
+     *
+     * @throws IllegalArgumentException when [limitMinutes] is not an accepted limit, or the
+     *   scope/category combination is not storable.
+     */
+    suspend fun upsert(
+        accountId: Long,
+        childId: Long,
+        scope: LimitScope,
+        category: AppCategory? = null,
+        limitMinutes: Int,
+    )
+
+    /**
+     * Removes the limit for one scope, and only that one: another category, the total, or
+     * another child's configuration is untouched. After this the scope evaluates as
+     * unlimited.
+     */
+    suspend fun delete(
+        accountId: Long,
+        childId: Long,
+        scope: LimitScope,
+        category: AppCategory? = null,
+    )
 }

@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -37,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -61,6 +63,10 @@ import uz.faceguard.app.domain.policy.ProtectionAction
 import uz.faceguard.app.domain.repository.AccountRepository
 import uz.faceguard.app.domain.repository.ChildProfileRepository
 import uz.faceguard.app.domain.repository.ProtectedAppsRepository
+import uz.faceguard.app.domain.screentime.AppCategory
+import uz.faceguard.app.domain.screentime.LimitScope
+import uz.faceguard.app.domain.screentime.ScreenTimeLimitRepository
+import uz.faceguard.app.domain.screentime.ScreenTimeLimits
 
 /** Navigation contract for the child app-policy route. */
 object ChildPolicyArgs {
@@ -71,6 +77,9 @@ object ChildPolicyArgs {
 val LIMIT_OPTIONS_MINUTES = listOf(15, 30, 60, 120)
 
 const val DEFAULT_LIMIT_MINUTES = 30
+
+/** Longest limit the input accepts (4 digits covers the 1440-minute maximum). */
+private const val MAX_LIMIT_DIGITS = 4
 
 private const val SEARCH_THRESHOLD = 15
 
@@ -104,6 +113,38 @@ internal fun AppPolicyMode.defaultAction(): ProtectionAction = when (this) {
     AppPolicyMode.BLOCK -> ProtectionAction.HARD_BLOCK
 }
 
+/** Which screen-time limit a save/remove is currently acting on. */
+sealed interface ScreenTimeLimitScopeTarget {
+    data object Total : ScreenTimeLimitScopeTarget
+    data class Category(val category: AppCategory) : ScreenTimeLimitScopeTarget
+}
+
+/**
+ * Phase 4 Step 1D: the selected child's TOTAL and CATEGORY screen-time limits.
+ *
+ * `null` values are meaningful and are the whole point of the section: they mean *no limit
+ * configured*, which the evaluator reports as unlimited. They are never rendered as `0`,
+ * because `0` is a real configuration meaning "immediately exceeded" — the two must stay
+ * distinguishable everywhere.
+ *
+ * Per-app limits are deliberately absent: they belong to the app policies below, so there is
+ * one place to edit each kind of limit.
+ */
+data class ScreenTimeLimitsUiState(
+    val loading: Boolean = false,
+    /** The child's total daily limit in minutes, or `null` when none is configured. */
+    val totalMinutes: Int? = null,
+    /** Configured category limits, keyed by category; a missing key means "no limit". */
+    val categoryMinutes: Map<AppCategory, Int?> = emptyMap(),
+    val savingTarget: ScreenTimeLimitScopeTarget? = null,
+    val errorMessageRes: Int? = null,
+) {
+    /** Every category the product supports, so each one can be configured. */
+    val categories: List<AppCategory> get() = AppCategory.entries.toList()
+
+    fun categoryLimit(category: AppCategory): Int? = categoryMinutes[category]
+}
+
 data class ChildPolicyUiState(
     val state: UiState = UiState.Loading,
     val children: List<ChildProfile> = emptyList(),
@@ -127,6 +168,8 @@ class ChildPolicyViewModel @Inject constructor(
     private val childRepository: ChildProfileRepository,
     private val childAppPolicyRepository: ChildAppPolicyRepository,
     private val protectedAppsRepository: ProtectedAppsRepository,
+    /** Phase 4 Step 1D: TOTAL/CATEGORY limits — the same store the evaluator reads. */
+    private val screenTimeLimitRepository: ScreenTimeLimitRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -187,6 +230,7 @@ class ChildPolicyViewModel @Inject constructor(
             policyJob?.cancel()
             policyJob = null
             observedChildId = null
+            observeScreenTimeLimits(null)
             _ui.update { it.copy(selectedChildId = null, policies = emptyMap()) }
             return
         }
@@ -197,6 +241,9 @@ class ChildPolicyViewModel @Inject constructor(
         observedChildId = childId
         policyJob?.cancel()
         _ui.update { it.copy(selectedChildId = childId, policies = emptyMap()) }
+        // The screen-time limits follow the same selection, so they can never be shown or
+        // edited for a child other than the one on screen.
+        observeScreenTimeLimits(childId)
 
         val account = accountId ?: return
         policyJob = viewModelScope.launch {
@@ -251,6 +298,101 @@ class ChildPolicyViewModel @Inject constructor(
         val childId = _ui.value.selectedChildId ?: return
         viewModelScope.launch { childAppPolicyRepository.delete(account, childId, packageName) }
     }
+
+    // ------------------------------------------------- Phase 4 screen-time limits
+
+    private var limitJob: Job? = null
+
+    /** The selected child's TOTAL/CATEGORY limits, observed so a save is reflected at once. */
+    private val _screenTimeLimits = MutableStateFlow(ScreenTimeLimitsUiState())
+
+    val screenTimeLimits: StateFlow<ScreenTimeLimitsUiState> = _screenTimeLimits
+
+    /**
+     * Observes the limits of whichever child is selected, so switching children loads that
+     * child's configuration and nothing leaks between them.
+     */
+    private fun observeScreenTimeLimits(childId: Long?) {
+        limitJob?.cancel()
+        limitJob = null
+        if (childId == null) {
+            _screenTimeLimits.value = ScreenTimeLimitsUiState()
+            return
+        }
+        val account = accountId ?: return
+        _screenTimeLimits.value = ScreenTimeLimitsUiState(loading = true)
+        limitJob = viewModelScope.launch {
+            screenTimeLimitRepository.observeLimits(account, childId).collect { limits ->
+                _screenTimeLimits.value = ScreenTimeLimitsUiState(
+                    loading = false,
+                    totalMinutes = limits.firstOrNull { it.scope == LimitScope.TOTAL }?.limitMinutes,
+                    categoryMinutes = limits
+                        .filter { it.scope == LimitScope.CATEGORY && it.category != null }
+                        .associate { it.category!! to it.limitMinutes },
+                )
+            }
+        }
+    }
+
+    /**
+     * Saves the child's total daily limit.
+     *
+     * A value the domain does not accept is rejected before anything is written, and the
+     * rejection is reported rather than silently ignored — the previously saved value stays
+     * in place.
+     */
+    fun setTotalLimit(minutes: Int) {
+        val account = accountId ?: return
+        val childId = _ui.value.selectedChildId ?: return
+        saveLimit(ScreenTimeLimitScopeTarget.Total) {
+            screenTimeLimitRepository.upsert(account, childId, LimitScope.TOTAL, null, minutes)
+        }
+    }
+
+    /** Removes the total daily limit so the scope evaluates as unlimited again. */
+    fun removeTotalLimit() {
+        val account = accountId ?: return
+        val childId = _ui.value.selectedChildId ?: return
+        saveLimit(ScreenTimeLimitScopeTarget.Total, remove = true) {
+            screenTimeLimitRepository.delete(account, childId, LimitScope.TOTAL, null)
+        }
+    }
+
+    fun setCategoryLimit(category: AppCategory, minutes: Int) {
+        val account = accountId ?: return
+        val childId = _ui.value.selectedChildId ?: return
+        saveLimit(ScreenTimeLimitScopeTarget.Category(category)) {
+            screenTimeLimitRepository.upsert(account, childId, LimitScope.CATEGORY, category, minutes)
+        }
+    }
+
+    /** Removes one category's limit; every other category and the total are untouched. */
+    fun removeCategoryLimit(category: AppCategory) {
+        val account = accountId ?: return
+        val childId = _ui.value.selectedChildId ?: return
+        saveLimit(ScreenTimeLimitScopeTarget.Category(category), remove = true) {
+            screenTimeLimitRepository.delete(account, childId, LimitScope.CATEGORY, category)
+        }
+    }
+
+    /**
+     * Runs one limit write and reports its outcome on the section's state.
+     *
+     * Validation lives in the repository, so this catches its rejection instead of
+     * duplicating the rule; a failure never reports success and never changes the saved
+     * value.
+     */
+    private fun saveLimit(target: ScreenTimeLimitScopeTarget, remove: Boolean = false, write: suspend () -> Unit) {
+        viewModelScope.launch {
+            _screenTimeLimits.update { it.copy(savingTarget = target, errorMessageRes = null) }
+            runCatching { write() }.onFailure {
+                _screenTimeLimits.update {
+                    it.copy(errorMessageRes = if (remove) R.string.screentime_limit_error_remove else R.string.screentime_limit_error_save)
+                }
+            }
+            _screenTimeLimits.update { it.copy(savingTarget = null) }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -261,8 +403,11 @@ fun ChildPolicyScreen(
     viewModel: ChildPolicyViewModel = hiltViewModel(),
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
+    val limits by viewModel.screenTimeLimits.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf("") }
     var dialogApp by remember { mutableStateOf<ProtectedApp?>(null) }
+    // Which screen-time limit is being edited: null, or the scope the dialog is open for.
+    var limitDialog by remember { mutableStateOf<ScreenTimeLimitScopeTarget?>(null) }
 
     Scaffold(
         topBar = {
@@ -308,6 +453,16 @@ fun ChildPolicyScreen(
                     item { NoChildrenCard(onOpenChildren) }
                 } else {
                     item { ChildSelector(ui, viewModel::selectChild) }
+                    item {
+                        ScreenTimeLimitsCard(
+                            limits = limits,
+                            childName = ui.selectedChild?.childName,
+                            onSaveTotal = viewModel::setTotalLimit,
+                            onRemoveTotal = viewModel::removeTotalLimit,
+                            onSaveCategory = viewModel::setCategoryLimit,
+                            onRemoveCategory = viewModel::removeCategoryLimit,
+                        )
+                    }
                     item { AppsHeader(refreshing = ui.refreshing, onRefresh = viewModel::refreshApps) }
 
                     val visible = if (query.isBlank()) {
@@ -473,6 +628,227 @@ private fun AppPolicyRow(
         }
     }
 }
+/**
+ * Phase 4 Step 1D: the selected child's daily screen-time limits.
+ *
+ * Two kinds are configurable here, and the distinction is spelled out so a parent is never
+ * guessing: the total for the whole day, and a limit per app category. Per-app limits are
+ * *not* here — they belong to each app's own ALLOW/LIMIT/BLOCK policy below, so there is one
+ * place to edit each kind of limit.
+ *
+ * This is manual configuration, not recognition: the child is whichever profile is selected
+ * above, and the wording says the parent is setting limits for them. "No limit" and
+ * "0 minutes" are shown differently on purpose.
+ */
+@Composable
+private fun ScreenTimeLimitsCard(
+    limits: ScreenTimeLimitsUiState,
+    childName: String?,
+    onSaveTotal: (Int) -> Unit,
+    onRemoveTotal: () -> Unit,
+    onSaveCategory: (AppCategory, Int) -> Unit,
+    onRemoveCategory: (AppCategory) -> Unit,
+) {
+    var editing by remember { mutableStateOf<ScreenTimeLimitScopeTarget?>(null) }
+
+    SectionCard(
+        title = stringResource(R.string.screentime_limits_title),
+        subtitle = childName?.let { stringResource(R.string.screentime_limits_subtitle, it) },
+    ) {
+        if (limits.loading) {
+            Text(
+                stringResource(R.string.state_loading),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            return@SectionCard
+        }
+
+        LimitRow(
+            name = stringResource(R.string.screentime_limits_total_label),
+            minutes = limits.totalMinutes,
+            enabled = limits.savingTarget == null,
+            onEdit = { editing = ScreenTimeLimitScopeTarget.Total },
+            onRemove = onRemoveTotal,
+        )
+
+        Spacer(Modifier.height(8.dp))
+        Text(
+            stringResource(R.string.screentime_limits_category_header),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        limits.categories.forEach { category ->
+            LimitRow(
+                name = categoryLabel(category),
+                minutes = limits.categoryLimit(category),
+                enabled = limits.savingTarget == null,
+                onEdit = { editing = ScreenTimeLimitScopeTarget.Category(category) },
+                onRemove = { onRemoveCategory(category) },
+            )
+        }
+
+        limits.errorMessageRes?.let { message ->
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(message),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+
+    editing?.let { target ->
+        TextLimitDialog(
+            title = when (target) {
+                ScreenTimeLimitScopeTarget.Total -> stringResource(R.string.screentime_limits_total_label)
+                is ScreenTimeLimitScopeTarget.Category -> categoryLabel(target.category)
+            },
+            current = when (target) {
+                ScreenTimeLimitScopeTarget.Total -> limits.totalMinutes
+                is ScreenTimeLimitScopeTarget.Category -> limits.categoryLimit(target.category)
+            },
+            onDismiss = { editing = null },
+            onSave = { minutes ->
+                when (target) {
+                    ScreenTimeLimitScopeTarget.Total -> onSaveTotal(minutes)
+                    is ScreenTimeLimitScopeTarget.Category -> onSaveCategory(target.category, minutes)
+                }
+                editing = null
+            },
+        )
+    }
+}
+
+/** One configurable limit: its name, its saved value, and how to change or remove it. */
+@Composable
+private fun LimitRow(
+    name: String,
+    minutes: Int?,
+    enabled: Boolean,
+    onEdit: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(name, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                // "No limit" is the absence of a configured limit, never a stored 0.
+                text = if (minutes == null) {
+                    stringResource(R.string.screentime_limits_no_limit)
+                } else {
+                    stringResource(R.string.screentime_limits_minutes_value, minutes)
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        TextButton(onClick = onEdit, enabled = enabled) {
+            Text(
+                stringResource(
+                    if (minutes == null) R.string.screentime_limits_set else R.string.screentime_limits_edit,
+                ),
+            )
+        }
+        if (minutes != null) {
+            TextButton(onClick = onRemove, enabled = enabled) {
+                Text(stringResource(R.string.screentime_limits_remove))
+            }
+        }
+    }
+}
+
+/**
+ * Numeric input for one limit.
+ *
+ * Digits only, so malformed text and negatives cannot be entered, and the accepted range is
+ * enforced before saving so the parent is told rather than silently ignored. `0` is accepted
+ * and is explained in the note, because it means "already used up" rather than "no limit".
+ */
+@Composable
+private fun TextLimitDialog(
+    title: String,
+    current: Int?,
+    onDismiss: () -> Unit,
+    onSave: (Int) -> Unit,
+) {
+    var text by remember(current) {
+        mutableStateOf(current?.toString() ?: DEFAULT_LIMIT_MINUTES.toString())
+    }
+    val parsed = text.toIntOrNull()
+    val valid = parsed != null && ScreenTimeLimits.isAccepted(parsed)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.screentime_limits_dialog_title, title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = text,
+                    // Keep only digits: no sign, no letters, no separators.
+                    onValueChange = { input -> text = input.filter { it.isDigit() }.take(MAX_LIMIT_DIGITS) },
+                    label = { Text(stringResource(R.string.screentime_limits_input_label)) },
+                    singleLine = true,
+                    isError = !valid,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LIMIT_OPTIONS_MINUTES.forEach { minutes ->
+                        FilterChip(
+                            selected = parsed == minutes,
+                            onClick = { text = minutes.toString() },
+                            label = { Text(stringResource(R.string.child_policy_minutes, minutes)) },
+                        )
+                    }
+                }
+                if (!valid) {
+                    Text(
+                        stringResource(R.string.screentime_limits_input_invalid),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                if (parsed == 0) {
+                    Text(
+                        stringResource(R.string.screentime_limits_zero_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(
+                    stringResource(R.string.screentime_limits_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { parsed?.let(onSave) }, enabled = valid) {
+                Text(stringResource(R.string.btn_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.btn_cancel)) }
+        },
+    )
+}
+
+/** Localized name of an existing category; the enum name stays the canonical identifier. */
+@Composable
+private fun categoryLabel(category: AppCategory): String = stringResource(
+    when (category) {
+        AppCategory.VIDEO -> R.string.app_category_video
+        AppCategory.GAMES -> R.string.app_category_games
+        AppCategory.EDUCATION -> R.string.app_category_education
+        AppCategory.SOCIAL -> R.string.app_category_social
+        AppCategory.OTHER -> R.string.app_category_other
+    },
+)
 
 @Composable
 private fun displayLabel(display: PolicyDisplay, policy: AppPolicy?): String = when (display) {

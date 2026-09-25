@@ -414,5 +414,26 @@
     <string name="screentime_target_missing">Tanlangan bola topilmadi. Iltimos, boshqa bolani tanlang</string>
     <string name="screentime_target_error_load">Tanlovni yuklab bo\'lmadi</string>
     <string name="screentime_target_error_save">Tanlovni saqlab bo\'lmadi. Iltimos, qayta urinib ko\'ring</string>
+    <string name="screentime_limits_title">Ekran vaqti chegaralari</string>
+    <string name="screentime_limits_subtitle">%1$s uchun kunlik chegaralar. Chegara qo\'yilmasa, nazorat qilinmaydi.</string>
+    <string name="screentime_limits_total_label">Kunlik umumiy ekran vaqti</string>
+    <string name="screentime_limits_category_header">Toifalar bo\'yicha</string>
+    <string name="screentime_limits_no_limit">Chegara qo\'yilmagan</string>
+    <string name="screentime_limits_minutes_value">%1$d daqiqa</string>
+    <string name="screentime_limits_zero_hint">0 daqiqa — vaqt darhol tugagan hisoblanadi</string>
+    <string name="screentime_limits_edit">O\'zgartirish</string>
+    <string name="screentime_limits_remove">Chegarani olib tashlash</string>
+    <string name="screentime_limits_set">Chegara qo\'yish</string>
+    <string name="screentime_limits_dialog_title">%1$s — kunlik chegara</string>
+    <string name="screentime_limits_input_label">Daqiqa (0–1440)</string>
+    <string name="screentime_limits_input_invalid">0 dan 1440 gacha daqiqa kiriting</string>
+    <string name="screentime_limits_note">Chegaraga yetganda kunlik vaqt tugagan hisoblanadi. Bu bosqichda faqat saqlanadi.</string>
+    <string name="screentime_limit_error_save">Chegarani saqlab bo\'lmadi. Iltimos, qayta urinib ko\'ring</string>
+    <string name="screentime_limit_error_remove">Chegarani olib tashlab bo\'lmadi. Iltimos, qayta urinib ko\'ring</string>
+    <string name="app_category_video">Video</string>
+    <string name="app_category_games">O\'yinlar</string>
+    <string name="app_category_education">Ta\'lim</string>
+    <string name="app_category_social">Ijtimoiy tarmoqlar</string>
+    <string name="app_category_other">Boshqa</string>
 
 </resources>

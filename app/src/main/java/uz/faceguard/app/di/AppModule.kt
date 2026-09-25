@@ -14,6 +14,7 @@ import javax.inject.Singleton
 import uz.faceguard.app.data.db.ActivityEventDao
 import uz.faceguard.app.data.db.ChildAppPolicyDao
 import uz.faceguard.app.data.db.ChildProfileDao
+import uz.faceguard.app.data.db.ChildScreenTimeLimitDao
 import uz.faceguard.app.data.db.DailyAppUsageDao
 import uz.faceguard.app.data.db.FaceGuardDatabase
 import uz.faceguard.app.data.db.MIGRATION_3_4
@@ -116,6 +117,7 @@ object AppModule {
     @Provides fun provideNotificationRecordDao(db: FaceGuardDatabase): NotificationRecordDao = db.notificationRecordDao()
     @Provides fun provideDailyAppUsageDao(db: FaceGuardDatabase): DailyAppUsageDao = db.dailyAppUsageDao()
     @Provides fun provideUsageSnapshotCheckpointDao(db: FaceGuardDatabase): UsageSnapshotCheckpointDao = db.usageSnapshotCheckpointDao()
+    @Provides fun provideChildScreenTimeLimitDao(db: FaceGuardDatabase): ChildScreenTimeLimitDao = db.childScreenTimeLimitDao()
 
     @Provides
     @Singleton

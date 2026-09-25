@@ -413,5 +413,26 @@
     <string name="screentime_target_missing">The selected child no longer exists. Please choose another child</string>
     <string name="screentime_target_error_load">Could not load the selection</string>
     <string name="screentime_target_error_save">Could not save the selection. Please try again</string>
+    <string name="screentime_limits_title">Screen time limits</string>
+    <string name="screentime_limits_subtitle">Daily limits for %1$s. Without a limit, screen time is not capped.</string>
+    <string name="screentime_limits_total_label">Total daily screen time</string>
+    <string name="screentime_limits_category_header">By category</string>
+    <string name="screentime_limits_no_limit">No limit</string>
+    <string name="screentime_limits_minutes_value">%1$d min</string>
+    <string name="screentime_limits_zero_hint">0 min counts as already used up</string>
+    <string name="screentime_limits_edit">Change</string>
+    <string name="screentime_limits_remove">Remove limit</string>
+    <string name="screentime_limits_set">Set limit</string>
+    <string name="screentime_limits_dialog_title">%1$s — daily limit</string>
+    <string name="screentime_limits_input_label">Minutes (0–1440)</string>
+    <string name="screentime_limits_input_invalid">Enter a number of minutes from 0 to 1440</string>
+    <string name="screentime_limits_note">Reaching the limit counts the daily time as used up. Nothing is blocked in this step.</string>
+    <string name="screentime_limit_error_save">Could not save the limit. Please try again</string>
+    <string name="screentime_limit_error_remove">Could not remove the limit. Please try again</string>
+    <string name="app_category_video">Video</string>
+    <string name="app_category_games">Games</string>
+    <string name="app_category_education">Education</string>
+    <string name="app_category_social">Social</string>
+    <string name="app_category_other">Other</string>
 
 </resources>

@@ -1,7 +1,10 @@
 package uz.faceguard.app.screentime
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -81,21 +84,44 @@ class ScreenTimeLimitEvaluatorTest {
 
     /** Limits exactly like the real table, including the ""-category TOTAL convention. */
     private class FakeLimits : ScreenTimeLimitRepository {
-        private val rows = mutableListOf<ScreenTimeLimit>()
+        private val state = MutableStateFlow<List<ScreenTimeLimit>>(emptyList())
 
         fun set(accountId: Long, childId: Long, scope: LimitScope, category: AppCategory?, minutes: Int?) {
-            rows.removeAll {
-                it.accountId == accountId && it.childId == childId &&
-                    it.scope == scope && it.category == category
+            state.update { rows ->
+                rows.filterNot {
+                    it.accountId == accountId && it.childId == childId &&
+                        it.scope == scope && it.category == category
+                } + if (minutes == null) {
+                    emptyList()
+                } else {
+                    listOf(ScreenTimeLimit(accountId, childId, scope, category, minutes))
+                }
             }
-            rows += ScreenTimeLimit(accountId, childId, scope, category, minutes)
         }
 
         override suspend fun limits(accountId: Long, childId: Long) =
-            rows.filter { it.accountId == accountId && it.childId == childId }
+            state.value.filter { it.accountId == accountId && it.childId == childId }
+
+        override fun observeLimits(accountId: Long, childId: Long): Flow<List<ScreenTimeLimit>> =
+            state.map { rows -> rows.filter { it.accountId == accountId && it.childId == childId } }
+
+        override suspend fun upsert(
+            accountId: Long,
+            childId: Long,
+            scope: LimitScope,
+            category: AppCategory?,
+            limitMinutes: Int,
+        ) = set(accountId, childId, scope, category, limitMinutes)
+
+        override suspend fun delete(
+            accountId: Long,
+            childId: Long,
+            scope: LimitScope,
+            category: AppCategory?,
+        ) = set(accountId, childId, scope, category, null)
 
         override suspend fun limit(accountId: Long, childId: Long, scope: LimitScope, category: AppCategory?) =
-            rows.firstOrNull {
+            state.value.firstOrNull {
                 it.accountId == accountId && it.childId == childId &&
                     it.scope == scope && it.category == category
             }

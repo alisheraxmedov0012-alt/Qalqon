@@ -413,5 +413,26 @@
     <string name="screentime_target_missing">Выбранный ребёнок не найден. Пожалуйста, выберите другого ребёнка</string>
     <string name="screentime_target_error_load">Не удалось загрузить выбор</string>
     <string name="screentime_target_error_save">Не удалось сохранить выбор. Попробуйте ещё раз</string>
+    <string name="screentime_limits_title">Лимиты экранного времени</string>
+    <string name="screentime_limits_subtitle">Дневные лимиты для %1$s. Без лимита экранное время не ограничивается.</string>
+    <string name="screentime_limits_total_label">Общее время за день</string>
+    <string name="screentime_limits_category_header">По категориям</string>
+    <string name="screentime_limits_no_limit">Без лимита</string>
+    <string name="screentime_limits_minutes_value">%1$d мин</string>
+    <string name="screentime_limits_zero_hint">0 мин — время считается уже исчерпанным</string>
+    <string name="screentime_limits_edit">Изменить</string>
+    <string name="screentime_limits_remove">Убрать лимит</string>
+    <string name="screentime_limits_set">Задать лимит</string>
+    <string name="screentime_limits_dialog_title">%1$s — дневной лимит</string>
+    <string name="screentime_limits_input_label">Минуты (0–1440)</string>
+    <string name="screentime_limits_input_invalid">Введите число минут от 0 до 1440</string>
+    <string name="screentime_limits_note">При достижении лимита дневное время считается исчерпанным. На этом шаге ничего не блокируется.</string>
+    <string name="screentime_limit_error_save">Не удалось сохранить лимит. Попробуйте ещё раз</string>
+    <string name="screentime_limit_error_remove">Не удалось убрать лимит. Попробуйте ещё раз</string>
+    <string name="app_category_video">Видео</string>
+    <string name="app_category_games">Игры</string>
+    <string name="app_category_education">Обучение</string>
+    <string name="app_category_social">Соцсети</string>
+    <string name="app_category_other">Другое</string>
 
 </resources>

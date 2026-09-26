@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.flow.first
+import java.time.ZoneOffset
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
@@ -23,6 +24,7 @@ import uz.faceguard.app.data.repository.AccountRepositoryImpl
 import uz.faceguard.app.data.repository.ChildAppPolicyRepositoryImpl
 import uz.faceguard.app.data.repository.ChildProfileRepositoryImpl
 import uz.faceguard.app.data.repository.ScreenTimeLimitRepositoryImpl
+import uz.faceguard.app.data.repository.ScreenTimeUsageRepositoryImpl
 import uz.faceguard.app.domain.model.AuthResult
 import uz.faceguard.app.domain.model.RestrictionLevel
 import uz.faceguard.app.domain.policy.AppPolicyMode
@@ -30,7 +32,9 @@ import uz.faceguard.app.domain.screentime.AppCategory
 import uz.faceguard.app.domain.screentime.LimitScope
 import uz.faceguard.app.domain.screentime.ScreenTimeLimit
 import uz.faceguard.app.domain.screentime.ScreenTimeLimitRepository
+import uz.faceguard.app.domain.screentime.ScreenTimeLimitEvaluator
 import uz.faceguard.app.security.PassthroughTemplateCipher
+import uz.faceguard.app.testing.FakeAppUsageSource
 import uz.faceguard.app.testing.FakeProtectedAppsRepository
 
 /**
@@ -88,6 +92,16 @@ class ScreenTimeLimitsConfigurationViewModelTest {
         childAppPolicyRepository = ChildAppPolicyRepositoryImpl(db.childAppPolicyDao()),
         protectedAppsRepository = FakeProtectedAppsRepository(),
         screenTimeLimitRepository = screenTimeLimitRepository,
+        // Phase 4 Step 3: per-app usage presentation reads these.
+        screenTimeUsageRepository = ScreenTimeUsageRepositoryImpl(db.dailyAppUsageDao()),
+        screenTimeLimitEvaluator = ScreenTimeLimitEvaluator(
+            ScreenTimeUsageRepositoryImpl(db.dailyAppUsageDao()),
+            ScreenTimeLimitRepositoryImpl(db.childScreenTimeLimitDao()) { 1L },
+            ChildAppPolicyRepositoryImpl(db.childAppPolicyDao()),
+        ),
+        appUsageSource = FakeAppUsageSource(),
+        zone = ZoneOffset.UTC,
+        clock = { 1_790_294_460_000L },
         savedStateHandle = SavedStateHandle(mapOf(ChildPolicyArgs.CHILD_ID to childId)),
     )
 

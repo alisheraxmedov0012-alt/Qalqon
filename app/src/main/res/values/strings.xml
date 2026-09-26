@@ -450,5 +450,14 @@
     <string name="screentime_duration_minutes">%1$d daqiqa</string>
     <string name="screentime_duration_hours">%1$d soat</string>
     <string name="screentime_duration_hours_minutes">%1$d soat %2$d daqiqa</string>
+    <string name="screentime_app_used">Bugun: %1$s</string>
+    <string name="screentime_app_limit">Kunlik chegara: %1$s</string>
+    <string name="screentime_app_no_limit">Kunlik chegara: qo\'yilmagan</string>
+    <string name="screentime_app_blocked">Ilova bloklangan</string>
+    <string name="screentime_app_limit_invalid">Kunlik chegara: noto\'g\'ri sozlangan</string>
+    <string name="screentime_app_status_remaining">Qoldi: %1$s</string>
+    <string name="screentime_app_status_reached">Chegaraga yetdi</string>
+    <string name="screentime_app_unavailable">Foydalanish ma\'lumoti mavjud emas</string>
+    <string name="screentime_app_error">Ilova foydalanishini yuklab bo\'lmadi</string>
 
 </resources>

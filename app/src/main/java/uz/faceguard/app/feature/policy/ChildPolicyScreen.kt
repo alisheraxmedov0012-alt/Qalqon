@@ -46,11 +46,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import java.time.ZoneId
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import uz.faceguard.app.R
 import uz.faceguard.app.core.ui.SectionCard
 import uz.faceguard.app.core.ui.UiState
@@ -64,9 +71,17 @@ import uz.faceguard.app.domain.repository.AccountRepository
 import uz.faceguard.app.domain.repository.ChildProfileRepository
 import uz.faceguard.app.domain.repository.ProtectedAppsRepository
 import uz.faceguard.app.domain.screentime.AppCategory
+import uz.faceguard.app.domain.screentime.AppUsageSource
 import uz.faceguard.app.domain.screentime.LimitScope
+import uz.faceguard.app.domain.screentime.ScreenTimeLimitEvaluator
 import uz.faceguard.app.domain.screentime.ScreenTimeLimitRepository
 import uz.faceguard.app.domain.screentime.ScreenTimeLimits
+import uz.faceguard.app.domain.screentime.ScreenTimeUsageRepository
+import uz.faceguard.app.domain.screentime.UsageAccessState
+import uz.faceguard.app.domain.screentime.UsageDateKey
+import uz.faceguard.app.feature.home.ScreenTimeInfoRow
+import uz.faceguard.app.feature.home.durationLabel
+import uz.faceguard.app.feature.home.durationLabelMinutes
 
 /** Navigation contract for the child app-policy route. */
 object ChildPolicyArgs {
@@ -170,6 +185,17 @@ class ChildPolicyViewModel @Inject constructor(
     private val protectedAppsRepository: ProtectedAppsRepository,
     /** Phase 4 Step 1D: TOTAL/CATEGORY limits — the same store the evaluator reads. */
     private val screenTimeLimitRepository: ScreenTimeLimitRepository,
+    /** Phase 4 Step 3: per-app usage and its evaluation, for the app rows. */
+    private val screenTimeUsageRepository: ScreenTimeUsageRepository,
+    private val screenTimeLimitEvaluator: ScreenTimeLimitEvaluator,
+    /**
+     * The usage-access capability probe, used to tell "no usage yet" apart from "usage cannot
+     * be read". Deliberately not the protection runtime's snapshot: this screen must report the
+     * device's actual capability, independent of whether protection happens to be running.
+     */
+    private val appUsageSource: AppUsageSource,
+    private val zone: ZoneId = ZoneId.systemDefault(),
+    private val clock: () -> Long = System::currentTimeMillis,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -231,6 +257,7 @@ class ChildPolicyViewModel @Inject constructor(
             policyJob = null
             observedChildId = null
             observeScreenTimeLimits(null)
+            observeAppScreenTime(null)
             _ui.update { it.copy(selectedChildId = null, policies = emptyMap()) }
             return
         }
@@ -244,6 +271,8 @@ class ChildPolicyViewModel @Inject constructor(
         // The screen-time limits follow the same selection, so they can never be shown or
         // edited for a child other than the one on screen.
         observeScreenTimeLimits(childId)
+        // Phase 4 Step 3: and so do the per-app usage rows.
+        observeAppScreenTime(childId)
 
         val account = accountId ?: return
         policyJob = viewModelScope.launch {
@@ -375,6 +404,77 @@ class ChildPolicyViewModel @Inject constructor(
         }
     }
 
+    // ------------------------------------------------- Phase 4 per-app screen time
+
+    private var appScreenTimeJob: Job? = null
+
+    /** Today's per-app screen-time rows for the selected child; see [ScreenTimeAppsUiState]. */
+    private val _screenTimeApps = MutableStateFlow(ScreenTimeAppsUiState())
+
+    val screenTimeApps: StateFlow<ScreenTimeAppsUiState> = _screenTimeApps
+
+    /**
+     * Recomputes the app rows whenever the day's usage or the child's policies change, so the
+     * rows follow a collector tick or a policy edit without polling.
+     *
+     * Rows are computed only for apps that actually have usage or a policy: an app with neither
+     * has nothing to show, and evaluating the whole installed catalogue would be wasteful.
+     * Every value comes from [ScreenTimeLimitEvaluator]; this class never derives a remaining
+     * time or an exceeded flag itself.
+     */
+    private fun observeAppScreenTime(childId: Long?) {
+        appScreenTimeJob?.cancel()
+        appScreenTimeJob = null
+        if (childId == null) {
+            _screenTimeApps.value = ScreenTimeAppsUiState()
+            return
+        }
+        val account = accountId ?: return
+        val dateKey = UsageDateKey.of(clock(), zone)
+        _screenTimeApps.value = ScreenTimeAppsUiState(loading = true)
+
+        appScreenTimeJob = viewModelScope.launch {
+            // Probed once per load, off the main thread: it is a platform capability call, not
+            // something to repeat for every row.
+            val available = withContext(Dispatchers.IO) {
+                appUsageSource.usageAccess() == UsageAccessState.AVAILABLE
+            }
+            if (!available) {
+                // Without Usage Access there is no usage to report, and reporting "0 min"
+                // would claim the child used nothing.
+                _screenTimeApps.value = ScreenTimeAppsUiState(usageAvailable = false)
+                return@launch
+            }
+
+            combine(
+                childAppPolicyRepository.observePolicies(account, childId),
+                screenTimeUsageRepository.observeDayUsage(account, childId, dateKey),
+            ) { policies, usageRows -> policies to usageRows }
+                // The transform sees both sources' contents, not just the set of packages, so a
+                // usage *value* changing recomputes the rows too.
+                .map { (policies, usageRows) ->
+                    val packages = (policies.map { it.packageName } + usageRows.map { it.packageName })
+                        .distinct()
+                        .sorted()
+                    ScreenTimeAppsUiState(
+                        loading = false,
+                        usageAvailable = true,
+                        rows = packages.mapNotNull { packageName ->
+                            screenTimeLimitEvaluator.evaluateApp(account, childId, dateKey, packageName)
+                                .toAppRow()
+                                ?.let { packageName to it }
+                        }.toMap(),
+                    )
+                }
+                .distinctUntilChanged()
+                .catch {
+                    // A read failure is reported; it never becomes "no limit" or zero usage.
+                    emit(ScreenTimeAppsUiState(errorMessageRes = R.string.screentime_app_error))
+                }
+                .collect { _screenTimeApps.value = it }
+        }
+    }
+
     /**
      * Runs one limit write and reports its outcome on the section's state.
      *
@@ -404,6 +504,7 @@ fun ChildPolicyScreen(
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val limits by viewModel.screenTimeLimits.collectAsStateWithLifecycle()
+    val screenTimeApps by viewModel.screenTimeApps.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf("") }
     var dialogApp by remember { mutableStateOf<ProtectedApp?>(null) }
     // Which screen-time limit is being edited: null, or the scope the dialog is open for.
@@ -489,6 +590,9 @@ fun ChildPolicyScreen(
                                 app = app,
                                 display = ui.displayFor(app.packageName),
                                 policy = ui.policyFor(app.packageName),
+                                screenTime = screenTimeApps.rowFor(app.packageName),
+                                screenTimeAvailable = screenTimeApps.usageAvailable,
+                                screenTimeLoading = screenTimeApps.loading,
                                 onOpen = { dialogApp = app },
                             )
                         }
@@ -607,6 +711,9 @@ private fun AppPolicyRow(
     app: ProtectedApp,
     display: PolicyDisplay,
     policy: AppPolicy?,
+    screenTime: ScreenTimeInfoRow?,
+    screenTimeAvailable: Boolean,
+    screenTimeLoading: Boolean,
     onOpen: () -> Unit,
 ) {
     SectionCard(title = app.appDisplayName) {
@@ -626,6 +733,106 @@ private fun AppPolicyRow(
                 Text(stringResource(R.string.child_policy_open))
             }
         }
+        // Phase 4 Step 3: today's screen time for this app, below the existing policy control
+        // so the ALLOW/LIMIT/BLOCK interaction stays exactly where it was.
+        AppScreenTimeInfo(
+            screenTime = screenTime,
+            usageAvailable = screenTimeAvailable,
+            loading = screenTimeLoading,
+            policyMode = policy?.mode,
+        )
+    }
+}
+
+/**
+ * Phase 4 Step 3: one app's compact screen-time line.
+ *
+ * Every number comes from the evaluator. Three things are deliberately kept apart:
+ *  - an app with no *time* limit says so, and never shows a numeric remaining value — in
+ *    particular `BLOCK` is an enforcement mode, not a zero-minute limit, so it is reported as
+ *    the blocked policy it is;
+ *  - no usage yet (`0 min`) is shown as a real value, while "usage cannot be read" is its own
+ *    state, because claiming `0 min` there would say the child used nothing;
+ *  - a corrupt stored limit is stated as such rather than being repaired or read as unlimited.
+ */
+@Composable
+private fun AppScreenTimeInfo(
+    screenTime: ScreenTimeInfoRow?,
+    usageAvailable: Boolean,
+    loading: Boolean,
+    policyMode: AppPolicyMode?,
+) {
+    if (!usageAvailable) {
+        Text(
+            text = stringResource(R.string.screentime_app_unavailable),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
+    if (screenTime == null) {
+        // Nothing measured and nothing configured for this app: no line is added at all,
+        // rather than claiming a value.
+        if (loading) {
+            Text(
+                text = stringResource(R.string.state_loading),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
+
+    Text(
+        text = stringResource(R.string.screentime_app_used, durationLabel(screenTime.usedMs)),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+
+    when {
+        screenTime.invalidLimit -> Text(
+            text = stringResource(R.string.screentime_app_limit_invalid),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+        )
+
+        screenTime.hasLimit -> {
+            Text(
+                text = stringResource(
+                    R.string.screentime_app_limit,
+                    durationLabelMinutes(screenTime.limitMinutes!!),
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            // Text, not colour alone, so the reached state is readable without colour.
+            val reached = screenTime.exceeded
+            Text(
+                text = if (reached) {
+                    stringResource(R.string.screentime_app_status_reached)
+                } else {
+                    stringResource(
+                        R.string.screentime_app_status_remaining,
+                        durationLabel(screenTime.remainingMs ?: 0L),
+                    )
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (reached) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+            )
+        }
+
+        // No time limit. A blocked app says it is blocked; everything else has no daily limit.
+        policyMode == AppPolicyMode.BLOCK -> Text(
+            text = stringResource(R.string.screentime_app_blocked),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        else -> Text(
+            text = stringResource(R.string.screentime_app_no_limit),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 /**

@@ -891,23 +891,6 @@ private fun categoryLabel(row: ScreenTimeInfoRow): String = when (val label = ro
     is ScreenTimeInfoLabel.App -> label.packageName
 }
 
-/** Human-readable duration from exact milliseconds, e.g. `1 h 30 min`. */
-@Composable
-private fun durationLabel(ms: Long): String {
-    val parts = ScreenTimeDurationFormat.partsOf(ms)
-    return when {
-        parts.hours > 0L && parts.minutes > 0L ->
-            stringResource(R.string.screentime_duration_hours_minutes, parts.hours, parts.minutes)
-        parts.hours > 0L -> stringResource(R.string.screentime_duration_hours, parts.hours)
-        else -> stringResource(R.string.screentime_duration_minutes, parts.minutes)
-    }
-}
-
-/** Same formatting for a limit, which is stored in whole minutes. */
-@Composable
-private fun durationLabelMinutes(minutes: Int): String =
-    durationLabel(minutes.toLong() * ScreenTimeDurationFormat.MS_PER_MINUTE)
-
 @Composable
 private fun categoryLabel(category: AppCategory): String = stringResource(
     when (category) {

@@ -449,5 +449,14 @@
     <string name="screentime_duration_minutes">%1$d min</string>
     <string name="screentime_duration_hours">%1$d h</string>
     <string name="screentime_duration_hours_minutes">%1$d h %2$d min</string>
+    <string name="screentime_app_used">Today: %1$s</string>
+    <string name="screentime_app_limit">Daily limit: %1$s</string>
+    <string name="screentime_app_no_limit">Daily limit: none</string>
+    <string name="screentime_app_blocked">App is blocked</string>
+    <string name="screentime_app_limit_invalid">Daily limit: not configured correctly</string>
+    <string name="screentime_app_status_remaining">%1$s remaining</string>
+    <string name="screentime_app_status_reached">Limit reached</string>
+    <string name="screentime_app_unavailable">Usage data unavailable</string>
+    <string name="screentime_app_error">Could not load app usage</string>
 
 </resources>

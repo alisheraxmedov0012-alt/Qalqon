@@ -449,5 +449,14 @@
     <string name="screentime_duration_minutes">%1$d мин</string>
     <string name="screentime_duration_hours">%1$d ч</string>
     <string name="screentime_duration_hours_minutes">%1$d ч %2$d мин</string>
+    <string name="screentime_app_used">Сегодня: %1$s</string>
+    <string name="screentime_app_limit">Дневной лимит: %1$s</string>
+    <string name="screentime_app_no_limit">Дневной лимит: не задан</string>
+    <string name="screentime_app_blocked">Приложение заблокировано</string>
+    <string name="screentime_app_limit_invalid">Дневной лимит: настроен неверно</string>
+    <string name="screentime_app_status_remaining">Осталось: %1$s</string>
+    <string name="screentime_app_status_reached">Лимит достигнут</string>
+    <string name="screentime_app_unavailable">Данные об использовании недоступны</string>
+    <string name="screentime_app_error">Не удалось загрузить использование приложений</string>
 
 </resources>

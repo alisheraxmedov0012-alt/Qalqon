@@ -171,7 +171,7 @@ class FaceGuardMigration6To7Test {
 
     private fun openLatest(): FaceGuardDatabase =
         Room.databaseBuilder(context, FaceGuardDatabase::class.java, DB_NAME)
-            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
             .allowMainThreadQueries()
             .build()
             .also {
@@ -185,7 +185,7 @@ class FaceGuardMigration6To7Test {
 
         val db = openLatest()
 
-        assertEquals("the database is opened at the latest version", 8, db.openHelper.writableDatabase.version)
+        assertEquals("the database is opened at the latest version", 9, db.openHelper.writableDatabase.version)
         assertNotNull(db.userAccountDao().getById(1L))
         assertNotNull(db.parentProfileDao().get(1L))
         val children = db.childProfileDao().observeAll(1L).first()

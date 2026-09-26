@@ -22,10 +22,12 @@ import uz.faceguard.app.data.db.MIGRATION_4_5
 import uz.faceguard.app.data.db.MIGRATION_5_6
 import uz.faceguard.app.data.db.MIGRATION_6_7
 import uz.faceguard.app.data.db.MIGRATION_7_8
+import uz.faceguard.app.data.db.MIGRATION_8_9
 import uz.faceguard.app.data.db.ParentProfileDao
 import uz.faceguard.app.data.db.NotificationRecordDao
 import uz.faceguard.app.data.db.ParentRequestDao
 import uz.faceguard.app.data.db.ProtectedAppDao
+import uz.faceguard.app.data.db.ScheduleDao
 import uz.faceguard.app.data.db.UserAccountDao
 import uz.faceguard.app.data.db.UsageSnapshotCheckpointDao
 import uz.faceguard.app.data.prefs.settingsDataStore
@@ -39,6 +41,7 @@ import uz.faceguard.app.data.repository.ResetRepositoryImpl
 import uz.faceguard.app.data.repository.ChildProfileRepositoryImpl
 import uz.faceguard.app.data.repository.ParentProfileRepositoryImpl
 import uz.faceguard.app.data.repository.ProtectedAppsRepositoryImpl
+import uz.faceguard.app.data.repository.ScheduleRepositoryImpl
 import uz.faceguard.app.data.repository.ScreenTimeUsageRepositoryImpl
 import uz.faceguard.app.data.repository.ScreenTimeActiveChildRepositoryImpl
 import uz.faceguard.app.data.repository.ScreenTimeLimitRepositoryImpl
@@ -67,6 +70,7 @@ import uz.faceguard.app.domain.notification.NotificationCoordinator
 import uz.faceguard.app.domain.notification.NotificationPolicy
 import uz.faceguard.app.domain.notification.NotificationRepository
 import uz.faceguard.app.domain.request.ParentRequestRepository
+import uz.faceguard.app.domain.schedule.ScheduleRepository
 import uz.faceguard.app.domain.screentime.AppUsageSource
 import uz.faceguard.app.domain.screentime.ElapsedTimeSource
 import uz.faceguard.app.domain.screentime.ScreenTimeUsageRepository
@@ -104,7 +108,7 @@ object AppModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): FaceGuardDatabase =
         Room.databaseBuilder(context, FaceGuardDatabase::class.java, "faceguard.db")
-            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8) // additive v3 -> v8; keeps existing user data
+            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9) // additive v3 -> v9; keeps existing user data
             .build()
 
     @Provides fun provideUserAccountDao(db: FaceGuardDatabase): UserAccountDao = db.userAccountDao()
@@ -118,6 +122,7 @@ object AppModule {
     @Provides fun provideDailyAppUsageDao(db: FaceGuardDatabase): DailyAppUsageDao = db.dailyAppUsageDao()
     @Provides fun provideUsageSnapshotCheckpointDao(db: FaceGuardDatabase): UsageSnapshotCheckpointDao = db.usageSnapshotCheckpointDao()
     @Provides fun provideChildScreenTimeLimitDao(db: FaceGuardDatabase): ChildScreenTimeLimitDao = db.childScreenTimeLimitDao()
+    @Provides fun provideScheduleDao(db: FaceGuardDatabase): ScheduleDao = db.scheduleDao()
 
     @Provides
     @Singleton
@@ -239,6 +244,11 @@ object AppModule {
     fun provideScreenTimeLimitRepository(
         impl: ScreenTimeLimitRepositoryImpl,
     ): ScreenTimeLimitRepository = impl
+
+    // Phase 5 Step 2: per-child schedule persistence (schedule_rules + schedule_app_targets).
+    @Provides
+    @Singleton
+    fun provideScheduleRepository(impl: ScheduleRepositoryImpl): ScheduleRepository = impl
 
     // Future backend sync: bound to offline no-ops by default; swap these
     // bindings to enable sync without touching any call site.

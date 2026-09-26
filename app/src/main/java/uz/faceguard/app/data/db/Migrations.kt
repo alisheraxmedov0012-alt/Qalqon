@@ -210,3 +210,50 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
         )
     }
 }
+
+/**
+ * v8 -> v9: adds Phase 5 schedule persistence.
+ *
+ * Purely additive: no existing table is altered or dropped, so accounts, profiles, protected
+ * apps, policies, activity events, parent requests, notification records, screen-time usage,
+ * limits and snapshot checkpoints all survive the upgrade. Statements mirror Room's generated
+ * schema for [ScheduleRuleEntity] and [ScheduleAppTargetEntity] (column order follows the
+ * constructors).
+ *
+ * No index is created for `schedule_app_targets`: every query against it filters on a prefix
+ * of its composite primary key, so SQLite already has the index it needs. There are no foreign
+ * keys, matching the rest of this database; deleting a schedule deletes its target rows in the
+ * same repository transaction instead.
+ */
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `schedule_rules` (" +
+                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`accountId` INTEGER NOT NULL, " +
+                "`childId` INTEGER NOT NULL, " +
+                "`name` TEXT NOT NULL, " +
+                "`mode` TEXT NOT NULL, " +
+                "`enabled` INTEGER NOT NULL, " +
+                "`startMinuteOfDay` INTEGER NOT NULL, " +
+                "`endMinuteOfDay` INTEGER NOT NULL, " +
+                "`daysMask` INTEGER NOT NULL, " +
+                "`priority` INTEGER NOT NULL, " +
+                "`action` TEXT NOT NULL, " +
+                "`createdAt` INTEGER NOT NULL, " +
+                "`updatedAt` INTEGER NOT NULL)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_schedule_rules_accountId_childId` " +
+                "ON `schedule_rules` (`accountId`, `childId`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `schedule_app_targets` (" +
+                "`accountId` INTEGER NOT NULL, " +
+                "`childId` INTEGER NOT NULL, " +
+                "`scheduleId` INTEGER NOT NULL, " +
+                "`packageName` TEXT NOT NULL, " +
+                "PRIMARY KEY(`accountId`, `childId`, `scheduleId`, `packageName`))",
+        )
+    }
+}

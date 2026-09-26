@@ -250,3 +250,67 @@ data class UsageSnapshotCheckpointEntity(
     /** Wall-clock time this counter was observed; unrelated to its value. */
     val observedAtMs: Long,
 )
+
+/**
+ * Phase 5 Step 2: a persisted schedule.
+ *
+ * Schedules are per-child, so the row carries `accountId` + `childId` and every query in
+ * [ScheduleDao] is scoped by both: a schedule id alone is never a security boundary.
+ *
+ * The window is stored exactly as the Step 1 domain encodes it — two whole-minute
+ * minute-of-day integers — so a cross-midnight window (22:00 -> 07:00) persists as
+ * `startMinuteOfDay = 1320`, `endMinuteOfDay = 420` and is never split or normalised.
+ * `mode` and `action` are the domain enums' stable names; `daysMask` is
+ * [uz.faceguard.app.domain.schedule.ScheduleDays.mask]. Added in DB v9 without touching any
+ * existing table, so v1-v8 user data survives (see [MIGRATION_8_9]). Column order matches
+ * the constructor because Room builds `CREATE TABLE` from it.
+ */
+@Entity(
+    tableName = "schedule_rules",
+    indices = [Index(value = ["accountId", "childId"])],
+)
+data class ScheduleRuleEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val accountId: Long,
+    val childId: Long,
+    val name: String,
+    /** ScheduleMode.name */
+    val mode: String,
+    val enabled: Boolean = true,
+    /** Minutes from midnight, 0..1439 (ScheduleWindow.startMinuteOfDay). */
+    val startMinuteOfDay: Int,
+    /** Minutes from midnight, 0..1439 (ScheduleWindow.endMinuteOfDay). */
+    val endMinuteOfDay: Int,
+    /** ScheduleDays.mask */
+    val daysMask: Int,
+    val priority: Int = 0,
+    /** ProtectionAction.name */
+    val action: String,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+)
+
+/**
+ * Phase 5 Step 2: which packages one schedule targets (the affected-app relation).
+ *
+ * This is deliberately a flat join table, not a serialized list: it holds only
+ * "this package is targeted by this schedule" and duplicates none of the schedule's own
+ * columns. It also never duplicates app policy (ALLOW/LIMIT/BLOCK, daily limit, action) —
+ * `child_app_policies` stays authoritative for that.
+ *
+ * The composite primary key is the relation's identity, so the same package cannot be
+ * targeted twice by one schedule, and it is account + child + schedule scoped like the
+ * schedule itself. Every query is a prefix of that key, so no extra index is needed.
+ * Deleting a schedule deletes its rows here in the same transaction (there are no foreign
+ * keys in this database; see the schedule repository).
+ */
+@Entity(
+    tableName = "schedule_app_targets",
+    primaryKeys = ["accountId", "childId", "scheduleId", "packageName"],
+)
+data class ScheduleAppTargetEntity(
+    val accountId: Long,
+    val childId: Long,
+    val scheduleId: Long,
+    val packageName: String,
+)

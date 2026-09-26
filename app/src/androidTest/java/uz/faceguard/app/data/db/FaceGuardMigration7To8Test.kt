@@ -77,7 +77,7 @@ class FaceGuardMigration7To8Test {
 
     private fun openLatest(): FaceGuardDatabase =
         Room.databaseBuilder(context, FaceGuardDatabase::class.java, DB_NAME)
-            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
             .allowMainThreadQueries()
             .build()
             .also {
@@ -91,7 +91,7 @@ class FaceGuardMigration7To8Test {
 
         val db = openLatest()
 
-        assertEquals("the database is now v8", 8, db.openHelper.writableDatabase.version)
+        assertEquals("the database is now v9", 9, db.openHelper.writableDatabase.version)
         assertNotNull(db.userAccountDao().getById(1L))
         assertEquals("Vali", db.childProfileDao().observeAll(1L).first().single().childName)
         assertEquals("LIMIT", db.childAppPolicyDao().getPolicy(1L, 10L, "com.google.android.youtube")!!.mode)

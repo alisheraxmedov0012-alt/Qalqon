@@ -16,8 +16,10 @@ import androidx.room.RoomDatabase
         DailyAppUsageEntity::class,
         ChildScreenTimeLimitEntity::class,
         UsageSnapshotCheckpointEntity::class,
+        ScheduleRuleEntity::class,
+        ScheduleAppTargetEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = false,
 )
 abstract class FaceGuardDatabase : RoomDatabase() {
@@ -32,4 +34,5 @@ abstract class FaceGuardDatabase : RoomDatabase() {
     abstract fun dailyAppUsageDao(): DailyAppUsageDao
     abstract fun childScreenTimeLimitDao(): ChildScreenTimeLimitDao
     abstract fun usageSnapshotCheckpointDao(): UsageSnapshotCheckpointDao
+    abstract fun scheduleDao(): ScheduleDao
 }

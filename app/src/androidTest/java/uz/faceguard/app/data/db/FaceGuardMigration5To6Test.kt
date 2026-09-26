@@ -128,7 +128,7 @@ class FaceGuardMigration5To6Test {
 
     private fun openLatest(): FaceGuardDatabase =
         Room.databaseBuilder(context, FaceGuardDatabase::class.java, DB_NAME)
-            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
             .allowMainThreadQueries()
             .build()
 

@@ -434,5 +434,20 @@
     <string name="app_category_education">Обучение</string>
     <string name="app_category_social">Соцсети</string>
     <string name="app_category_other">Другое</string>
+    <string name="screentime_summary_today">Экранное время за сегодня</string>
+    <string name="screentime_summary_used">Использовано: %1$s</string>
+    <string name="screentime_summary_limit">Дневной лимит: %1$s</string>
+    <string name="screentime_summary_unlimited">Дневной лимит: не задан</string>
+    <string name="screentime_summary_limit_invalid">Дневной лимит: настроен неверно</string>
+    <string name="screentime_summary_status_remaining">Осталось: %1$s</string>
+    <string name="screentime_summary_status_reached">Лимит достигнут</string>
+    <string name="screentime_summary_status_unlimited">Без лимита</string>
+    <string name="screentime_summary_no_target">Ребёнок для экранного времени не выбран</string>
+    <string name="screentime_summary_unavailable">Данные об использовании недоступны</string>
+    <string name="screentime_summary_unavailable_hint">Включите доступ к использованию, чтобы собирать экранное время</string>
+    <string name="screentime_summary_error">Не удалось загрузить данные экранного времени</string>
+    <string name="screentime_duration_minutes">%1$d мин</string>
+    <string name="screentime_duration_hours">%1$d ч</string>
+    <string name="screentime_duration_hours_minutes">%1$d ч %2$d мин</string>
 
 </resources>

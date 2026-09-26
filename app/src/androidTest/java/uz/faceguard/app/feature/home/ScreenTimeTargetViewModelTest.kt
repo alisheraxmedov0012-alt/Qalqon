@@ -7,6 +7,7 @@ import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
+import java.time.ZoneOffset
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -36,11 +37,14 @@ import uz.faceguard.app.data.repository.ParentProfileRepositoryImpl
 import uz.faceguard.app.data.repository.ParentRequestRepositoryImpl
 import uz.faceguard.app.data.repository.ProtectedAppsRepositoryImpl
 import uz.faceguard.app.data.repository.ScreenTimeActiveChildRepositoryImpl
+import uz.faceguard.app.data.repository.ScreenTimeLimitRepositoryImpl
+import uz.faceguard.app.data.repository.ScreenTimeUsageRepositoryImpl
 import uz.faceguard.app.data.repository.SettingsRepositoryImpl
 import uz.faceguard.app.domain.model.AuthResult
 import uz.faceguard.app.domain.model.RestrictionLevel
 import uz.faceguard.app.domain.model.UserAccount
 import uz.faceguard.app.domain.repository.AccountRepository
+import uz.faceguard.app.domain.screentime.ScreenTimeLimitEvaluator
 import uz.faceguard.app.security.PassthroughTemplateCipher
 
 /**
@@ -67,6 +71,11 @@ class ScreenTimeTargetViewModelTest {
     private lateinit var activeChild: ScreenTimeActiveChildRepositoryImpl
     private val accounts = FakeAccountSession()
 
+    /** Phase 4 Step 2 dependencies: the real implementations over the same database. */
+    private lateinit var usageRepository: ScreenTimeUsageRepositoryImpl
+    private lateinit var activeChildLimits: ScreenTimeLimitRepositoryImpl
+    private lateinit var evaluator: ScreenTimeLimitEvaluator
+
     /**
      * Keeps a subscriber on each ViewModel's target flow for the length of a test, exactly
      * as the screen does while it is visible: the flow is shared `WhileSubscribed`, so
@@ -87,6 +96,13 @@ class ScreenTimeTargetViewModelTest {
 
         children = ChildProfileRepositoryImpl(db.childProfileDao(), PassthroughTemplateCipher)
         activeChild = ScreenTimeActiveChildRepositoryImpl(settingsStore)
+        usageRepository = ScreenTimeUsageRepositoryImpl(db.dailyAppUsageDao())
+        activeChildLimits = ScreenTimeLimitRepositoryImpl(db.childScreenTimeLimitDao()) { 1L }
+        evaluator = ScreenTimeLimitEvaluator(
+            usageRepository,
+            activeChildLimits,
+            ChildAppPolicyRepositoryImpl(db.childAppPolicyDao()),
+        )
     }
 
     @After
@@ -130,6 +146,13 @@ class ScreenTimeTargetViewModelTest {
         settingsRepository = SettingsRepositoryImpl(settingsStore),
         requestRepository = ParentRequestRepositoryImpl(db.parentRequestDao(), children),
         screenTimeActiveChildRepository = activeChild,
+        // Phase 4 Step 2: the presentation reads these; they are the real implementations over
+        // the same database, so the summary shows what the app would really show.
+        screenTimeUsageRepository = usageRepository,
+        screenTimeLimitRepository = activeChildLimits,
+        screenTimeLimitEvaluator = evaluator,
+        zone = ZoneOffset.UTC,
+        clock = { 1_790_294_460_000L },
         runtime = app.protectionRuntime,
     ).also { viewModel ->
         // Subscribe as the screen does, so the shared flow is actually running.

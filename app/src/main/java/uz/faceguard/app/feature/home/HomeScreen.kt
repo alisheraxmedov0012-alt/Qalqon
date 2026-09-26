@@ -50,9 +50,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.ZoneId
 import uz.faceguard.app.R
 import uz.faceguard.app.core.debug.DebugFlags
 import uz.faceguard.app.core.monitor.ForegroundAppMonitor
@@ -69,7 +71,11 @@ import uz.faceguard.app.domain.repository.ChildProfileRepository
 import uz.faceguard.app.domain.repository.ParentProfileRepository
 import uz.faceguard.app.domain.repository.ProtectedAppsRepository
 import uz.faceguard.app.domain.repository.SettingsRepository
+import uz.faceguard.app.domain.screentime.AppCategory
 import uz.faceguard.app.domain.screentime.ScreenTimeActiveChildRepository
+import uz.faceguard.app.domain.screentime.ScreenTimeLimitEvaluator
+import uz.faceguard.app.domain.screentime.ScreenTimeLimitRepository
+import uz.faceguard.app.domain.screentime.ScreenTimeUsageRepository
 import uz.faceguard.app.domain.request.ParentRequestRepository
 
 /**
@@ -91,6 +97,11 @@ class HomeViewModel @Inject constructor(
     settingsRepository: SettingsRepository,
     requestRepository: ParentRequestRepository,
     private val screenTimeActiveChildRepository: ScreenTimeActiveChildRepository,
+    screenTimeUsageRepository: ScreenTimeUsageRepository,
+    screenTimeLimitRepository: ScreenTimeLimitRepository,
+    screenTimeLimitEvaluator: ScreenTimeLimitEvaluator,
+    private val zone: ZoneId = ZoneId.systemDefault(),
+    private val clock: () -> Long = System::currentTimeMillis,
     runtime: ProtectionRuntime,
 ) : ViewModel() {
 
@@ -166,6 +177,27 @@ class HomeViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ScreenTimeTargetUiState())
 
+    // ------------------------------------------------- Phase 4 screen-time summary
+
+    private val screenTimeSummaryLoader = ScreenTimeSummaryLoader(
+        usageRepository = screenTimeUsageRepository,
+        limitRepository = screenTimeLimitRepository,
+        evaluator = screenTimeLimitEvaluator,
+        zone = zone,
+        clock = clock,
+    )
+
+    /**
+     * Today's usage and limit state for the selected screen-time child, assembled from the
+     * evaluator so the screen never computes a remaining time or an exceeded flag itself.
+     */
+    val screenTimeSummary: StateFlow<ScreenTimeSummaryUiState> = screenTimeSummaryLoader.observe(
+        accountId = accountRepository.currentAccountId,
+        target = screenTimeTarget,
+        usageAccessGranted = runtime.state.map { it.usageAccessGranted },
+        scope = viewModelScope,
+    )
+
     /**
      * Persists [childId] as this device's screen-time target.
      *
@@ -211,6 +243,7 @@ fun HomeScreen(
     val account by viewModel.account.collectAsStateWithLifecycle()
     val parentProfile by viewModel.parentProfile.collectAsStateWithLifecycle()
     val screenTimeTarget by viewModel.screenTimeTarget.collectAsStateWithLifecycle()
+    val screenTimeSummary by viewModel.screenTimeSummary.collectAsStateWithLifecycle()
 
     var showMore by remember { mutableStateOf(false) }
     var showDeveloperTools by remember { mutableStateOf(false) }
@@ -263,6 +296,7 @@ fun HomeScreen(
                     RecentActivityCard(dashboard, onOpenActivity = onOpenActivity)
                     UsageCard(
                         target = screenTimeTarget,
+                        summary = screenTimeSummary,
                         onSelectChild = viewModel::selectScreenTimeChild,
                         onOpenChildren = onOpenChildren,
                     )
@@ -626,6 +660,7 @@ private fun RecentActivityCard(dashboard: DashboardUiState, onOpenActivity: () -
 @Composable
 private fun UsageCard(
     target: ScreenTimeTargetUiState,
+    summary: ScreenTimeSummaryUiState,
     onSelectChild: (Long) -> Unit,
     onOpenChildren: () -> Unit,
 ) {
@@ -633,6 +668,15 @@ private fun UsageCard(
         title = stringResource(R.string.screentime_target_title),
         subtitle = stringResource(R.string.screentime_target_subtitle),
     ) {
+        // Phase 4 Step 2: today's facts for the selected child, straight from the evaluator.
+        ScreenTimeSummarySection(summary)
+
+        if (target.status != ScreenTimeTargetStatus.READY || target.children.isEmpty()) {
+            // Nothing to choose from; fall through to the selection states below.
+        } else {
+            Spacer(Modifier.height(12.dp))
+        }
+
         when {
             target.status == ScreenTimeTargetStatus.LOADING -> Text(
                 stringResource(R.string.state_loading),
@@ -729,6 +773,151 @@ private fun UsageCard(
         }
     }
 }
+
+/**
+ * Phase 4 Step 2: today's screen time for the selected child.
+ *
+ * Every value shown comes from the evaluator, so the screen never derives a remaining time or
+ * an exceeded flag. Each situation gets its own wording: no usage yet (`0 min`) is deliberately
+ * different from usage that could not be read, and "no limit" is never rendered as `0 min`.
+ *
+ * The total and each category are shown side by side as independent facts — one being reached
+ * does not hide the others — and nothing here blocks or warns: this is information only.
+ */
+@Composable
+private fun ScreenTimeSummarySection(summary: ScreenTimeSummaryUiState) {
+    when (summary.status) {
+        ScreenTimeSummaryStatus.LOADING -> Unit // the card's own loading line covers this
+
+        ScreenTimeSummaryStatus.NO_ACCOUNT -> Unit
+
+        ScreenTimeSummaryStatus.NO_TARGET -> Text(
+            stringResource(R.string.screentime_summary_no_target),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        ScreenTimeSummaryStatus.USAGE_UNAVAILABLE -> Column {
+            Text(
+                stringResource(R.string.screentime_summary_unavailable),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                stringResource(R.string.screentime_summary_unavailable_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        ScreenTimeSummaryStatus.ERROR -> Text(
+            stringResource(summary.errorMessageRes ?: R.string.screentime_summary_error),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+        )
+
+        ScreenTimeSummaryStatus.READY -> {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    stringResource(R.string.screentime_summary_today),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                summary.total?.let { total ->
+                    ScreenTimeRow(label = stringResource(R.string.screentime_limits_total_label), row = total)
+                }
+
+                val interesting = summary.usedCategories
+                if (interesting.isNotEmpty()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        stringResource(R.string.screentime_limits_category_header),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    interesting.forEach { row ->
+                        ScreenTimeRow(label = categoryLabel(row), row = row)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** One scope's line: used, limit, remaining and whether it has been reached. */
+@Composable
+private fun ScreenTimeRow(label: String, row: ScreenTimeInfoRow) {
+    Column(modifier = Modifier.padding(vertical = 2.dp)) {
+        Text(label, style = MaterialTheme.typography.bodyLarge)
+        Text(
+            text = stringResource(R.string.screentime_summary_used, durationLabel(row.usedMs)),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = when {
+                // A stored limit that is not a valid configuration is stated as such, rather
+                // than being shown as a limit the product would honour.
+                row.invalidLimit -> stringResource(R.string.screentime_summary_limit_invalid)
+                !row.hasLimit -> stringResource(R.string.screentime_summary_unlimited)
+                else -> stringResource(R.string.screentime_summary_limit, durationLabelMinutes(row.limitMinutes!!))
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        // The status is text, not colour alone, so the state is readable without colour.
+        val (statusRes, statusColor) = when {
+            row.invalidLimit -> R.string.screentime_summary_limit_invalid to MaterialTheme.colorScheme.error
+            !row.hasLimit -> R.string.screentime_summary_status_unlimited to MaterialTheme.colorScheme.onSurfaceVariant
+            row.exceeded -> R.string.screentime_summary_status_reached to MaterialTheme.colorScheme.error
+            else -> R.string.screentime_summary_status_remaining to MaterialTheme.colorScheme.primary
+        }
+        Text(
+            text = if (statusRes == R.string.screentime_summary_status_reached) {
+                stringResource(statusRes)
+            } else if (statusRes == R.string.screentime_summary_limit_invalid) {
+                stringResource(statusRes)
+            } else {
+                stringResource(statusRes, durationLabel(row.remainingMs ?: 0L))
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = statusColor,
+        )
+    }
+}
+
+/** Localized name for a summary row. */
+@Composable
+private fun categoryLabel(row: ScreenTimeInfoRow): String = when (val label = row.label) {
+    ScreenTimeInfoLabel.Total -> stringResource(R.string.screentime_limits_total_label)
+    is ScreenTimeInfoLabel.Category -> categoryLabel(label.category)
+    is ScreenTimeInfoLabel.App -> label.packageName
+}
+
+/** Human-readable duration from exact milliseconds, e.g. `1 h 30 min`. */
+@Composable
+private fun durationLabel(ms: Long): String {
+    val parts = ScreenTimeDurationFormat.partsOf(ms)
+    return when {
+        parts.hours > 0L && parts.minutes > 0L ->
+            stringResource(R.string.screentime_duration_hours_minutes, parts.hours, parts.minutes)
+        parts.hours > 0L -> stringResource(R.string.screentime_duration_hours, parts.hours)
+        else -> stringResource(R.string.screentime_duration_minutes, parts.minutes)
+    }
+}
+
+/** Same formatting for a limit, which is stored in whole minutes. */
+@Composable
+private fun durationLabelMinutes(minutes: Int): String =
+    durationLabel(minutes.toLong() * ScreenTimeDurationFormat.MS_PER_MINUTE)
+
+@Composable
+private fun categoryLabel(category: AppCategory): String = stringResource(
+    when (category) {
+        AppCategory.VIDEO -> R.string.app_category_video
+        AppCategory.GAMES -> R.string.app_category_games
+        AppCategory.EDUCATION -> R.string.app_category_education
+        AppCategory.SOCIAL -> R.string.app_category_social
+        AppCategory.OTHER -> R.string.app_category_other
+    },
+)
 
 /** Seven-step readiness checklist with a simple progress indicator. */
 @Composable

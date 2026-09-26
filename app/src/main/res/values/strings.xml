@@ -435,5 +435,20 @@
     <string name="app_category_education">Ta\'lim</string>
     <string name="app_category_social">Ijtimoiy tarmoqlar</string>
     <string name="app_category_other">Boshqa</string>
+    <string name="screentime_summary_today">Bugungi ekran vaqti</string>
+    <string name="screentime_summary_used">Ishlatildi: %1$s</string>
+    <string name="screentime_summary_limit">Kunlik chegara: %1$s</string>
+    <string name="screentime_summary_unlimited">Kunlik chegara: qo\'yilmagan</string>
+    <string name="screentime_summary_limit_invalid">Kunlik chegara: noto\'g\'ri sozlangan</string>
+    <string name="screentime_summary_status_remaining">Qoldi: %1$s</string>
+    <string name="screentime_summary_status_reached">Chegaraga yetdi</string>
+    <string name="screentime_summary_status_unlimited">Chegara yo\'q</string>
+    <string name="screentime_summary_no_target">Ekran vaqti uchun bola tanlanmagan</string>
+    <string name="screentime_summary_unavailable">Foydalanish ma\'lumoti mavjud emas</string>
+    <string name="screentime_summary_unavailable_hint">Ekran vaqtini hisoblash uchun foydalanish ruxsatini yoqing</string>
+    <string name="screentime_summary_error">Ma\'lumotni yuklab bo\'lmadi</string>
+    <string name="screentime_duration_minutes">%1$d daqiqa</string>
+    <string name="screentime_duration_hours">%1$d soat</string>
+    <string name="screentime_duration_hours_minutes">%1$d soat %2$d daqiqa</string>
 
 </resources>

@@ -94,8 +94,12 @@ class DefaultPolicyEvaluator : PolicyEvaluator {
 
                 AppPolicyMode.LIMIT -> {
                     val limit = policy.dailyLimitMinutes
+                    // Phase 4 Step 4: the comparison is unchanged (`used >= limit`, equality is
+                    // reached), but it only runs on a real measurement. A null measurement means
+                    // usage is unknown — never zero — so no screen-time restriction is derived
+                    // from it. The app's own BLOCK/ALLOW policy is unaffected either way.
                     val used = context.appTimeUsedMinutes
-                    val exceeded = limit != null && used >= limit
+                    val exceeded = limit != null && used != null && used >= limit
                     if (!exceeded) return PolicyDecision.Allow
                     return protect(
                         action = policy.action,

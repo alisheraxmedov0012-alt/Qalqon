@@ -177,6 +177,17 @@ class ProtectionEngine(
     /** Resolves the persisted per-child app policy; set by the runtime. */
     var appPolicyLookup: (childId: Long, packageName: String) -> AppPolicy? = { _, _ -> null }
 
+    /**
+     * Resolves the recognised child's measured usage today for a package, in whole minutes;
+     * set by the runtime. `null` means "no measurement available".
+     *
+     * Phase 4 Step 4: exactly like [appPolicyLookup], this is a plain in-memory lookup the
+     * runtime keeps fresh from the existing usage repository, so the engine performs no I/O on
+     * the evaluation path. The default returns "no measurement", so an engine that has not been
+     * wired for screen-time enforcement behaves exactly as it did before.
+     */
+    var appTimeUsedMinutesLookup: (childId: Long, packageName: String) -> Int? = { _, _ -> null }
+
     fun updateContext(parent: ParentProfile?, children: List<ChildProfile>, protected: Set<String>) {
         this.parent = parent
         this.children = children
@@ -330,6 +341,13 @@ class ProtectionEngine(
         liveness: LivenessResult,
     ): PolicyContext {
         val identity = identityContextOf(result)
+        // The usage lookup is keyed by the SAME child the app policy is resolved for — the
+        // recognised child — so enforcement can never read a different child's usage. A null
+        // measurement (Usage Access unavailable, or a child with no attributed usage) stays
+        // null and suppresses only the screen-time restriction, never the app's own policy.
+        val appTimeUsedMinutes = identity.childId?.let { childId ->
+            foreground?.let { appTimeUsedMinutesLookup(childId, it) }
+        }
         return PolicyContext(
             identity = identity,
             settings = policy,
@@ -339,6 +357,7 @@ class ProtectionEngine(
                 foreground?.let { appPolicyLookup(childId, it) }
             },
             isProtectedApp = foreground != null && foreground in protectedPackages,
+            appTimeUsedMinutes = appTimeUsedMinutes,
             currentTimeMillis = now,
         )
     }

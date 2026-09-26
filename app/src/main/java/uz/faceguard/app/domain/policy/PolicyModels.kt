@@ -204,7 +204,20 @@ data class PolicyContext(
     /** True when [foregroundPackage] is in the global protected-apps list. */
     val isProtectedApp: Boolean = false,
     val screenTimeUsedMinutes: Int = 0,
-    val appTimeUsedMinutes: Int = 0,
+    /**
+     * The foreground app's measured usage today, in whole minutes, for the **recognised child
+     * in [identity]** — the same child [appPolicy] belongs to.
+     *
+     * `null` means "no measurement" (typically because Usage Access is not granted, or the
+     * device's usage is attributed to a different child), and no screen-time restriction may be
+     * derived from it. `0` means a genuine measurement of zero, which is a real value: a
+     * `0`-minute limit is therefore reached immediately, exactly as before. The two must never
+     * be conflated, which is why this is nullable rather than defaulting to zero.
+     *
+     * Phase 4 Step 4 supplies this from the existing screen-time usage repository; the policy
+     * engine keeps owning the comparison, as it always has.
+     */
+    val appTimeUsedMinutes: Int? = null,
     val currentTimeMillis: Long = System.currentTimeMillis(),
     val isScheduleActive: Boolean = false,
     val eyeSafetyState: EyeSafetyState = EyeSafetyState.UNKNOWN,

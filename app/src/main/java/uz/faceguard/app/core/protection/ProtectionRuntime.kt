@@ -5,6 +5,7 @@ import android.content.Intent
 import android.media.AudioManager
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -27,6 +28,11 @@ import uz.faceguard.app.core.monitor.ForegroundAppMonitor
 import uz.faceguard.app.core.recognition.Recognizer
 import uz.faceguard.app.core.scan.ScanScheduler
 import uz.faceguard.app.core.screentime.ScreenTimeUsageCollectionRunner
+import uz.faceguard.app.domain.screentime.AppUsageSource
+import uz.faceguard.app.domain.screentime.ScreenTimeUsageRepository
+import uz.faceguard.app.domain.screentime.ScreenTimeLimits
+import uz.faceguard.app.domain.screentime.UsageAccessState
+import uz.faceguard.app.domain.screentime.UsageDateKey
 import uz.faceguard.app.domain.model.ActivityEventType
 import uz.faceguard.app.domain.model.ChildProfile
 import uz.faceguard.app.domain.model.ParentProfile
@@ -151,6 +157,11 @@ class ProtectionRuntime @Inject constructor(
      * here) so it is the single shared instance and its interval stays owned by DI.
      */
     private val screenTimeCollection: ScreenTimeUsageCollectionRunner,
+    /** Phase 4 Step 4: the usage the policy engine enforces app daily limits against. */
+    private val screenTimeUsageRepository: ScreenTimeUsageRepository,
+    private val appUsageSource: AppUsageSource,
+    private val zone: ZoneId,
+    private val clock: () -> Long,
 ) {
 
     private val monitor = ForegroundAppMonitor(context)
@@ -185,6 +196,14 @@ class ProtectionRuntime @Inject constructor(
     private var childPolicies: Map<Long, Map<String, AppPolicy>> = emptyMap()
     private val childPolicyJobs = mutableListOf<Job>()
 
+    /** Phase 4 Step 4: whole minutes of today's usage per child and package; see [refreshChildUsage]. */
+    private var childUsage: Map<Long, Map<String, Int>> = emptyMap()
+    private val childUsageJobs = mutableListOf<Job>()
+
+    /** True only while Usage Access is granted; without it usage is unknown, never zero. */
+    @Volatile
+    private var usageAccessAvailable = false
+
     /** Group 7: collapses duplicate accessibility window transitions. */
     private val accessibilityTracker = AccessibilityForegroundTracker()
 
@@ -198,6 +217,43 @@ class ProtectionRuntime @Inject constructor(
             childPolicyJobs += scope.launch {
                 childAppPolicyRepository.observePolicies(account, child.id).collect { list ->
                     childPolicies = childPolicies + (child.id to list.associateBy { it.packageName })
+                }
+            }
+        }
+    }
+
+    /**
+     * Phase 4 Step 4: today's measured usage per child and package, in whole minutes.
+     *
+     * Kept in memory beside [childPolicies] and for the same reason — the engine must be able to
+     * resolve it without doing I/O while it decides. Refreshed from the existing usage repository
+     * whenever the account or the child list changes, which is also what makes the map
+     * account-scoped: nothing survives an account switch.
+     *
+     * While Usage Access is not granted there is **no** measurement, so the map stays empty and
+     * the lookup reports "unknown" rather than zero. Availability is re-probed on each refresh,
+     * including the screen's existing permission refresh, so granting access starts enforcement
+     * without any new timer.
+     */
+    private fun refreshChildUsage() {
+        childUsageJobs.forEach { it.cancel() }
+        childUsageJobs.clear()
+        childUsage = emptyMap()
+        usageAccessAvailable = runCatching {
+            appUsageSource.usageAccess() == UsageAccessState.AVAILABLE
+        }.getOrDefault(false)
+        if (!usageAccessAvailable) return
+
+        val account = accountId ?: return
+        val dateKey = UsageDateKey.of(clock(), zone)
+        children.forEach { child ->
+            childUsageJobs += scope.launch {
+                screenTimeUsageRepository.observeDayUsage(account, child.id, dateKey).collect { rows ->
+                    // Truncating to whole minutes is exact for the limit comparison the policy
+                    // engine performs: floor(usedMs / 60000) >= limit ⟺ usedMs >= limit * 60000.
+                    childUsage = childUsage + (
+                        child.id to rows.associate { it.packageName to (it.usedMs / ScreenTimeLimits.MS_PER_MINUTE).toInt() }
+                        )
                 }
             }
         }
@@ -230,6 +286,12 @@ class ProtectionRuntime @Inject constructor(
             }
         }
         engine.appPolicyLookup = { childId, packageName -> childPolicies[childId]?.get(packageName) }
+        // Phase 4 Step 4: the same recognised child and package the app policy was resolved for.
+        // A null result means "no measurement", which suppresses only the screen-time
+        // restriction — the app's own ALLOW/BLOCK policy is decided independently.
+        engine.appTimeUsedMinutesLookup = { childId, packageName ->
+            if (!usageAccessAvailable) null else childUsage[childId]?.get(packageName)
+        }
 
         scope.launch {
             accountRepository.currentAccountId.collect { id ->
@@ -249,6 +311,7 @@ class ProtectionRuntime @Inject constructor(
                 }
                 accountId = id
                 refreshChildPolicies()
+                refreshChildUsage()
                 syncActive()
             }
         }
@@ -280,7 +343,13 @@ class ProtectionRuntime @Inject constructor(
         scope.launch {
             accountRepository.currentAccountId
                 .flatMapLatest { id -> if (id == null) flowOf<List<ChildProfile>>(emptyList()) else childProfileRepository.observeChildren(id) }
-                .collect { list -> children = list; refreshChildPolicies(); syncContext(); syncActive() }
+                .collect { list ->
+                    children = list
+                    refreshChildPolicies()
+                    refreshChildUsage()
+                    syncContext()
+                    syncActive()
+                }
         }
 
         scope.launch { engine.state.collect { value -> _state.update { it.copy(protectionState = value) } } }
@@ -392,6 +461,10 @@ class ProtectionRuntime @Inject constructor(
 
     /** Re-reads permission state after returning from system settings. */
     fun refreshPermissions() {
+        // Phase 4 Step 4: re-probe usage capability and the day, so granting Usage Access (or
+        // crossing midnight and returning to the screen) starts/stops enforcement without any
+        // new timer. Collectors are only re-created, never started anywhere else.
+        refreshChildUsage()
         _state.update {
             it.copy(
                 overlayGranted = overlay.hasPermission(),

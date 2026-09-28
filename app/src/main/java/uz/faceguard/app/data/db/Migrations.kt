@@ -257,3 +257,37 @@ val MIGRATION_8_9 = object : Migration(8, 9) {
         )
     }
 }
+
+/**
+ * v9 -> v10: adds child-scoped eye-safety configuration.
+ *
+ * Purely additive: no existing table is altered, renamed or dropped, so accounts, profiles,
+ * protected apps, policies, activity events, parent requests, notification records, screen-time
+ * usage, limits, snapshot checkpoints, schedules and schedule targets all survive the upgrade. The
+ * statement mirrors Room's generated schema for [ChildEyeSafetyEntity] (column order follows the
+ * constructor).
+ *
+ * Thresholds are stored as integer percentages, and a missing row means the child is
+ * unconfigured — nothing is seeded here, so the upgrade cannot invent a setting for any child.
+ * `(accountId, childId)` is the primary key, which is also the lookup index, so no separate index
+ * is created; there are no foreign keys, matching the rest of this database.
+ */
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `child_eye_safety` (" +
+                "`accountId` INTEGER NOT NULL, " +
+                "`childId` INTEGER NOT NULL, " +
+                "`enabled` INTEGER NOT NULL, " +
+                "`warningEnterThresholdPercent` INTEGER NOT NULL, " +
+                "`warningExitThresholdPercent` INTEGER NOT NULL, " +
+                "`dangerEnterThresholdPercent` INTEGER NOT NULL, " +
+                "`dangerExitThresholdPercent` INTEGER NOT NULL, " +
+                "`confirmFrames` INTEGER NOT NULL, " +
+                "`warningAction` TEXT NOT NULL, " +
+                "`dangerAction` TEXT NOT NULL, " +
+                "`updatedAt` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`accountId`, `childId`))",
+        )
+    }
+}

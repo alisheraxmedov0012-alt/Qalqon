@@ -18,8 +18,9 @@ import androidx.room.RoomDatabase
         UsageSnapshotCheckpointEntity::class,
         ScheduleRuleEntity::class,
         ScheduleAppTargetEntity::class,
+        ChildEyeSafetyEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = false,
 )
 abstract class FaceGuardDatabase : RoomDatabase() {
@@ -35,4 +36,5 @@ abstract class FaceGuardDatabase : RoomDatabase() {
     abstract fun childScreenTimeLimitDao(): ChildScreenTimeLimitDao
     abstract fun usageSnapshotCheckpointDao(): UsageSnapshotCheckpointDao
     abstract fun scheduleDao(): ScheduleDao
+    abstract fun childEyeSafetyDao(): ChildEyeSafetyDao
 }

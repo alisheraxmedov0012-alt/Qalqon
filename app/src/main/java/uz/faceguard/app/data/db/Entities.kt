@@ -314,3 +314,53 @@ data class ScheduleAppTargetEntity(
     val scheduleId: Long,
     val packageName: String,
 )
+
+/**
+ * Phase 6 Step 3: a child's eye-safety **configuration**.
+ *
+ * Configuration only. This table deliberately holds no runtime state: no measured ratio, no
+ * window, no confirmed [uz.faceguard.app.domain.policy.EyeSafetyState], no frame or camera data
+ * and no per-observation timestamps. Those are transient and belong to the evaluating engine, not
+ * to storage; only the parent's choices are durable.
+ *
+ * The identity is `(accountId, childId)` as the composite primary key, so one child's settings can
+ * never be read as another's and the pair is directly queryable. A **missing row means the child
+ * has no eye-safety configuration**, which the repository reports as absence; nothing seeds a row,
+ * so "unconfigured" is never silently turned into a persisted default. No extra index is needed —
+ * the primary-key index already serves the lookup.
+ *
+ * Thresholds are stored as **integer percentages** (`30` means 30%) rather than floats: the value a
+ * parent configures is a whole percent, and an integer cannot drift the way a float ratio can. The
+ * mapper converts to and from the domain's normalized ratio, and the domain constructor
+ * re-validates on load, so a corrupt row fails loudly instead of being quietly corrected.
+ *
+ * `warningAction` and `dangerAction` are `ProtectionAction.name`, matching the project's existing
+ * enum persistence and covering the whole enum. `enabled` and the thresholds are the parent's
+ * values, carried through unchanged. Added in DB v10 without touching any existing table, so all
+ * v1-v9 user data survives (see [MIGRATION_9_10]). Column order matches the constructor because
+ * Room builds `CREATE TABLE` from it.
+ */
+@Entity(
+    tableName = "child_eye_safety",
+    primaryKeys = ["accountId", "childId"],
+)
+data class ChildEyeSafetyEntity(
+    val accountId: Long,
+    val childId: Long,
+    val enabled: Boolean,
+    /** Percentage of the frame width, 1..99. */
+    val warningEnterThresholdPercent: Int,
+    /** Percentage of the frame width, 0..99. */
+    val warningExitThresholdPercent: Int,
+    /** Percentage of the frame width, 1..99. */
+    val dangerEnterThresholdPercent: Int,
+    /** Percentage of the frame width, 0..99. */
+    val dangerExitThresholdPercent: Int,
+    /** Consecutive observed frames that must agree before the state changes. */
+    val confirmFrames: Int,
+    /** ProtectionAction.name */
+    val warningAction: String,
+    /** ProtectionAction.name */
+    val dangerAction: String,
+    val updatedAt: Long,
+)

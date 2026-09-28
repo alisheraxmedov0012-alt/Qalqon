@@ -44,6 +44,8 @@ class PolicyStringsLocalizationTest {
         // Group 5 activity log labels
         "activity_no_face",
         "activity_protection_released",
+        // Phase 5 Step 6: the effective schedule state changed.
+        "activity_schedule_changed",
         // Group 6 foreground service notification
         "protection_service_channel_name",
         "protection_service_channel_description",

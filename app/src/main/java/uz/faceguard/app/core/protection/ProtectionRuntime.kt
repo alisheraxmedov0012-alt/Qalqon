@@ -5,6 +5,7 @@ import android.content.Intent
 import android.media.AudioManager
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.time.Instant
 import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -15,8 +16,10 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uz.faceguard.app.core.accessibility.AccessibilityCapability
@@ -49,8 +52,14 @@ import uz.faceguard.app.domain.request.RequestCreationResult
 import uz.faceguard.app.domain.request.RequestDeduplication
 import uz.faceguard.app.domain.request.RequestLimits
 import uz.faceguard.app.domain.request.RequestType
+import uz.faceguard.app.domain.eyesafety.ChildEyeSafetyConfig
+import uz.faceguard.app.domain.eyesafety.EyeSafetyRepository
 import uz.faceguard.app.domain.policy.PolicySettings
 import uz.faceguard.app.domain.policy.PolicySettingsRepository
+import uz.faceguard.app.domain.schedule.ScheduleRepository
+import uz.faceguard.app.domain.schedule.ScheduleResolution
+import uz.faceguard.app.domain.schedule.ScheduleRule
+import uz.faceguard.app.domain.schedule.resolveScheduleForPackage
 import uz.faceguard.app.domain.repository.AccountRepository
 import uz.faceguard.app.domain.repository.ActivityLogRepository
 import uz.faceguard.app.domain.repository.ChildProfileRepository
@@ -86,6 +95,14 @@ data class ProtectionRuntimeState(
      * restoration target). Null when no cycle is active.
      */
     val blockedApp: String? = null,
+    /**
+     * Phase 5 Step 6: the schedule that is *effective* for the current runtime context — the
+     * recognised child plus the protected app in the foreground. It reuses the schedule domain's
+     * own [ScheduleResolution], so there is exactly one representation of "which schedule applies"
+     * and it can never disagree with the policy layer. Defaults to
+     * [ScheduleResolution.NoActiveSchedule], so a runtime that has not observed one reports "none".
+     */
+    val scheduleResolution: ScheduleResolution = ScheduleResolution.NoActiveSchedule,
     val scanMode: ScanMode = ScanMode.BALANCED,
     val scanning: Boolean = false,
     val cooldownRemainingMs: Long = 0L,
@@ -160,6 +177,14 @@ class ProtectionRuntime @Inject constructor(
     /** Phase 4 Step 4: the usage the policy engine enforces app daily limits against. */
     private val screenTimeUsageRepository: ScreenTimeUsageRepository,
     private val appUsageSource: AppUsageSource,
+    /** Phase 5 Step 4: the per-child schedules the policy engine enforces. */
+    private val scheduleRepository: ScheduleRepository,
+    /**
+     * Phase 6 Step 4: the per-child eye-safety configuration the engine observes. Read only
+     * outside the evaluation path (see [refreshChildEyeSafety]); the engine consults the cached
+     * value, never this repository.
+     */
+    private val eyeSafetyRepository: EyeSafetyRepository,
     private val zone: ZoneId,
     private val clock: () -> Long,
 ) {
@@ -199,6 +224,26 @@ class ProtectionRuntime @Inject constructor(
     /** Phase 4 Step 4: whole minutes of today's usage per child and package; see [refreshChildUsage]. */
     private var childUsage: Map<Long, Map<String, Int>> = emptyMap()
     private val childUsageJobs = mutableListOf<Job>()
+
+    /**
+     * Phase 5 Step 4: the schedules of each child, and — per child — the package names each of
+     * those schedules targets. Kept in memory beside [childPolicies] and [childUsage] and for the
+     * same reason: the engine must be able to resolve a schedule when it decides, without doing
+     * I/O. Refreshed whenever the account or the child list changes, which is also what keeps it
+     * account-scoped — nothing survives an account switch.
+     */
+    private var childSchedules: Map<Long, List<ScheduleRule>> = emptyMap()
+    private var childScheduleTargets: Map<Long, Map<Long, Set<String>>> = emptyMap()
+    private val childScheduleJobs = mutableListOf<Job>()
+
+    /**
+     * Phase 6 Step 4: the eye-safety configuration of each child, observed from the repository
+     * outside the evaluation path and handed to the engine as an in-memory lookup. Kept beside
+     * [childPolicies]/[childSchedules] and for the same reason, and cleared on every refresh, so
+     * one account's or child's configuration can never be observed for another.
+     */
+    private var childEyeSafety: Map<Long, ChildEyeSafetyConfig> = emptyMap()
+    private val childEyeSafetyJobs = mutableListOf<Job>()
 
     /** True only while Usage Access is granted; without it usage is unknown, never zero. */
     @Volatile
@@ -259,6 +304,87 @@ class ProtectionRuntime @Inject constructor(
         }
     }
 
+    /**
+     * Phase 5 Step 4: keeps the engine's schedule lookup in sync with the existing
+     * [ScheduleRepository].
+     *
+     * One collector per child observes that child's schedules and, for each of them, its
+     * affected-app membership, so a schedule edit or a target edit both reach the next policy
+     * decision without polling and without a new timer. Nothing is read from Room on the
+     * evaluation path: the engine only consults these in-memory maps, exactly as it does for app
+     * policies.
+     *
+     * Cleared on every refresh, so a previous account's (or a removed child's) schedules can never
+     * be resolved for the new session.
+     */
+    private fun refreshChildSchedules() {
+        childScheduleJobs.forEach { it.cancel() }
+        childScheduleJobs.clear()
+        childSchedules = emptyMap()
+        childScheduleTargets = emptyMap()
+        val account = accountId ?: return
+
+        children.forEach { child ->
+            childScheduleJobs += scope.launch {
+                scheduleRepository.observeSchedules(account, child.id)
+                    .flatMapLatest { schedules ->
+                        childSchedules = childSchedules + (child.id to schedules)
+                        if (schedules.isEmpty()) {
+                            flowOf(emptyMap())
+                        } else {
+                            // Re-subscribes whenever the child's schedule set changes, so each
+                            // schedule's membership stays observed rather than sampled once.
+                            combine(
+                                schedules.map { schedule ->
+                                    scheduleRepository.observeTargetPackages(account, child.id, schedule.id)
+                                        .map { packages -> schedule.id to packages.toSet() }
+                                },
+                            ) { memberships -> memberships.toMap() }
+                        }
+                    }
+                    .collect { targets ->
+                        childScheduleTargets = childScheduleTargets + (child.id to targets)
+                    }
+            }
+        }
+    }
+
+    /**
+     * Phase 6 Step 4: keeps the engine's eye-safety lookup in sync with the existing
+     * [EyeSafetyRepository].
+     *
+     * One collector per child observes that child's configuration, so a saved change reaches the
+     * next decision without polling and without a new timer. Nothing is read from Room on the
+     * evaluation path: the engine only consults this in-memory map, exactly as it does for app
+     * policies and schedules.
+     *
+     * A child with no configuration simply has no entry — the map holds absence as "no key", which
+     * the lookup reports as `null` (unconfigured), matching the repository's own semantics.
+     *
+     * Cleared on every refresh, so a previous account's (or a removed child's) configuration can
+     * never be observed for the new session. Collectors are cancelled and re-created rather than
+     * accumulated, so the number of live collectors stays bounded by the child count.
+     */
+    private fun refreshChildEyeSafety() {
+        childEyeSafetyJobs.forEach { it.cancel() }
+        childEyeSafetyJobs.clear()
+        childEyeSafety = emptyMap()
+        val account = accountId ?: return
+
+        children.forEach { child ->
+            childEyeSafetyJobs += scope.launch {
+                eyeSafetyRepository.observeConfig(account, child.id).collect { config ->
+                    // Reassign the whole map so the engine's lookup sees one consistent snapshot.
+                    childEyeSafety = if (config == null) {
+                        childEyeSafety - child.id
+                    } else {
+                        childEyeSafety + (child.id to config)
+                    }
+                }
+            }
+        }
+    }
+
     fun start() {
         if (started) return
         started = true
@@ -292,6 +418,24 @@ class ProtectionRuntime @Inject constructor(
         engine.appTimeUsedMinutesLookup = { childId, packageName ->
             if (!usageAccessAvailable) null else childUsage[childId]?.get(packageName)
         }
+        // Phase 5 Step 4: the recognised child's schedules for the app in the foreground, resolved
+        // with the existing resolver and this device's zone. Only schedules whose affected-app
+        // membership contains the package participate, so a schedule can never apply to another
+        // child, another account, or an app it does not target. Resolution happens off the engine,
+        // which only consumes the result.
+        engine.scheduleResolutionLookup = { childId, packageName, now ->
+            resolveScheduleForPackage(
+                schedules = childSchedules[childId].orEmpty(),
+                targets = childScheduleTargets[childId].orEmpty(),
+                packageName = packageName,
+                now = Instant.ofEpochMilli(now),
+                zone = zone,
+            )
+        }
+        // Phase 6 Step 4: the recognised child's eye-safety configuration, from the in-memory map
+        // the repository collectors keep fresh. Only this child's configuration is reachable, and a
+        // missing entry (unconfigured) reads as null — an eye-safety no-op rather than a block.
+        engine.eyeSafetyConfigLookup = { childId -> childEyeSafety[childId] }
 
         scope.launch {
             accountRepository.currentAccountId.collect { id ->
@@ -305,6 +449,12 @@ class ProtectionRuntime @Inject constructor(
                     // Group 9: liveness is account-scoped too.
                     engine.resetLiveness()
                     onLivenessChanged(null)
+                    // Phase 5 Step 6: so is the effective schedule — a previous account's schedule
+                    // must not linger as this session's state or baseline.
+                    engine.resetSchedule()
+                    // Phase 6 Step 4: and the eye-safety session belongs to the previous account's
+                    // child, so it must not survive into this one either.
+                    engine.resetEyeSafety()
                     // Phase 9: a previous account's pending recovery must never
                     // release or alter anything in the new session.
                     engine.cancelRecovery()
@@ -312,6 +462,8 @@ class ProtectionRuntime @Inject constructor(
                 accountId = id
                 refreshChildPolicies()
                 refreshChildUsage()
+                refreshChildSchedules()
+                refreshChildEyeSafety()
                 syncActive()
             }
         }
@@ -347,6 +499,8 @@ class ProtectionRuntime @Inject constructor(
                     children = list
                     refreshChildPolicies()
                     refreshChildUsage()
+                    refreshChildSchedules()
+                    refreshChildEyeSafety()
                     syncContext()
                     syncActive()
                 }
@@ -367,6 +521,13 @@ class ProtectionRuntime @Inject constructor(
         scope.launch { engine.liveness.collect { result -> onLivenessChanged(result) } }
         // Phase 9: the app the current protection cycle is holding.
         scope.launch { engine.blockedApp.collect { pkg -> _state.update { it.copy(blockedApp = pkg) } } }
+        // Phase 5 Step 6: the effective schedule, kept in step with the engine that decides it. The
+        // engine already logged any transition through its event hook; this only mirrors the state.
+        scope.launch {
+            engine.effectiveSchedule.collect { resolution ->
+                _state.update { it.copy(scheduleResolution = resolution) }
+            }
+        }
         scope.launch { monitor.current.collect { value -> _state.update { it.copy(foregroundApp = value) } } }
         // Phase 12: surface the at-rest security state (no secrets, no technical detail).
         scope.launch {
@@ -432,6 +593,8 @@ class ProtectionRuntime @Inject constructor(
         onIdentityChanged(null)
         // Group 9: and no liveness state.
         onLivenessChanged(null)
+        // Phase 5 Step 6: nor an effective schedule.
+        _state.update { it.copy(scheduleResolution = ScheduleResolution.NoActiveSchedule) }
     }
 
     /**

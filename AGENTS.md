@@ -25,8 +25,25 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   UiState everywhere; RestrictionLevel LOW/MEDIUM/HIGH with Uzbek labels.
 
 ## Env notes
-- No JDK/Android SDK/Gradle here - source-complete authoring only; build in
-  Android Studio (AGP 8.7.2, Kotlin 2.0.21, SDK 35).
+- The dev container is ephemeral: `/workspace/project` survives, but the JDK and
+  Android SDK on the image do NOT. After a reset, reinstall them before building:
+  - `sudo apt-get install -y openjdk-21-jdk-headless unzip`
+  - `curl -sSL -o /tmp/cmdtools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip`
+    then unpack into `$HOME/Android/Sdk/cmdline-tools/latest`
+  - `sdkmanager --licenses`, then install `platform-tools platforms;android-35 build-tools;35.0.0`
+  - write gitignored `local.properties` with `sdk.dir=$HOME/Android/Sdk`
+- Build env for every command: `HOME=/home/openhands`, `ANDROID_HOME=$HOME/Android/Sdk`,
+  `JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64`, `PATH=$JAVA_HOME/bin:$PATH`.
+  AGP 8.7.2 / Kotlin 2.0.21 / SDK 35. JDK 21 works even though CI pins 17.
+- `gradlew` has no execute bit at baseline: run `bash ./gradlew <task>` instead of
+  `chmod +x` (which would leave a spurious mode change in `git status`).
+- `:app:assembleDebug` is wired to also run `testDebugUnitTest` and
+  `assembleDebugAndroidTest`, so it verifies the JVM suite and compiles the
+  instrumented tests in one go.
+- Gradle runs exceed the 10s terminal soft-timeout: run in background with
+  `nohup ... > /tmp/log 2>&1 &` and poll the log.
+- No `/dev/kvm` and no CPU virtualization here, so an emulator cannot run:
+  instrumented tests compile but cannot be executed. Never claim otherwise.
 - terminal tool: ONE heredoc per command call; big heredocs silently fail.
   Validate XML via python ET after each strings write.
 
@@ -163,3 +180,132 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   block transition, PROTECTION_RELEASED once per recovery cycle, no timer-tick events.
   Tests: `ProtectionEngineRecoveryLifecycleTest` + `ProtectionRuntimeRecoveryTest`.
   JVM regression 87/87 unchanged.
+
+- Phase 5 Step 5 (schedule configuration UI): new `feature/schedule/` package.
+  `ScheduleEditorState` is a UI state wrapper only - the persisted shape is still
+  `ScheduleDraft`/`ScheduleDays`/`ScheduleWindow`/`ScheduleRule`. `ScheduleConfigController`
+  holds the whole per-child configuration logic (list, editor, save, delete-with-confirmation,
+  enabled toggle) and is Android-free, so it is JVM-tested against a fake `ScheduleRepository`;
+  the Hilt ViewModels are thin wrappers. `ScheduleLabels.kt` maps days/modes/actions/times to
+  string-resource ids, so no visible text is hardcoded, and only `SCHEDULE_ACTIONS` (derived from
+  IMPLEMENTED_ACTIONS) is offered - DIM/BLUR/BLACK_SCREEN never are. Routes
+  `child_schedules/{childId}` + `child_schedule_editor/{childId}?scheduleId={scheduleId}` are
+  reached from the child-policy screen, so schedules are always per-child. App selection reads only
+  `ProtectedAppsRepository.protectedApps` filtered to `isProtected`, so a schedule can never target
+  an arbitrary app. 71 new strings in all three locales (441 -> 512, parity verified).
+  JVM total 664 -> 720 (+56: ScheduleEditorStateTest, ScheduleConfigControllerTest), 0 failures.
+
+- Phase 5 Step 6 (runtime activation + schedule activity events): schedules now surface in
+  `ProtectionRuntimeState.scheduleResolution` (the domain `ScheduleResolution` itself, no second
+  state type) and every *effective* state change is logged once as a new
+  `ActivityEventType.SCHEDULE_CHANGED`, with child/schedule ids in the existing `detail` field -
+  no new column, no migration. Transition detection lives in
+  `domain/schedule/ScheduleTransition.kt`: `ScheduleStateIdentity` (None / Active(childId,
+  scheduleId) / Conflict(childId, sorted ids)) is the stable id-based identity, `effectiveScheduleState`
+  folds in the child + protected-app gates, and `ScheduleTransitionTracker` reports a change once
+  and then treats it as the new baseline. `ProtectionEngine` owns the tracker (engine lifecycle, not
+  UI), recomputes the effective schedule on the existing 500ms tick, publishes
+  `effectiveSchedule` only when it really changed, and logs through its existing `onEvent` hook -
+  no new timer, loop, service or scheduler. Parent/unknown/no-face carry no child id, so they
+  collapse to None and can never be reported as under a child schedule. SCHEDULE_CHANGED does not
+  produce a notification (`notificationEventFor` else-branch). JVM total 720 -> 766
+  (+46 ScheduleTransitionTest), 0 failures.
+
+- Phase 5 Step 7 (integration tests + closure audit): audited the whole Phase 5 stack and added
+  `Phase5IntegrationTest` (46 tests) - a cross-step harness wiring the production
+  `ScheduleConfigController` + `resolveScheduleForPackage`/`ScheduleResolver` +
+  `DefaultPolicyEvaluator` + `ScheduleTransitionTracker`/`effectiveScheduleState` together, with
+  only the two Room-backed adapters (`ScheduleRepository`, protected-app catalog) substituted.
+  Covers scenarios A-Z (basic activation, non-targeting/unprotected app, parent precedence,
+  priority, conflict, restriction combination incl. MUTE, cross-midnight, day/zone, disabled,
+  child/account isolation, enable/disable, time boundary, persistence round trip, target
+  replacement, all transition kinds, restart) plus permutation/order-independence and a
+  whole-day no-spam sweep. Audit found NO production defects: single resolver/evaluator/executor/
+  DAO/repository/event system, no duplicate timer or scheduler, no Phase-5-introduced
+  WorkManager/AlarmManager/notification/service, no Phase 4 file touched, migration DDL still
+  byte-identical to Room's generated schema, 513 keys in each locale (72 schedule-related).
+  812 JVM tests / 53 classes, 0 failures. Instrumented tests compile (APK produced) but cannot
+  execute - no device and no /dev/kvm in this container.
+
+- Phase 6 Step 1 (eye-safety domain foundation): new `domain/eyesafety/` package - pure, no
+  Android/Room/Compose/coroutines. `EyeSafetyFrame` (timestampMs/facePresent/faceWidthRatio, with
+  `usableRatio` returning null for no-face, NaN/Infinity, <=0 and >1 so invalid input is neither
+  "safe" nor "far"), `EyeSafetyConfig` (4 explicit thresholds + confirmFrames/maxWindowAgeMs/
+  maxWindowFrames/minimumPresenceRatio, `require`-validated with NO silent clamping;
+  `EyeSafetyConfig.DEFAULT` = 0.30/0.27/0.40/0.35), `EyeSafetyWindow` (age + frame eviction,
+  strictly increasing timestamps), `EyeSafetyDetector`/`TemporalEyeSafetyDetector` (returns
+  EyeSafetyState; UNKNOWN/enabled/presence/confirmFrames gates, then hysteresis + persistence over
+  the last confirmFrames usable observations) and `EyeSafetyEvaluator` (observe/result/reset, owns
+  the confirmed state). Reuses the existing `domain.policy.EyeSafetyState`; no new enum.
+  No-face is UNKNOWN, never SAFE and never a distance. JVM total 883 (+71).
+
+- Phase 6 Step 2 (eye-safety policy integration): `PolicySettings` gains
+  `eyeSafetyWarningAction` / `eyeSafetyDangerAction` (both `ProtectionAction`, both default ALLOW =
+  no-op). `DefaultPolicyEvaluator` gains `applyEyeSafety` and the child branch now reads
+  `applySchedule(applyEyeSafety(evaluateChild(...)))` - eye safety inner, schedule outer. It is a
+  restriction layer: `restrictionRank` maximum, so eye safety can only tighten (never unlock);
+  UNKNOWN/SAFE return the decision untouched, and it is gated on `isProtectedApp` exactly like
+  schedules. Parent / unknown / no-face / obstructed and the parent-device bypass never consult it.
+  On an equal rank with a schedule the inner layer's trigger survives (the outer layer only
+  overrides on a strictly greater rank) - same rule as the ordinary decision under a schedule, so
+  no tie-breaker was invented. Phase 5 tests unchanged and green. JVM total 883 -> 927 (+44
+  EyeSafetyPolicyTest). No Room/migration/UI/runtime change (DB stays v9).
+
+- Phase 6 Step 3 (eye-safety persistence, DB v9 -> v10): new table `child_eye_safety` with
+  composite PK `(accountId, childId)` and no extra index (the PK index covers the lookup, as with
+  `schedule_app_targets`). Columns: accountId, childId, enabled, warningEnter/Exit and
+  dangerEnter/Exit threshold **percentages** (Int, `30` = 30%), confirmFrames, warningAction,
+  dangerAction (each `ProtectionAction.name`), updatedAt. Config only - no ratio, window,
+  EyeSafetyState, frame or per-observation data. `MIGRATION_9_10` is a single additive
+  `CREATE TABLE IF NOT EXISTS` whose DDL is byte-identical to Room's generated schema (verified
+  against FaceGuardDatabase_Impl.java); the chain is now v3..v10 and no historical migration was
+  edited. Domain `EyeSafetyRepository` + `ChildEyeSafetyConfig` compose the Step 1 `EyeSafetyConfig`
+  (so its invariants re-run on load) and add only the scope, the two actions and updatedAt; the
+  three temporal params are engine tuning and take domain defaults on load. Mapper converts whole
+  percents <-> ratios and throws on an unknown action or a corrupt/invalid row instead of fixing
+  it. **Absence is the answer**: a missing row means unconfigured, nothing is seeded, and no default
+  row is ever written. Repo is bound in Hilt but has NO consumer yet (no runtime/UI). 7 new test
+  files (1 JVM mapper + DAO/repo/migration instrumented + 6 existing migration tests updated for
+  v10). JVM total 927 -> 944 (+17). DB version 10.
+
+- Phase 6 Step 4 (eye-safety runtime integration): the child's eye-safety state now reaches the
+  existing policy pipeline, with no second engine/evaluator/executor/scheduler/service/camera. New
+  `core/eyesafety/`: `eyeSafetyFrameOf(quality, timestampMs)` (the boundary adapter - takes
+  `FaceQuality`, not `FrameEvent`, so it stays Android-free and JVM-testable; no-face becomes
+  `EyeSafetyFrame.noFace`, never a zero ratio) and `EyeSafetyObservationState` (owns only "which
+  child's evaluator is active and when to reset"; delegates thresholds/hysteresis/confirmFrames to
+  the Step 1 `EyeSafetyEvaluator`). `ProtectionEngine` gained `eyeSafetyConfigLookup` and calls
+  `recordEyeSafety(frame, recognizedChildId, now)` at the point where the frame AND the confirmed
+  identity are both available, passing the state into `PolicyContext.eyeSafetyState`; a
+  `policySettings()` override supplies the child's persisted warning/danger actions through the
+  existing Step 2 settings mechanism. `ProtectionRuntime` injects `EyeSafetyRepository`, caches the
+  per-child config via `refreshChildEyeSafety()` (observeConfig per child, cancelled/re-created on
+  account/child change - no Room on the tick) and installs the lookup; account change and
+  `stop()`/`deactivate()` reset the session. Gate: no recognised child (parent/unknown/no-face/
+  obstructed) or unconfigured/disabled config ⇒ UNKNOWN + a no-op, so one child's DANGER can never
+  leak to another child or to a non-child. JVM total 944 -> 982 (+38 EyeSafetyRuntimeTest).
+  DB/schema/migration/UI/recognition/ScanScheduler/liveness untouched; Step 3 repository consumed
+  unchanged.
+
+- Phase 6 Step 5 (eye-safety configuration UI + localization): new `feature/eyesafety/` package, mirroring the Phase 5 schedule config screen. `EyeSafetyEditorState` is a UI state wrapper only - it holds thresholds/confirmFrames as digit-only **text** (whole percents, so no float reaches the UI) and builds the real `ChildEyeSafetyConfig` via `toModel()`, so the Step 1 `EyeSafetyConfig` invariants stay the single authority (nothing is clamped, swapped or silently repaired). `EyeSafetyConfigController` is Android-free and JVM-tested against a fake `EyeSafetyRepository`: one-shot load (no live collector, so a refresh cannot clobber unsaved edits), a distinct unconfigured state, validation, save, and both failure paths; the Hilt ViewModel is a thin wrapper taking `childId` from the route. `EyeSafetyConfigController.create()` forces `EyeSafetyConfig.DEFAULT.copy(enabled = false)` - the domain default is enabled=true, and an unconfigured child must not open with eye safety apparently on. A missing row stays missing until an explicit save; disabling updates the row in place (never deletes). Entry card added to the per-child policy screen beside the schedules entry, new route `child_eye_safety/{childId}`. 42 new strings x 3 languages (513 -> 555, full key-set equality verified by `EyeSafetyStringsLocalizationTest`, which also checks no duplicates/placeholders/empty/declared-but-unused).   Literal `%` strings carry `formatted="false"`. JVM total 982 -> 1041 (+59).
+
+- Phase 6 Step 6 (integration tests + closure audit): no production change - the audit found no
+  defect. Added `Phase6IntegrationTest` (34 JVM tests), the end-to-end suite the other Phase 6
+  tests could not provide: they drive one layer each (`EyeSafetyPolicyTest` sets `eyeSafetyState`
+  on the context, `EyeSafetyRuntimeTest` feeds the observation state by hand), so nothing walked a
+  **saved** configuration through to the decision. This wires the real `EyeSafetyConfigController`
+  -> `EyeSafetyRepository` -> the runtime's `observeConfig` cache -> `eyeSafetyConfigLookup` ->
+  `eyeSafetyFrameOf(FaceQuality)` -> `EyeSafetyObservationState`/`EyeSafetyEvaluator` ->
+  `PolicyContext.eyeSafetyState` -> `DefaultPolicyEvaluator`, plus `resolveScheduleForPackage` for
+  the schedule composition. Only two substitutions: the Room-backed repository (instrumented-tested
+  in Step 3) and `ProtectionRuntime.refreshChildEyeSafety`'s one-line cache copy, which needs an
+  Android `Context` to instantiate. Covers scenarios A-L end to end (SAFE/WARNING/DANGER + the
+  configured actions and triggers reaching policy, DANGER hysteresis and recovery, no-face never
+  SAFE, parent and unknown after a child, child A->B isolation, protected vs unprotected, and the
+  schedule and screen-time compositions), the configuration->runtime propagation chain (new save,
+  updated threshold, disable, delete, sibling isolation, account switch) and the stale-state audit.
+  Audit verified: 555/555/555 localization parity with identical key sets, migration chain
+  v3..v10 all registered with no destructive fallback, `MIGRATION_9_10` DDL still byte-identical to
+  Room's generated schema, exactly one of every singleton, no parallel Eye Safety
+  engine/scheduler/service, `faces.firstOrNull()` unchanged, no eye-safety notification or liveness
+  work, and no Room/DAO/suspend on the 500ms evaluation path. JVM total 1041 -> 1075 (+34).

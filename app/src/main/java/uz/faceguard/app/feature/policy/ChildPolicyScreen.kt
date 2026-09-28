@@ -500,6 +500,8 @@ class ChildPolicyViewModel @Inject constructor(
 fun ChildPolicyScreen(
     onBack: () -> Unit,
     onOpenChildren: () -> Unit,
+    onOpenSchedules: (Long) -> Unit = {},
+    onOpenEyeSafety: (Long) -> Unit = {},
     viewModel: ChildPolicyViewModel = hiltViewModel(),
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
@@ -554,6 +556,10 @@ fun ChildPolicyScreen(
                     item { NoChildrenCard(onOpenChildren) }
                 } else {
                     item { ChildSelector(ui, viewModel::selectChild) }
+                    ui.selectedChildId?.let { childId ->
+                        item { SchedulesEntryCard(onOpen = { onOpenSchedules(childId) }) }
+                        item { EyeSafetyEntryCard(onOpen = { onOpenEyeSafety(childId) }) }
+                    }
                     item {
                         ScreenTimeLimitsCard(
                             limits = limits,
@@ -653,6 +659,39 @@ private fun ChildSelector(
                     label = { Text(child.childName) },
                 )
             }
+        }
+    }
+}
+
+/**
+ * Phase 5 Step 5: the entry point to the selected child's schedules.
+ *
+ * It sits with the child selection and the screen-time limits it belongs to, so schedules are
+ * reached in the context of one child rather than from a global list.
+ */
+@Composable
+private fun SchedulesEntryCard(onOpen: () -> Unit) {
+    SectionCard(title = stringResource(R.string.schedule_title)) {
+        OutlinedButton(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.schedule_open))
+        }
+    }
+}
+
+/**
+ * Phase 6 Step 5: the entry point to the selected child's eye-safety configuration.
+ *
+ * It sits beside the schedules entry, with the child selection and screen-time limits it belongs
+ * to, so eye safety is configured in the context of one child rather than globally.
+ */
+@Composable
+private fun EyeSafetyEntryCard(onOpen: () -> Unit) {
+    SectionCard(
+        title = stringResource(R.string.eye_safety_title),
+        subtitle = stringResource(R.string.eye_safety_subtitle),
+    ) {
+        OutlinedButton(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.eye_safety_open))
         }
     }
 }

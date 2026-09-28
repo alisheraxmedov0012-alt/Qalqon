@@ -23,6 +23,11 @@ import uz.faceguard.app.feature.privacy.PrivacyScreen
 import uz.faceguard.app.feature.parent.ParentProfileScreen
 import uz.faceguard.app.feature.policy.ChildPolicyScreen
 import uz.faceguard.app.feature.protection.ProtectionScreen
+import uz.faceguard.app.feature.schedule.ScheduleArgs
+import uz.faceguard.app.feature.schedule.ScheduleEditorScreen
+import uz.faceguard.app.feature.schedule.ScheduleListScreen
+import uz.faceguard.app.feature.eyesafety.EyeSafetyArgs
+import uz.faceguard.app.feature.eyesafety.EyeSafetyScreen
 import uz.faceguard.app.feature.requests.RequestsArgs
 import uz.faceguard.app.feature.requests.RequestsScreen
 import uz.faceguard.app.feature.recognition.RecognitionDebugScreen
@@ -48,8 +53,15 @@ object Routes {
     const val PARENT_FACE_ENROLLMENT = "parent_face_enrollment"
     const val CHILD_FACE_ENROLLMENT = "child_face_enrollment/{childId}"
     const val CHILD_POLICY = "child_policy/{childId}"
+    const val CHILD_SCHEDULES = "child_schedules/{childId}"
+    const val CHILD_SCHEDULE_EDITOR = "child_schedule_editor/{childId}?scheduleId={scheduleId}"
+    const val CHILD_EYE_SAFETY = "child_eye_safety/{childId}"
     fun childFaceEnrollment(childId: Long) = "child_face_enrollment/$childId"
     fun childPolicy(childId: Long) = "child_policy/$childId"
+    fun childSchedules(childId: Long) = "child_schedules/$childId"
+    fun childScheduleEditor(childId: Long, scheduleId: Long = -1L) =
+        "child_schedule_editor/$childId?scheduleId=$scheduleId"
+    fun childEyeSafety(childId: Long) = "child_eye_safety/$childId"
     fun requests(requestId: Long = -1L) =
         if (requestId <= 0L) REQUESTS else "$REQUESTS?${RequestsArgs.REQUEST_ID}=$requestId"
 }
@@ -168,6 +180,45 @@ fun FaceGuardNavHost(
             ChildPolicyScreen(
                 onBack = { navController.popBackStack() },
                 onOpenChildren = { navController.navigate(Routes.CHILD_PROFILES) },
+                onOpenSchedules = { childId -> navController.navigate(Routes.childSchedules(childId)) },
+                onOpenEyeSafety = { childId -> navController.navigate(Routes.childEyeSafety(childId)) },
+            )
+        }
+        composable(
+            route = Routes.CHILD_EYE_SAFETY,
+            arguments = listOf(navArgument(EyeSafetyArgs.CHILD_ID) { type = NavType.LongType }),
+        ) {
+            EyeSafetyScreen(
+                onBack = { navController.popBackStack() },
+                onSaved = { navController.popBackStack() },
+            )
+        }
+        composable(
+            route = Routes.CHILD_SCHEDULES,
+            arguments = listOf(navArgument(ScheduleArgs.CHILD_ID) { type = NavType.LongType }),
+        ) { entry ->
+            val childId = entry.arguments?.getLong(ScheduleArgs.CHILD_ID) ?: -1L
+            ScheduleListScreen(
+                onBack = { navController.popBackStack() },
+                onAddSchedule = { navController.navigate(Routes.childScheduleEditor(childId)) },
+                onEditSchedule = { scheduleId ->
+                    navController.navigate(Routes.childScheduleEditor(childId, scheduleId))
+                },
+            )
+        }
+        composable(
+            route = Routes.CHILD_SCHEDULE_EDITOR,
+            arguments = listOf(
+                navArgument(ScheduleArgs.CHILD_ID) { type = NavType.LongType },
+                navArgument(ScheduleArgs.SCHEDULE_ID) {
+                    type = NavType.LongType
+                    defaultValue = ScheduleArgs.NEW_SCHEDULE_ID
+                },
+            ),
+        ) {
+            ScheduleEditorScreen(
+                onBack = { navController.popBackStack() },
+                onSaved = { navController.popBackStack() },
             )
         }
         composable(

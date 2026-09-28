@@ -150,6 +150,7 @@ fun eventLabelRes(type: ActivityEventType): Int = when (type) {
     ActivityEventType.PROTECTION_RELEASED -> R.string.activity_protection_released
     ActivityEventType.PARENT_UNLOCKED -> R.string.activity_parent_unlocked
     ActivityEventType.EMERGENCY_UNLOCK -> R.string.activity_emergency_unlock
+    ActivityEventType.SCHEDULE_CHANGED -> R.string.activity_schedule_changed
 }
 
 // ---------------------------------------------------------------------------

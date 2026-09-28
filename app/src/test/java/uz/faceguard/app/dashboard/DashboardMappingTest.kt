@@ -82,6 +82,8 @@ class DashboardMappingTest {
             ActivityEventType.PROTECTION_RELEASED to R.string.activity_protection_released,
             ActivityEventType.PARENT_UNLOCKED to R.string.activity_parent_unlocked,
             ActivityEventType.EMERGENCY_UNLOCK to R.string.activity_emergency_unlock,
+            // Phase 5 Step 6: the effective schedule state changed.
+            ActivityEventType.SCHEDULE_CHANGED to R.string.activity_schedule_changed,
         )
         assertEquals(ActivityEventType.entries.size, mapping.size)
         mapping.forEach { (type, res) -> assertEquals(res, eventLabelRes(type)) }

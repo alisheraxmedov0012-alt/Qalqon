@@ -69,6 +69,15 @@ enum class ActivityEventType {
     PROTECTION_RELEASED,
     PARENT_UNLOCKED,
     EMERGENCY_UNLOCK,
+
+    /**
+     * Phase 5 Step 6: the child's *effective* schedule state changed — it became active, became
+     * inactive, switched to another schedule, or entered/left a conflict. One transition, one
+     * event; an unchanged state (which is the case on almost every ~500ms tick) logs nothing.
+     *
+     * The child and the schedule id(s) involved are carried in the existing `detail` field.
+     */
+    SCHEDULE_CHANGED,
 }
 
 data class ActivityEvent(

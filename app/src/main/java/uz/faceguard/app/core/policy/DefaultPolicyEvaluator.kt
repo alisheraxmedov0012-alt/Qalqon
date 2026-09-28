@@ -3,6 +3,7 @@ package uz.faceguard.app.core.policy
 import uz.faceguard.app.domain.policy.AppPolicy
 import uz.faceguard.app.domain.policy.AppPolicyMode
 import uz.faceguard.app.domain.policy.DeviceOwnerMode
+import uz.faceguard.app.domain.policy.EyeSafetyState
 import uz.faceguard.app.domain.policy.LivenessState
 import uz.faceguard.app.domain.policy.PolicyContext
 import uz.faceguard.app.domain.policy.PolicyDecision
@@ -12,6 +13,8 @@ import uz.faceguard.app.domain.policy.PolicyTrigger
 import uz.faceguard.app.domain.policy.ProtectionAction
 import uz.faceguard.app.domain.policy.UserIdentity
 import uz.faceguard.app.domain.policy.isRestrictive
+import uz.faceguard.app.domain.policy.restrictionRank
+import uz.faceguard.app.domain.schedule.ScheduleResolution
 
 /**
  * Default implementation of the Parent Policy Engine.
@@ -45,8 +48,23 @@ class DefaultPolicyEvaluator : PolicyEvaluator {
             // 3. Parent always wins, on both device modes.
             UserIdentity.PARENT -> PolicyDecision.Allow
 
-            // 4. Child -> app-scoped policy, then global protected app.
-            UserIdentity.CHILD -> evaluateChild(context, settings)
+            // 4. Child -> app-scoped policy, then global protected app, then the restriction
+            //    layers: eye safety (Phase 6) and schedules (Phase 5), in that order. Both run only
+            //    for a recognised child, so a recognised parent (branch 3) is never restricted by
+            //    either.
+            //
+            //    The parent-device bypass is resolved *here*, around the whole child evaluation,
+            //    so a parent device configured to skip child enforcement cannot have it
+            //    reintroduced by a schedule or by eye safety.
+            UserIdentity.CHILD -> if (childPolicyBypassed(context, settings)) {
+                PolicyDecision.Allow
+            } else {
+                applySchedule(
+                    applyEyeSafety(evaluateChild(context, settings), context, settings),
+                    context,
+                    settings,
+                )
+            }
 
             // 5. Unknown / 6. obstructed / 7. no face follow configured actions.
             UserIdentity.UNKNOWN -> configured(
@@ -74,13 +92,6 @@ class DefaultPolicyEvaluator : PolicyEvaluator {
 
     private fun evaluateChild(context: PolicyContext, settings: PolicySettings): PolicyDecision {
         val childId = context.identity.childId
-
-        // The parent device may be configured to skip child enforcement.
-        if (context.deviceOwnerMode == DeviceOwnerMode.PARENT_DEVICE &&
-            !settings.parentDeviceChildPolicyEnabled
-        ) {
-            return PolicyDecision.Allow
-        }
 
         val policy = context.appPolicy
         // Guard against a policy leaking across children.
@@ -135,6 +146,155 @@ class DefaultPolicyEvaluator : PolicyEvaluator {
         }
 
         return PolicyDecision.Allow
+    }
+
+    /**
+     * Phase 6 Step 2: the eye-safety restriction layer, applied on top of the ordinary child
+     * decision (and below the schedule layer).
+     *
+     * Eye safety is a *restriction* layer like a schedule: the result is the more restrictive of
+     * the ordinary decision's action and the parent-configured eye-safety action
+     * ([restrictionRank]), so a warning or danger can tighten a decision but can never unlock an app
+     * the child's own policy restricts. Because the combination is a maximum over an ordered rank,
+     * the resulting **action** does not depend on whether eye safety or a schedule was applied
+     * first.
+     *
+     * It participates only when every one of these holds:
+     *  - the recognised user is a child. This runs inside the `CHILD` branch, so a recognised parent
+     *    is never restricted by eye safety (parent precedence is unchanged), and
+     *    unknown/no-face/obstructed keep following their own configured actions. Eye safety is never
+     *    consulted for a parent, so it cannot restrict a parent's own device use;
+     *  - the foreground package is one the existing protected-app gate already covers
+     *    ([PolicyContext.isProtectedApp]). Eye safety never makes an unprotected app protected and
+     *    never restricts outside that gate;
+     *  - the state is [EyeSafetyState.WARNING] or [EyeSafetyState.DANGER]. [EyeSafetyState.UNKNOWN]
+     *    (no measurement — which is also what "no face" reports, never "far away") and
+     *    [EyeSafetyState.SAFE] are explicit no-ops, so an unmeasured or comfortable child keeps
+     *    exactly the decision they had before.
+     *
+     * The [PolicyTrigger] names eye safety only when it is the strictly stronger source, mirroring
+     * [applySchedule]: a state whose action is not more restrictive than the decision it was given
+     * leaves that decision — and its trigger and reason — untouched.
+     */
+    private fun applyEyeSafety(
+        decision: PolicyDecision,
+        context: PolicyContext,
+        settings: PolicySettings,
+    ): PolicyDecision {
+        // Never broaden the protected-app gate: an unprotected app is untouched by eye safety.
+        if (!context.isProtectedApp) return decision
+
+        val (stateAction, stateTrigger, stateReason) = when (context.eyeSafetyState) {
+            EyeSafetyState.UNKNOWN,
+            EyeSafetyState.SAFE,
+            -> return decision
+
+            EyeSafetyState.WARNING -> Triple(
+                settings.eyeSafetyWarningAction,
+                PolicyTrigger.EYE_SAFETY_WARNING,
+                "eye safety warning",
+            )
+
+            EyeSafetyState.DANGER -> Triple(
+                settings.eyeSafetyDangerAction,
+                PolicyTrigger.EYE_SAFETY_DANGER,
+                "eye safety danger",
+            )
+        }
+
+        if (stateAction.restrictionRank <= decision.action().restrictionRank) return decision
+
+        return protect(
+            action = stateAction,
+            trigger = stateTrigger,
+            reason = stateReason,
+            activationOverride = null,
+            recoveryOverride = null,
+            settings = settings,
+        )
+    }
+
+    /**
+     * True when this device is a parent device that is configured to not apply child policy at
+     * all. Resolved before [evaluateChild] and before the restriction layers, so neither the child's
+     * app policies, their schedules nor eye safety can restrict the device when the parent has opted
+     * out.
+     */
+    private fun childPolicyBypassed(context: PolicyContext, settings: PolicySettings): Boolean =
+        context.deviceOwnerMode == DeviceOwnerMode.PARENT_DEVICE &&
+            !settings.parentDeviceChildPolicyEnabled
+
+    /**
+     * Phase 5 Step 4: the schedule restriction layer, applied on top of the ordinary child
+     * decision.
+     *
+     * A schedule may only ever *add* restriction. The result is the more restrictive of the
+     * ordinary decision's action and the schedule's action ([restrictionRank]), so a schedule
+     * `ALLOW` can never unlock an app the ordinary child/app policy restricts — a schedule is a
+     * restriction layer, never a permission grant.
+     *
+     * It participates only when every one of these holds:
+     *  - the recognised user is a child. This runs inside the `CHILD` branch, so a recognised
+     *    parent is never restricted by a schedule (parent precedence is unchanged), and
+     *    unknown/no-face/obstructed keep following their own configured actions;
+     *  - the foreground package is one the existing protected-app gate already covers
+     *    ([PolicyContext.isProtectedApp]). A schedule never makes an unprotected app protected
+     *    and never broadens that gate;
+     *  - the package is one of the schedule's affected apps, which the caller encodes as
+     *    [ScheduleResolution.NoActiveSchedule] for every other package.
+     *
+     * A [ScheduleResolution.ScheduleConflict] is preserved and never silently resolved to one
+     * schedule: all tied schedules are equally authoritative, so enforcement takes the strongest
+     * action among them. That is a maximum over the tied set, so it is independent of id, name,
+     * mode and collection order — no tie-break is introduced.
+     *
+     * A schedule's `mode` is descriptive metadata and is deliberately never consulted here: only
+     * the schedule's explicit `action` restricts anything.
+     */
+    private fun applySchedule(
+        decision: PolicyDecision,
+        context: PolicyContext,
+        settings: PolicySettings,
+    ): PolicyDecision {
+        // Never broaden the protected-app gate: an untargeted or unprotected app is untouched.
+        if (!context.isProtectedApp) return decision
+
+        val scheduleAction = when (val resolution = context.scheduleResolution) {
+            ScheduleResolution.NoActiveSchedule -> return decision
+
+            is ScheduleResolution.ActiveSchedule -> resolution.schedule.action
+
+            is ScheduleResolution.ScheduleConflict ->
+                resolution.schedules.maxByOrNull { it.action.restrictionRank }?.action
+                    ?: return decision
+        }
+
+        val ordinaryAction = decision.action()
+        if (scheduleAction.restrictionRank <= ordinaryAction.restrictionRank) return decision
+
+        return protect(
+            action = scheduleAction,
+            trigger = PolicyTrigger.SCHEDULE_ACTIVE,
+            reason = scheduleReason(context.scheduleResolution),
+            activationOverride = null,
+            recoveryOverride = null,
+            settings = settings,
+        )
+    }
+
+    /** The action a decision currently asks for, for comparison against a schedule's action. */
+    private fun PolicyDecision.action(): ProtectionAction = when (this) {
+        is PolicyDecision.Allow -> ProtectionAction.ALLOW
+        is PolicyDecision.Warn -> ProtectionAction.WARNING
+        is PolicyDecision.Protect -> action
+    }
+
+    /** Human-readable schedule provenance for the decision reason (logs/UI), not a rule input. */
+    private fun scheduleReason(resolution: ScheduleResolution): String = when (resolution) {
+        ScheduleResolution.NoActiveSchedule -> "schedule"
+        is ScheduleResolution.ActiveSchedule -> "schedule: ${resolution.schedule.name}"
+        is ScheduleResolution.ScheduleConflict ->
+            "schedule conflict (${resolution.schedules.joinToString(", ") { it.name }})"
     }
 
     /** Applies an identity-level action (unknown / no-face / obstruction). */

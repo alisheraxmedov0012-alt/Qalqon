@@ -16,6 +16,20 @@ import java.time.ZoneId
  * It answers a *temporal* question only. It does not look at the foreground app, the
  * ProtectionEngine, screen-time usage or the protected-app catalogue, and it returns
  * no decision: enforcement and policy precedence are later steps.
+ *
+ * Resolution follows one fixed precedence contract (Phase 5 Step 3):
+ *
+ *  1. a **disabled** schedule is ignored — it can neither win nor cause a conflict;
+ *  2. an **inactive** schedule (its owning weekday is not selected, or the time is outside
+ *     its `[start, end)` window) is ignored;
+ *  3. among the active schedules, the **highest integer [ScheduleRule.priority] wins**;
+ *  4. if two or more active schedules tie at that highest priority the tie is *surfaced* as
+ *     [ScheduleResolution.ScheduleConflict] and never resolved — no id, name, mode or input
+ *     order may pick a winner, and `(name, id)` orders the conflict for presentation only;
+ *  5. lower priorities are irrelevant once a unique highest priority exists;
+ *  6. a conflict contains only the schedules tied at the highest priority;
+ *  7. with nothing active, [ScheduleResolution.NoActiveSchedule] is returned — never a null
+ *     and never an invented default schedule.
  */
 sealed interface ScheduleResolution {
 

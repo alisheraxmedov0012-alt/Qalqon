@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import uz.faceguard.app.core.eyesafety.EyeSafetyObservationState
+import uz.faceguard.app.core.eyesafety.eyeSafetyFrameOf
 import uz.faceguard.app.core.liveness.LivenessEvaluator
 import uz.faceguard.app.core.liveness.LivenessFrame
 import uz.faceguard.app.core.liveness.LivenessResult
@@ -20,11 +22,16 @@ import uz.faceguard.app.domain.model.ActivityEventType
 import uz.faceguard.app.domain.model.ChildProfile
 import uz.faceguard.app.domain.model.ParentProfile
 import uz.faceguard.app.domain.policy.AppPolicy
+import uz.faceguard.app.domain.policy.EyeSafetyState
 import uz.faceguard.app.domain.policy.PolicyContext
 import uz.faceguard.app.domain.policy.PolicyDecision
 import uz.faceguard.app.domain.policy.PolicyEvaluator
 import uz.faceguard.app.domain.policy.PolicySettings
 import uz.faceguard.app.domain.policy.ProtectionAction
+import uz.faceguard.app.domain.schedule.ScheduleResolution
+import uz.faceguard.app.domain.schedule.ScheduleTransitionTracker
+import uz.faceguard.app.domain.schedule.scheduleEventDetail
+import uz.faceguard.app.domain.eyesafety.ChildEyeSafetyConfig
 
 /** Stable overlay state; transitions gated by debounce + recovery delay. */
 enum class ProtectionState { UNPROTECTED, SOFT_BLOCKED, HARD_BLOCKED, RECOVERING }
@@ -188,6 +195,69 @@ class ProtectionEngine(
      */
     var appTimeUsedMinutesLookup: (childId: Long, packageName: String) -> Int? = { _, _ -> null }
 
+    /**
+     * Phase 5 Step 4: the recognised child's schedule state for the app in the foreground,
+     * resolved for the tick's `now`; set by the runtime.
+     *
+     * Exactly like [appPolicyLookup], this is a plain in-memory lookup kept fresh from the
+     * existing schedule repository, so the engine performs no I/O on the evaluation path and
+     * never touches Room itself. The caller returns the resolution among the schedules of that
+     * child whose affected-app membership includes that package, and
+     * [ScheduleResolution.NoActiveSchedule] for any other package — so a schedule can never apply
+     * to another child, another account, or an app it does not target. The default returns "no
+     * active schedule", so an engine that has not been wired for schedules behaves exactly as it
+     * did before.
+     */
+    var scheduleResolutionLookup: (childId: Long, packageName: String, now: Long) -> ScheduleResolution =
+        { _, _, _ -> ScheduleResolution.NoActiveSchedule }
+
+    /**
+     * Phase 6 Step 4: the recognised child's eye-safety configuration; set by the runtime.
+     *
+     * Exactly like [appPolicyLookup] and [scheduleResolutionLookup], this is a plain in-memory
+     * lookup the runtime keeps fresh from the eye-safety repository, so the engine never performs
+     * I/O on the evaluation path and never touches Room itself. The argument is the recognised
+     * child — the same child the app policy and schedule are resolved for — so one child's
+     * configuration can never be applied to another, and a parent/unknown/no-face observation
+     * (which carries no child id) can never reach a child's configuration at all.
+     *
+     * `null` means "no active configuration for this child": either the child has none, or the
+     * parent disabled it. Either way eye safety is a no-op. The default returns `null`, so an
+     * engine that has not been wired for eye safety behaves exactly as it did before.
+     */
+    var eyeSafetyConfigLookup: (childId: Long) -> ChildEyeSafetyConfig? = { null }
+
+    /**
+     * Phase 6 Step 4: the recognised child's active eye-safety session.
+     *
+     * It lives with the engine because the *observations* do: the engine is the one place where a
+     * face frame and the confirmed identity for that same instant are both available, so feeding
+     * the evaluator here is race-free and needs no second collector on the camera flow.
+     * [EyeSafetyObservationState] owns the "which child is active, and when to reset" rule; the
+     * thresholds, hysteresis and confirmation belong to the Phase 6 Step 1 evaluator it delegates
+     * to, and are never reimplemented here.
+     */
+    private val eyeSafety = EyeSafetyObservationState()
+
+    /**
+     * Phase 5 Step 6: the schedule state that is *effective* for the current runtime context —
+     * the recognised child plus the protected app in the foreground. Published as a state (only
+     * when it actually changes), exactly like [identity] and [liveness], so the runtime can expose
+     * it without the engine leaking per-tick churn.
+     *
+     * It is recomputed on the existing tick, so a schedule starting or ending is noticed by the
+     * next evaluation; there is no schedule timer and no second loop.
+     */
+    private val _effectiveSchedule = MutableStateFlow<ScheduleResolution>(ScheduleResolution.NoActiveSchedule)
+    val effectiveSchedule: StateFlow<ScheduleResolution> = _effectiveSchedule
+
+    /**
+     * Reports the change between consecutive effective schedule states, once per change. It lives
+     * here — with the engine that observes the schedule — rather than in a ViewModel or screen, so
+     * recreating UI cannot produce a transition and only the engine's own lifecycle resets it.
+     */
+    private val scheduleTracker = ScheduleTransitionTracker()
+
     fun updateContext(parent: ParentProfile?, children: List<ChildProfile>, protected: Set<String>) {
         this.parent = parent
         this.children = children
@@ -231,6 +301,10 @@ class ProtectionEngine(
         _identity.value = null
         // Group 9: and no liveness state either.
         resetLiveness()
+        // Phase 5 Step 6: a stopped session holds no effective schedule.
+        resetSchedule()
+        // Phase 6 Step 4: and no child eye-safety session.
+        resetEyeSafety()
     }
 
     private fun tick(now: Long) {
@@ -271,6 +345,9 @@ class ProtectionEngine(
                 clearBlock()
             }
             resetTrackers()
+            // Phase 5 Step 6: with no protected app in the foreground no schedule is effective, so
+            // leaving one is a real deactivation rather than a silently held state.
+            recordSchedule(ScheduleResolution.NoActiveSchedule, childId = null, isProtectedApp = false)
             return
         }
         // Debounce is measured from the last state switch (see transition()),
@@ -291,12 +368,92 @@ class ProtectionEngine(
         // runtime always holds the identity that the decision was based on.
         recordIdentity(result, frameAvailable = frame != null, now = now)
 
+        // Phase 6 Step 4: feed this frame into the recognised child's eye-safety session and take
+        // the state the policy context should carry. Observations are the same frames recognition
+        // already saw — no second camera pass — and the temporal confirmation/hysteresis stay in
+        // the Phase 6 Step 1 evaluator, never here.
+        val eyeSafetyState = recordEyeSafety(frame, childId = result.recognizedChildId(), now = now)
+
+        val context = policyContext(result, foreground, now, livenessResult, eyeSafetyState)
+        // Phase 5 Step 6: the schedule the policy context was just built with is the effective one,
+        // so publish/track exactly that — the engine never recomputes it a second way.
+        recordSchedule(context.scheduleResolution, childId = context.identity.childId, isProtectedApp = protectedNow)
+
         applyDecision(
-            policyEvaluator.evaluate(policyContext(result, foreground, now, livenessResult)),
+            policyEvaluator.evaluate(context),
             result,
             now,
             foreground,
         )
+    }
+
+    /**
+     * The child the recognition result identifies, or `null` when it identifies none (parent,
+     * unknown user, no face, obstructed, unstable). Used verbatim from the domain mapping so the
+     * eye-safety lookup is keyed by exactly the same child the policy decision is about.
+     */
+    private fun RecognitionResult.recognizedChildId(): Long? = when (this) {
+        is RecognitionResult.ChildRecognized -> childId
+        else -> null
+    }
+
+    /**
+     * Phase 5 Step 6: publishes the effective schedule and reports a change exactly once.
+     *
+     * [ScheduleResolution] is a value type, so the state is only re-published when it really
+     * changed; the tracker then decides whether the change is a transition. An unchanged state —
+     * the case on almost every tick — publishes nothing and logs nothing, which is what keeps a
+     * schedule that stays active for hours from filling the activity log.
+     *
+     * The transition is written through the existing [onEvent] hook, the same path
+     * `CHILD_BLOCKED` and `PROTECTION_RELEASED` already use, so the runtime persists it without the
+     * engine knowing anything about the activity log or the database.
+     */
+    private fun recordSchedule(resolution: ScheduleResolution, childId: Long?, isProtectedApp: Boolean) {
+        // The published state is the one that actually applies, so an unprotected app reports
+        // "none" rather than a schedule the policy layer must ignore anyway.
+        val published = if (isProtectedApp) resolution else ScheduleResolution.NoActiveSchedule
+        if (_effectiveSchedule.value != published) _effectiveSchedule.value = published
+
+        val transition = scheduleTracker.onResolution(resolution, childId, isProtectedApp) ?: return
+        safeLog(ActivityEventType.SCHEDULE_CHANGED, scheduleEventDetail(transition.to))
+    }
+
+    /** Clears the effective-schedule state and its baseline (account change / sign-out / stop). */
+    fun resetSchedule() {
+        scheduleTracker.reset()
+        _effectiveSchedule.value = ScheduleResolution.NoActiveSchedule
+    }
+
+    /**
+     * Phase 6 Step 4: feeds the current frame into the recognised child's eye-safety session and
+     * returns the state the policy context should carry.
+     *
+     * The lookup is the runtime's in-memory map (never Room), and it is keyed by the recognised
+     * child — so a parent, an unknown user or a no-face observation (`childId == null`) can never
+     * reach a child's configuration. [EyeSafetyObservationState] applies the rest of the gate
+     * (unconfigured / disabled / different child) and owns the reset rules.
+     */
+    private fun recordEyeSafety(frame: FrameEvent?, childId: Long?, now: Long): EyeSafetyState =
+        eyeSafety.observe(
+            observation = frame?.let { eyeSafetyFrameOf(it.quality, it.timestamp) },
+            childId = childId,
+            child = childId?.let { eyeSafetyConfigLookup(it) },
+            now = now,
+        )
+
+    /**
+     * [settings] with the recognised child's configured eye-safety actions applied.
+     *
+     * Delegates to [EyeSafetyObservationState], which knows whether a child session is active; when
+     * none is, the runtime's own settings are passed through untouched.
+     */
+    private fun effectivePolicySettings(settings: PolicySettings): PolicySettings =
+        eyeSafety.policySettings(settings)
+
+    /** Drops the eye-safety session (no child, disabled, config changed, or session stop). */
+    fun resetEyeSafety() {
+        eyeSafety.reset()
     }
 
     /**
@@ -339,6 +496,7 @@ class ProtectionEngine(
         foreground: String?,
         now: Long,
         liveness: LivenessResult,
+        eyeSafetyState: EyeSafetyState,
     ): PolicyContext {
         val identity = identityContextOf(result)
         // The usage lookup is keyed by the SAME child the app policy is resolved for — the
@@ -350,7 +508,10 @@ class ProtectionEngine(
         }
         return PolicyContext(
             identity = identity,
-            settings = policy,
+            // Phase 6 Step 4: when a child eye-safety session is active, the policy settings the
+            // evaluator sees carry that child's own configured actions; every other field is the
+            // runtime's unchanged value.
+            settings = effectivePolicySettings(policy),
             liveness = liveness.state,
             foregroundPackage = foreground,
             appPolicy = identity.childId?.let { childId ->
@@ -359,6 +520,18 @@ class ProtectionEngine(
             isProtectedApp = foreground != null && foreground in protectedPackages,
             appTimeUsedMinutes = appTimeUsedMinutes,
             currentTimeMillis = now,
+            // Phase 5 Step 4: the same recognised child and foreground package the app policy and
+            // usage were resolved for, so a schedule can never be resolved for a different child
+            // or app. "No active schedule" for a child with no schedules, or for a package no
+            // schedule targets.
+            scheduleResolution = identity.childId?.let { childId ->
+                foreground?.let { scheduleResolutionLookup(childId, it, now) }
+            } ?: ScheduleResolution.NoActiveSchedule,
+            // Phase 6 Step 4: the recognised child's eye-safety state. UNKNOWN whenever there is no
+            // active child session (no child, unconfigured, disabled), which the evaluator treats
+            // as a no-op — so eye safety never restricts a parent, an unknown user or a child
+            // without a configuration.
+            eyeSafetyState = eyeSafetyState,
         )
     }
 

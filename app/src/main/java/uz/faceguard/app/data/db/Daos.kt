@@ -535,3 +535,29 @@ interface ScheduleDao {
     @Query("DELETE FROM schedule_app_targets WHERE accountId = :accountId AND childId = :childId")
     suspend fun deleteTargetsForChild(accountId: Long, childId: Long): Int
 }
+
+/**
+ * Phase 6 Step 3: a child's eye-safety configuration.
+ *
+ * Every statement is scoped by `accountId` + `childId`, which is also the composite primary key,
+ * so one child's settings can never be read, overwritten or deleted as another's. There is no
+ * `deleteAll`/global statement: configuration is per child, and a stray global statement would be
+ * the one way to cross the boundary.
+ */
+@Dao
+interface ChildEyeSafetyDao {
+
+    @Query("SELECT * FROM child_eye_safety WHERE accountId = :accountId AND childId = :childId LIMIT 1")
+    suspend fun config(accountId: Long, childId: Long): ChildEyeSafetyEntity?
+
+    @Query("SELECT * FROM child_eye_safety WHERE accountId = :accountId AND childId = :childId LIMIT 1")
+    fun observeConfig(accountId: Long, childId: Long): Flow<ChildEyeSafetyEntity?>
+
+    /** REPLACE: the composite key identifies one configuration, and a save overwrites it. */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(config: ChildEyeSafetyEntity)
+
+    /** Returns the number of rows deleted (0 when this child had no configuration). */
+    @Query("DELETE FROM child_eye_safety WHERE accountId = :accountId AND childId = :childId")
+    suspend fun delete(accountId: Long, childId: Long): Int
+}

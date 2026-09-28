@@ -1,6 +1,7 @@
 package uz.faceguard.app.domain.policy
 
 import uz.faceguard.app.domain.model.BlockPolicy
+import uz.faceguard.app.domain.schedule.ScheduleResolution
 
 /**
  * Parent Policy Engine — domain model.
@@ -107,6 +108,44 @@ val IMPLEMENTED_ACTIONS: Set<ProtectionAction> = setOf(
 val ProtectionAction.isRestrictive: Boolean
     get() = this != ProtectionAction.ALLOW && this != ProtectionAction.WARNING
 
+/**
+ * Phase 5 Step 4: how restrictive an action is, used to combine a schedule restriction with the
+ * ordinary child/app policy **without ever weakening it**.
+ *
+ * Higher means "restricts more", and combining two actions takes the higher rank. A schedule is a
+ * restriction layer, so this makes it structurally impossible for a schedule to unlock something
+ * the ordinary policy restricts — a schedule `ALLOW` simply cannot outrank a block.
+ *
+ * The order follows the approved restriction ordering, extended with the two existing actions
+ * that list omits:
+ *
+ * ```
+ * ALLOW (0) < WARNING (1) < MUTE (2) < SOFT_BLOCK (3) < HARD_BLOCK (4)
+ * ```
+ *
+ * `MUTE` keeps its existing, independent meaning (silence the stream — see the action executor).
+ * It is not redefined here and no combined "MUTE + X" action is invented (the domain has no such
+ * type, and this step does not add one). It simply ranks above a warning, because it actually
+ * enforces something, and below a block, because it does not stop usage at all.
+ *
+ * `DIM`/`BLUR`/`BLACK_SCREEN` have no platform effect in this build (see [IMPLEMENTED_ACTIONS]),
+ * so they contribute no restriction and rank with `ALLOW`: a corrupt stored row carrying one can
+ * therefore never displace an implemented action.
+ */
+val ProtectionAction.restrictionRank: Int
+    get() = when (this) {
+        ProtectionAction.ALLOW -> 0
+        ProtectionAction.WARNING -> 1
+        ProtectionAction.MUTE -> 2
+        ProtectionAction.SOFT_BLOCK -> 3
+        ProtectionAction.HARD_BLOCK -> 4
+        // Domain-only in this build: no platform effect, so no restriction contributed.
+        ProtectionAction.DIM,
+        ProtectionAction.BLUR,
+        ProtectionAction.BLACK_SCREEN,
+        -> 0
+    }
+
 // ---------------------------------------------------------------------------
 // Triggers
 // ---------------------------------------------------------------------------
@@ -182,6 +221,19 @@ data class PolicySettings(
     val recoveryDelayMs: Long = 30_000L,
     /** When true a parent device also applies the child policy. */
     val parentDeviceChildPolicyEnabled: Boolean = false,
+    /**
+     * Phase 6 Step 2: the restriction a parent-configured eye-safety **warning** applies
+     * (`EyeSafetyState.WARNING`), and the one a **danger** applies (`EyeSafetyState.DANGER`).
+     *
+     * Both reuse [ProtectionAction] — there is no eye-safety-specific action type — and both are
+     * combined with the ordinary child decision by taking the *more restrictive* action
+     * ([restrictionRank]), so eye safety can only ever tighten. A value of [ProtectionAction.ALLOW]
+     * therefore means "the eye-safety layer does not restrict", which is also the default: with
+     * nothing configured, eye safety changes no decision at all. Values are not persisted yet; they
+     * arrive with the parent's configuration in a later step.
+     */
+    val eyeSafetyWarningAction: ProtectionAction = ProtectionAction.ALLOW,
+    val eyeSafetyDangerAction: ProtectionAction = ProtectionAction.ALLOW,
 )
 
 // ---------------------------------------------------------------------------
@@ -219,7 +271,35 @@ data class PolicyContext(
      */
     val appTimeUsedMinutes: Int? = null,
     val currentTimeMillis: Long = System.currentTimeMillis(),
-    val isScheduleActive: Boolean = false,
+    /**
+     * Phase 5 Step 4: the schedule state that applies to [foregroundPackage] for the recognised
+     * child, already resolved by the caller from the child's schedules.
+     *
+     * This replaces the previous inert `isScheduleActive: Boolean`, which could not distinguish
+     * "no schedule", "one schedule" and "a conflict" and was never read. It reuses the schedule
+     * domain's own [ScheduleResolution] rather than a duplicate state type, and defaults to
+     * [ScheduleResolution.NoActiveSchedule] so every existing construction of this context keeps
+     * today's behaviour exactly.
+     *
+     * The caller is responsible for the two gates that decide whether a schedule may participate
+     * at all: the resolution must already be restricted to the schedules of _this_ child, and to
+     * those whose affected-app membership contains [foregroundPackage]. Any other package is
+     * reported as [ScheduleResolution.NoActiveSchedule]. A schedule therefore never applies to
+     * another child, another account, or an app it does not target.
+     */
+    val scheduleResolution: ScheduleResolution = ScheduleResolution.NoActiveSchedule,
+    /**
+     * Phase 6 Step 2: how close the child's face is to the screen, as decided by the eye-safety
+     * domain engine (`domain/eyesafety`). Defaults to [EyeSafetyState.UNKNOWN], which the evaluator
+     * treats as "no measurement" and therefore as a no-op, so every existing caller keeps today's
+     * behaviour exactly.
+     *
+     * Only [EyeSafetyState.WARNING] and [EyeSafetyState.DANGER] can ever restrict, and only for a
+     * recognised child in a protected app; [EyeSafetyState.SAFE] is also a no-op. Note that "no
+     * face" is reported as `UNKNOWN` by the domain engine, never as `SAFE` — an absent measurement
+     * must not be read as "the child is far away". The action applied comes from
+     * [PolicySettings.eyeSafetyWarningAction] / [PolicySettings.eyeSafetyDangerAction].
+     */
     val eyeSafetyState: EyeSafetyState = EyeSafetyState.UNKNOWN,
 )
 

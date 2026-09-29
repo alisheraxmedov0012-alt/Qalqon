@@ -260,42 +260,73 @@ class FaceCaptureController(
         if (primary == null) return FaceQuality(faceCount = 0)
         val box = primary.boundingBox
         val widthRatio = if (bitmap.width > 0) box.width().toFloat() / bitmap.width.toFloat() else 0f
+        val centerX = if (bitmap.width > 0) box.exactCenterX() / bitmap.width.toFloat() else FaceQuality.CENTER
+        val centerY = if (bitmap.height > 0) box.exactCenterY() / bitmap.height.toFloat() else FaceQuality.CENTER
+        val (brightness, sharpness) = faceLuminanceAndSharpness(bitmap, box)
         return FaceQuality(
             faceCount = faces.size,
             headEulerAngleX = primary.headEulerAngleX,
             headEulerAngleY = primary.headEulerAngleY,
             headEulerAngleZ = primary.headEulerAngleZ,
             faceWidthRatio = widthRatio,
-            brightness = averageLuminance(bitmap, box),
+            brightness = brightness,
+            faceCenterXRatio = centerX,
+            faceCenterYRatio = centerY,
+            sharpness = sharpness,
+            landmarkVisibility = FaceFeatureExtractor.landmarkVisibility(primary),
         )
     }
 
-    /** Average luminance (0..1) of the face region; sampled for speed. */
-    private fun averageLuminance(bitmap: Bitmap, box: Rect): Float {
+    /**
+     * Mean luminance (0..1) and mean absolute luminance gradient (0..1) of the
+     * face region, both from a single strided pixel read.
+     *
+     * The gradient is a cheap focus proxy: a sharp face has strong neighbour-to-
+     * neighbour luminance changes, a blurred or motion-smeared one is flat. It is
+     * deterministic and needs no image-processing library.
+     */
+    private fun faceLuminanceAndSharpness(bitmap: Bitmap, box: Rect): Pair<Float, Float> {
         val left = box.left.coerceIn(0, bitmap.width - 1)
         val top = box.top.coerceIn(0, bitmap.height - 1)
         val right = box.right.coerceIn(left + 1, bitmap.width)
         val bottom = box.bottom.coerceIn(top + 1, bitmap.height)
         val width = right - left
         val height = bottom - top
-        if (width <= 0 || height <= 0) return 0f
+        if (width <= 0 || height <= 0) return 0f to 0f
 
         val pixels = IntArray(width * height)
         bitmap.getPixels(pixels, 0, width, left, top, width, height)
 
-        var sum = 0.0
-        var samples = 0
-        var i = 0
-        while (i < pixels.size) {
-            val pixel = pixels[i]
+        fun luminance(offset: Int): Float {
+            val pixel = pixels[offset]
             val r = (pixel shr 16) and 0xFF
             val g = (pixel shr 8) and 0xFF
             val b = pixel and 0xFF
-            sum += (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
-            samples++
-            i += LUMINANCE_STRIDE
+            return ((0.299 * r + 0.587 * g + 0.114 * b) / 255.0).toFloat()
         }
-        return if (samples == 0) 0f else (sum / samples).toFloat()
+
+        var sum = 0.0
+        var gradientSum = 0.0
+        var samples = 0
+        var gradientSamples = 0
+        var y = 0
+        while (y < height) {
+            var x = 0
+            while (x < width) {
+                val offset = y * width + x
+                sum += luminance(offset)
+                samples++
+                if (x + SHARPNESS_STRIDE < width) {
+                    gradientSum += kotlin.math.abs(luminance(offset) - luminance(offset + SHARPNESS_STRIDE))
+                    gradientSamples++
+                }
+                x += SHARPNESS_STRIDE
+            }
+            y += SHARPNESS_STRIDE
+        }
+        val brightness = if (samples == 0) 0f else (sum / samples).toFloat()
+        val sharpness = if (gradientSamples == 0) 0f else (gradientSum / gradientSamples).toFloat()
+        return brightness to sharpness.coerceIn(0f, 1f)
     }
 
     private fun mediaImageToBitmap(image: Image): Bitmap? {
@@ -353,6 +384,7 @@ class FaceCaptureController(
     private companion object {
         const val TAG = "FaceCaptureController"
         const val ERROR_THROTTLE_MS = 3_000L
-        const val LUMINANCE_STRIDE = 8
+        /** Pixel step used for both luminance and gradient sampling. */
+        const val SHARPNESS_STRIDE = 8
     }
 }

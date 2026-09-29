@@ -1,11 +1,11 @@
 package uz.faceguard.app.core.recognition
 
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlin.math.sqrt
 import uz.faceguard.app.core.embed.FaceEmbeddingCodec
 import uz.faceguard.app.core.pipeline.FrameEvent
 import uz.faceguard.app.domain.model.ChildProfile
 import uz.faceguard.app.domain.model.ParentProfile
+import uz.faceguard.app.domain.similarity.CosineSimilarity
 
 /**
  * Cosine-similarity acceptance thresholds on L2-normalized embeddings.
@@ -86,18 +86,6 @@ class Recognizer(
         return best
     }
 
-    private fun cosine(a: FloatArray, b: FloatArray): Double {
-        val n = minOf(a.size, b.size)
-        var dot = 0.0
-        var normA = 0.0
-        var normB = 0.0
-        for (i in 0 until n) {
-            dot += a[i] * b[i]
-            normA += a[i] * a[i]
-            normB += b[i] * b[i]
-        }
-        val denom = sqrt(normA) * sqrt(normB)
-        if (denom <= 1e-6) return 0.0
-        return (dot / denom).coerceIn(-1.0, 1.0)
-    }
+    /** Delegates to the single shared implementation; identical maths. */
+    private fun cosine(a: FloatArray, b: FloatArray): Double = CosineSimilarity.of(a, b)
 }

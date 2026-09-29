@@ -605,4 +605,17 @@
     <string name="health_status_warning">Warning</string>
     <string name="health_status_failed">Failed</string>
     <string name="health_status_unknown">Unknown</string>
+
+    <!-- Robust frontal multi-frame enrollment -->
+    <string name="enroll_hint_initial">Face the camera and hold still naturally for a moment.</string>
+    <string name="enroll_hint_multiple_faces">Only one person should be in the camera.</string>
+    <string name="enroll_hint_too_close">Hold your face a little further from the camera.</string>
+    <string name="enroll_hint_off_center">Bring your face to the centre.</string>
+    <string name="enroll_hint_too_bright">Too much light. Move somewhere more comfortable.</string>
+    <string name="enroll_hint_hold_still">Keep the camera still for a moment.</string>
+    <string name="enroll_hint_occluded">Your face is not fully visible. Remove what is covering it.</string>
+    <string name="enroll_hint_quality_retry">Face quality is not good enough. Face the camera and try again.</string>
+    <string name="enroll_hint_unstable">Hold your face straight and steady to the camera.</string>
+    <string name="enroll_hint_preparing">Preparing face data\u2026</string>
+    <string name="enroll_progress">Face frames captured: %1$d / %2$d</string>
 </resources>

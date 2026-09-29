@@ -23,6 +23,29 @@ object FaceFeatureExtractor {
         FaceLandmark.RIGHT_CHEEK,
     )
 
+    /**
+     * The landmarks used as the enrollment occlusion proxy.
+     *
+     * Deliberately the five *core* points (eyes, nose, mouth) rather than the
+     * cheeks: ML Kit's fast detector returns cheeks least reliably, so counting
+     * them would reject unobstructed faces. These five survive glasses and
+     * natural hair, and drop when a hand or a mask covers a large part of the
+     * face.
+     */
+    private val VISIBILITY_LANDMARK_TYPES = intArrayOf(
+        FaceLandmark.LEFT_EYE,
+        FaceLandmark.RIGHT_EYE,
+        FaceLandmark.NOSE_BASE,
+        FaceLandmark.MOUTH_LEFT,
+        FaceLandmark.MOUTH_RIGHT,
+    )
+
+    /** Fraction (0..1) of the core landmarks present on [face]. */
+    fun landmarkVisibility(face: Face): Float {
+        val present = VISIBILITY_LANDMARK_TYPES.count { face.getLandmark(it) != null }
+        return present.toFloat() / VISIBILITY_LANDMARK_TYPES.size
+    }
+
     fun extract(face: Face, imageWidth: Int, imageHeight: Int): FloatArray? {
         val box = face.boundingBox ?: return null
         val boxWidth = box.width()

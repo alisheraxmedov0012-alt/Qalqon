@@ -606,4 +606,17 @@
     <string name="health_status_warning">Ogohlantirish</string>
     <string name="health_status_failed">Xato</string>
     <string name="health_status_unknown">Noma\'lum</string>
+
+    <!-- Robust frontal multi-frame enrollment (Uzbek Latin, default) -->
+    <string name="enroll_hint_initial">Yuzingizni kameraga to\'g\'ri qarating va bir necha lahza tabiiy holatda turing.</string>
+    <string name="enroll_hint_multiple_faces">Kamerada faqat bitta odam bo\'lsin.</string>
+    <string name="enroll_hint_too_close">Yuzingizni kameradan biroz uzoqroq tuting.</string>
+    <string name="enroll_hint_off_center">Yuzingizni markazga olib keling.</string>
+    <string name="enroll_hint_too_bright">Yorug\'lik juda kuchli. Biroz qulayroq joyga o\'ting.</string>
+    <string name="enroll_hint_hold_still">Kamerani bir lahza qimirlatmay turing.</string>
+    <string name="enroll_hint_occluded">Yuzingiz to\'liq ko\'rinmayapti. Yuzni to\'sib turgan narsani olib tashlang.</string>
+    <string name="enroll_hint_quality_retry">Yuz sifati yetarli emas. Kameraga to\'g\'ri qarab, yana urinib ko\'ring.</string>
+    <string name="enroll_hint_unstable">Yuzingizni kameraga to\'g\'ri va barqaror tuting.</string>
+    <string name="enroll_hint_preparing">Yuz ma\'lumotlari tayyorlanmoqda\u2026</string>
+    <string name="enroll_progress">Aniqlangan yuz kadrlari: %1$d / %2$d</string>
 </resources>

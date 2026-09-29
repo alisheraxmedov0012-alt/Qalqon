@@ -605,4 +605,17 @@
     <string name="health_status_warning">Предупреждение</string>
     <string name="health_status_failed">Ошибка</string>
     <string name="health_status_unknown">Неизвестно</string>
+
+    <!-- Robust frontal multi-frame enrollment -->
+    <string name="enroll_hint_initial">Направьте лицо в камеру и побудьте несколько мгновений естественно.</string>
+    <string name="enroll_hint_multiple_faces">В кадре должен быть только один человек.</string>
+    <string name="enroll_hint_too_close">Держите лицо немного дальше от камеры.</string>
+    <string name="enroll_hint_off_center">Сместите лицо к центру.</string>
+    <string name="enroll_hint_too_bright">Слишком яркий свет. Перейдите в более комфортное место.</string>
+    <string name="enroll_hint_hold_still">Задержите камеру неподвижно на мгновение.</string>
+    <string name="enroll_hint_occluded">Лицо видно не полностью. Уберите то, что его закрывает.</string>
+    <string name="enroll_hint_quality_retry">Качество лица недостаточно. Посмотрите в камеру и попробуйте снова.</string>
+    <string name="enroll_hint_unstable">Держите лицо ровно и устойчиво перед камерой.</string>
+    <string name="enroll_hint_preparing">Подготовка данных лица…</string>
+    <string name="enroll_progress">Заснятых кадров: %1$d / %2$d</string>
 </resources>

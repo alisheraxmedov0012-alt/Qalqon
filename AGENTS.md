@@ -336,3 +336,35 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   deliberately absent, drives ProtectionBootRestorer -> audit end to end) and
   `HealthStringsLocalizationTest`. No Room/migration/engine change; WorkManager
   is still intentionally not a dependency (event-driven ScanScheduler).
+
+- Enrollment hardening (robust frontal multi-frame capture): the enrollment
+  quality logic is now a pure, Android-free `domain/enrollment/` package -
+  `EnrollmentFrame` (identity-keyed metrics + embedding), `EnrollmentQualityConfig`
+  (require-validated thresholds), `EnrollmentRejection`/`EnrollmentStage`/
+  `EnrollmentProgress`, `EnrollmentQualityGate` (per-frame, ordered: face count ->
+  size -> position -> frontal pose (yaw/pitch/roll) -> brightness -> sharpness ->
+  occlusion -> embedding validity, with a pose/size/sharpness/light/occlusion
+  best-frame `score`), `FaceEmbeddingValidator` (empty / wrong dimension /
+  non-finite / zero-norm / not-unit-norm) and `FrontalEnrollmentCollector` (rolling
+  window, min stable span, mean-pairwise-cosine consistency, outlier pruning that
+  keeps the good remainder instead of restarting, best-frame selection, and a latch
+  on completion so a repeated stream cannot produce a second template). Front-facing
+  only - the user is never asked to turn left/right/up/down and never taps to
+  capture. `FaceQuality` gained `faceCenterXRatio/faceCenterYRatio/sharpness/
+  landmarkVisibility` (all defaulted, so no existing call site changed) and
+  `FaceCaptureController` now computes them (centre from the box, brightness+mean
+  luminance-gradient in one strided pixel read, landmark visibility = fraction of
+  the 5 core landmarks present). Occlusion is a landmark-count proxy, explicitly
+  NOT anti-spoofing (Phase 8 stays blocked). The shared `CosineSimilarity` moved to
+  `domain/similarity/` (core already depends on domain, so no cycle) and
+  `Recognizer` delegates to it - maths unchanged. `core/enrollment/
+  EnrollmentFrameMapper` is the single sanitising boundary (non-finite metrics
+  become their failing value) and is JVM-tested because it takes primitives, not
+  the Android `FrameEvent`. The ViewModel drives an 8-stage state machine
+  (SEARCHING/POSITIONING/FRONTAL_REQUIRED/QUALITY_CHECK/STABILIZING/VALIDATING/
+  SUCCESS/FAILED) with progress dots; storage is unchanged (single encrypted
+  template via the existing repository, no Room migration). 11 new strings x3
+  locales (586 -> 597, full key-set parity). 66 new JVM tests across 6 classes
+  covering the 30 required scenarios; JVM total 1221 -> 1287, 0 failures, 0
+  skipped (debug + release). Q-1 camera lifecycle, recognition semantics, policy,
+  anti-spoof and every out-of-scope area untouched.

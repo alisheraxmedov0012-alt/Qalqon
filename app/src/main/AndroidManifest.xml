@@ -17,6 +17,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Phase 7.4: restore protection (from the persisted intent) after a reboot. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
@@ -46,6 +48,22 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="parental_control_protection_state" />
         </service>
+
+        <!-- Phase 7.4: after a device reboot, ask the existing restorer to restore
+             protection from the persisted intent. It creates nothing of its own —
+             it only triggers the app's existing startup path. BOOT_COMPLETED is a
+             protected broadcast (system-only), and the restore is idempotent.
+             The launched service claims the `specialUse` type only at boot; the
+             camera type is never claimed from a boot context (Android 15 forbids
+             camera/dataSync/media* FGS starts from BOOT_COMPLETED receivers). -->
+        <receiver
+            android:name=".core.protection.ProtectionBootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Group 7: system interaction layer. The system is the only caller
              (guarded by BIND_ACCESSIBILITY_SERVICE) and only window/app

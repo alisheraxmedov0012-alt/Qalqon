@@ -9,6 +9,7 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
+import androidx.camera.core.UseCase
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
@@ -79,6 +80,32 @@ class FaceCaptureController(
 
     private val analysisExecutor = Executors.newSingleThreadExecutor()
 
+    /**
+     * Q-1 fix: the CameraX use cases *this* controller has bound, so [stop] releases
+     * only what it owns instead of a process-wide `unbindAll()`. The shared
+     * `ProcessCameraProvider` is used by more than one component (the process-scoped
+     * protection session and the transient enrollment/debug screens); a blind
+     * `unbindAll()` on teardown could otherwise destroy a binding this controller
+     * never created. Guarded by [boundUseCasesLock] because it is written on the main
+     * thread (the provider listener) and read from [stop]'s listener.
+     */
+    private val boundUseCasesLock = Any()
+    private var boundUseCases: List<UseCase> = emptyList()
+
+    private fun rememberBound(vararg useCases: UseCase) {
+        synchronized(boundUseCasesLock) { boundUseCases = useCases.toList() }
+    }
+
+    private fun takeBound(): List<UseCase> =
+        synchronized(boundUseCasesLock) {
+            val owned = boundUseCases
+            boundUseCases = emptyList()
+            owned
+        }
+
+    /** True while this controller currently holds a CameraX binding. Diagnostics/tests. */
+    fun isBound(): Boolean = synchronized(boundUseCasesLock) { boundUseCases.isNotEmpty() }
+
     fun start(previewView: PreviewView, callback: Callback) {
         cameraProviderFuture.addListener({
             try {
@@ -90,7 +117,12 @@ class FaceCaptureController(
                 previewView.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
                 previewView.scaleType = PreviewView.ScaleType.FILL_CENTER
 
-                // Release any existing use cases before re-binding.
+                // Q-1: take over the shared process-wide camera. Only one ImageAnalysis
+                // can be bound to the front camera, so whoever held it (the protection
+                // session, or a previous transient screen) is evicted here. The evicted
+                // protection session re-establishes its binding via
+                // CameraBindingCoordinator.onTransientCameraReleased() once this screen
+                // releases the camera — see [stop].
                 provider.unbindAll()
 
                 val owner = lifecycleOwner
@@ -104,6 +136,8 @@ class FaceCaptureController(
                 }
                 val analysis = buildAnalysis(callback)
                 provider.bindToLifecycle(owner, CameraSelector.DEFAULT_FRONT_CAMERA, preview, analysis)
+                // Q-1: record ownership so teardown releases only these use cases.
+                rememberBound(preview, analysis)
             } catch (t: Throwable) {
                 reportError(t)
             }
@@ -118,6 +152,8 @@ class FaceCaptureController(
         cameraProviderFuture.addListener({
             try {
                 val provider = cameraProviderFuture.get()
+                // Q-1: same takeover rule as [start] — the protection session claims the
+                // shared camera; any previous holder is evicted.
                 provider.unbindAll()
                 val owner = lifecycleOwner
                 if (owner == null) {
@@ -126,6 +162,8 @@ class FaceCaptureController(
                 }
                 val analysis = buildAnalysis(null)
                 provider.bindToLifecycle(owner, CameraSelector.DEFAULT_FRONT_CAMERA, analysis)
+                // Q-1: record ownership so teardown releases only this use case.
+                rememberBound(analysis)
             } catch (t: Throwable) {
                 reportError(t)
             }
@@ -278,10 +316,25 @@ class FaceCaptureController(
         }
     }
 
+    /**
+     * Q-1 fix: releases only the use cases *this* controller bound, never a
+     * process-wide `unbindAll()`.
+     *
+     * The shared `ProcessCameraProvider` is also used by the process-scoped protection
+     * session; a blind `unbindAll()` here would destroy a binding this controller never
+     * created (and, on the protection side, drop the analyzer without its owner knowing).
+     * Unbinding by ownership keeps each consumer responsible for exactly its own
+     * binding. A controller that bound nothing releases nothing.
+     */
     fun stop() {
         runCatching {
             cameraProviderFuture.addListener(
-                { cameraProviderFuture.get().unbindAll() },
+                {
+                    val owned = takeBound()
+                    if (owned.isNotEmpty()) {
+                        cameraProviderFuture.get().unbind(*owned.toTypedArray())
+                    }
+                },
                 ContextCompat.getMainExecutor(context),
             )
         }.onFailure { reportError(it) }

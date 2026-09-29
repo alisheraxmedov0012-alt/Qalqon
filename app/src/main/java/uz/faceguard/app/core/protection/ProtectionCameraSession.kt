@@ -43,6 +43,12 @@ object CameraSessionPolicy {
 @Singleton
 class ProtectionCameraSession @Inject constructor(
     private val binding: CameraSessionBinding,
+    /**
+     * Q-1 fix: the process-scoped invalidation/rebind hook shared with the transient
+     * camera consumers (enrollment / debug). Defaulted so the session can be unit
+     * tested without DI; production always injects the singleton.
+     */
+    private val coordinator: CameraBindingCoordinator = CameraBindingCoordinator(),
 ) {
 
     private val _active = MutableStateFlow(false)
@@ -55,15 +61,35 @@ class ProtectionCameraSession @Inject constructor(
         if (_active.value) return false
         binding.start()
         _active.value = true
+        // Q-1: while protection holds the camera, publish the rebind hook so a
+        // transient consumer that evicts it (enrollment/debug calls unbindAll()) can
+        // hand the camera back through the coordinator.
+        coordinator.registerProtectionRebind { refresh() }
         return true
     }
 
     /** Idempotent. Returns true when this call actually closed the session. */
     fun stop(): Boolean {
         if (!_active.value) return false
+        // Protection no longer wants the camera: drop the hook first so a later
+        // transient release can never resurrect the session.
+        coordinator.clearProtectionRebind()
         binding.stop()
         _active.value = false
         return true
+    }
+
+    /**
+     * Q-1 fix: re-establishes the CameraX binding after a transient consumer released
+     * the shared camera and evicted the protection analyzer. A no-op unless the session
+     * is still active, so protection is never resurrected by a screen that merely
+     * closed. The teardown/rebuild goes through the same [CameraSessionBinding], so it
+     * can never create a second analyzer or leak the previous lifecycle owner.
+     */
+    fun refresh() {
+        if (!_active.value) return
+        binding.stop()
+        binding.start()
     }
 
     /**

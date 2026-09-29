@@ -56,6 +56,7 @@ import uz.faceguard.app.core.embed.MeanFaceEmbeddingCollector
 import uz.faceguard.app.core.pipeline.FaceCaptureController
 import uz.faceguard.app.core.pipeline.FaceQuality
 import uz.faceguard.app.core.pipeline.FrameEvent
+import uz.faceguard.app.core.protection.CameraBindingCoordinator
 import uz.faceguard.app.core.recognition.Recognizer
 import uz.faceguard.app.domain.repository.AccountRepository
 import uz.faceguard.app.domain.repository.ChildProfileRepository
@@ -79,6 +80,7 @@ class FaceEnrollmentViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
     val recognizer: Recognizer,
     val embeddingModel: FaceEmbeddingModel,
+    private val cameraCoordinator: CameraBindingCoordinator,
 ) : ViewModel() {
 
     enum class Phase { IDLE, CAPTURING, SAVED, FAILED, CANCELED }
@@ -159,6 +161,7 @@ class FaceEnrollmentViewModel @Inject constructor(
     }
 
     fun stopCamera() {
+        val hadCamera = controller != null
         startedPreview = null
         pendingPreview = null
         try {
@@ -166,6 +169,10 @@ class FaceEnrollmentViewModel @Inject constructor(
         } catch (t: Throwable) {
             reportError(t)
         }
+        // Q-1 fix: this transient screen has taken and now released the shared
+        // camera. If protection is still active it must get its binding back —
+        // only announce when this screen actually held the camera.
+        if (hadCamera) cameraCoordinator.onTransientCameraReleased()
     }
 
     fun onFrame(frame: FrameEvent) {

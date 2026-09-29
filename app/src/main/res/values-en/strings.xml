@@ -135,6 +135,7 @@
     <string name="protection_emergency_title">Emergency unlock</string>
     <string name="protection_emergency_pin_label">PIN</string>
     <string name="protection_emergency_wrong_pin">Wrong PIN</string>
+    <string name="protection_emergency_locked_out">Too many attempts. Try again in %1$s.</string>
     <string name="protection_emergency_unlock">Unlock</string>
 
     <string name="home_protection_debug">Check protection</string>

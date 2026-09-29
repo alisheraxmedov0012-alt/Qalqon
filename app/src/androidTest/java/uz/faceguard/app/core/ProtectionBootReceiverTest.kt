@@ -20,6 +20,7 @@ import uz.faceguard.app.data.prefs.SessionManager
 import uz.faceguard.app.data.prefs.SettingsStore
 import uz.faceguard.app.data.prefs.settingsDataStore
 import uz.faceguard.app.data.repository.SettingsRepositoryImpl
+import uz.faceguard.app.domain.security.PinVerification
 
 /**
  * Phase 7.4: the boot restoration wiring, over the **production** DataStore/session
@@ -125,6 +126,6 @@ class ProtectionBootReceiverTest {
         override suspend fun login(phoneNumber: String, pin: String) = throw UnsupportedOperationException()
         override suspend fun getCurrentAccount() = null
         override suspend fun logout() = Unit
-        override suspend fun verifyPin(pin: String) = false
+        override suspend fun verifyPin(pin: String): PinVerification = PinVerification.InvalidPin
     }
 }

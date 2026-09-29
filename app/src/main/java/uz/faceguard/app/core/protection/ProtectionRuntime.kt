@@ -62,6 +62,7 @@ import uz.faceguard.app.domain.repository.ChildProfileRepository
 import uz.faceguard.app.domain.repository.ParentProfileRepository
 import uz.faceguard.app.domain.repository.ProtectedAppsRepository
 import uz.faceguard.app.domain.repository.SettingsRepository
+import uz.faceguard.app.domain.security.PinVerification
 
 /** Parent-facing snapshot of the protection session. */
 data class ProtectionRuntimeState(
@@ -653,12 +654,19 @@ class ProtectionRuntime @Inject constructor(
         _uiForeground.value = false
     }
 
-    /** PIN-based parent emergency unlock; verified against the stored PIN. */
-    fun emergencyUnlock(pin: String, onResult: (Boolean) -> Unit) {
+    /**
+     * PIN-based parent emergency unlock; verified against the stored PIN.
+     *
+     * Phase 8 (PIN lockout UX): the typed [PinVerification] is reported to the
+     * caller so the UI can distinguish a wrong PIN from a temporary lockout and show
+     * the remaining wait. Protection is only lifted on [PinVerification.Success]; a
+     * lockout or a wrong PIN leaves the protection state untouched.
+     */
+    fun emergencyUnlock(pin: String, onResult: (PinVerification) -> Unit) {
         scope.launch {
-            val ok = accountRepository.verifyPin(pin)
-            if (ok) engine.emergencyUnlock()
-            onResult(ok)
+            val result = accountRepository.verifyPin(pin)
+            if (result is PinVerification.Success) engine.emergencyUnlock()
+            onResult(result)
         }
     }
 

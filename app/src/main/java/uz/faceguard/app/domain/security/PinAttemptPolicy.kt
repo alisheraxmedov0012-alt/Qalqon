@@ -49,4 +49,21 @@ object PinAttemptPolicy {
     /** Remaining failures before the next lockout (never negative). */
     fun remainingAttempts(state: PinAttemptState): Int =
         (MAX_ATTEMPTS - (state.failedCount % MAX_ATTEMPTS)).let { if (it == 0) MAX_ATTEMPTS else it }
+
+    /**
+     * The typed verification outcome for a *wrong* PIN, given the attempt state
+     * **after** the failure has been recorded.
+     *
+     * A wrong PIN that trips the threshold reports [PinVerification.LockedOut] — so
+     * the caller can show the wait on that very attempt instead of a generic "wrong
+     * PIN" and only discovering the lockout on the next tap. Any other wrong PIN is a
+     * plain [PinVerification.InvalidPin]. Pure, so the typed semantics are
+     * unit-testable without storage or Android.
+     */
+    fun outcomeForFailure(stateAfterFailure: PinAttemptState, nowMillis: Long): PinVerification =
+        if (stateAfterFailure.isLocked(nowMillis)) {
+            PinVerification.LockedOut(stateAfterFailure.remainingLockMillis(nowMillis))
+        } else {
+            PinVerification.InvalidPin
+        }
 }

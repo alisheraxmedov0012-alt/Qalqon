@@ -17,6 +17,7 @@ import uz.faceguard.app.domain.model.ScanMode
 import uz.faceguard.app.domain.model.UserAccount
 import uz.faceguard.app.domain.repository.AccountRepository
 import uz.faceguard.app.domain.repository.SettingsRepository
+import uz.faceguard.app.domain.security.PinVerification
 
 /** Stateful settings fake: the "persisted protection intent" the restorer reads. */
 private class FakeSettingsRepository(enabled: Boolean = false, private val fail: Boolean = false) :
@@ -60,7 +61,7 @@ private class FakeAccountRepository(
 
     override suspend fun logout() = Unit
 
-    override suspend fun verifyPin(pin: String): Boolean = false
+    override suspend fun verifyPin(pin: String): PinVerification = PinVerification.InvalidPin
 }
 
 private class RecordingServiceLauncher : ProtectionServiceLauncher {

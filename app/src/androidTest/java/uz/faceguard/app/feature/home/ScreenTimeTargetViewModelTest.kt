@@ -46,6 +46,7 @@ import uz.faceguard.app.domain.model.UserAccount
 import uz.faceguard.app.domain.repository.AccountRepository
 import uz.faceguard.app.domain.screentime.ScreenTimeLimitEvaluator
 import uz.faceguard.app.security.PassthroughTemplateCipher
+import uz.faceguard.app.domain.security.PinVerification
 
 /**
  * Phase 4 Step 1B-8: the screen-time target section's real behaviour.
@@ -133,7 +134,7 @@ class ScreenTimeTargetViewModelTest {
         }
 
         override suspend fun logout() = Unit
-        override suspend fun verifyPin(pin: String): Boolean = false
+        override suspend fun verifyPin(pin: String): PinVerification = PinVerification.InvalidPin
     }
 
     private fun viewModel(): HomeViewModel = HomeViewModel(

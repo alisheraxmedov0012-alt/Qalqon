@@ -10,6 +10,7 @@ import uz.faceguard.app.domain.model.RestrictionLevel
 import uz.faceguard.app.domain.model.ScanMode
 import uz.faceguard.app.domain.model.BlockPolicy
 import uz.faceguard.app.domain.model.UserAccount
+import uz.faceguard.app.domain.security.PinVerification
 
 /**
  * Local-first account repository. raw PINs never leave the ViewModel layer
@@ -27,7 +28,7 @@ interface AccountRepository {
     suspend fun logout()
 
     /** Salted PIN check for the emergency unlock; never exposes the hash. */
-    suspend fun verifyPin(pin: String): Boolean
+    suspend fun verifyPin(pin: String): PinVerification
 }
 
 interface ParentProfileRepository {

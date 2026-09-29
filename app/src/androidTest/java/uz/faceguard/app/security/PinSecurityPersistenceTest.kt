@@ -21,6 +21,7 @@ import uz.faceguard.app.data.prefs.SessionManager
 import uz.faceguard.app.data.repository.AccountRepositoryImpl
 import uz.faceguard.app.domain.model.AuthResult
 import uz.faceguard.app.domain.security.PinAttemptPolicy
+import uz.faceguard.app.domain.security.PinVerification
 
 /**
  * Phase 12: PIN storage and brute-force resistance with real Room + DataStore and
@@ -168,11 +169,37 @@ class PinSecurityPersistenceTest {
     @Test
     fun theEmergencyPinPathAlsoRespectsTheLockout() = runBlocking {
         repository.register("Parent", phone, pin)
-        repeat(PinAttemptPolicy.MAX_ATTEMPTS) { repository.verifyPin("0000") }
 
-        assertFalse("a locked session cannot be unlocked with the correct PIN", repository.verifyPin(pin))
+        // The attempt that trips the threshold reports the lockout immediately, with
+        // the remaining wait, so the UI can show a timer instead of a generic error.
+        var last: PinVerification = PinVerification.Success
+        repeat(PinAttemptPolicy.MAX_ATTEMPTS) { last = repository.verifyPin("0000") }
+        assertTrue("the tipping attempt must report LockedOut", last is PinVerification.LockedOut)
+        assertTrue(
+            "the remaining wait must be positive while locked",
+            (last as PinVerification.LockedOut).remainingMillis > 0L,
+        )
+
+        // A locked session refuses even the correct PIN, still reporting the wait.
+        val locked = repository.verifyPin(pin)
+        assertTrue("a locked session cannot be unlocked with the correct PIN", locked is PinVerification.LockedOut)
+        assertTrue((locked as PinVerification.LockedOut).remainingMillis > 0L)
 
         now += PinAttemptPolicy.MAX_LOCKOUT_MS
-        assertTrue(repository.verifyPin(pin))
+        assertTrue("after the window the correct PIN succeeds", repository.verifyPin(pin) is PinVerification.Success)
+    }
+
+    @Test
+    fun aWrongPinWithoutALockoutReportsInvalidPin() = runBlocking {
+        repository.register("Parent", phone, pin)
+
+        assertTrue(repository.verifyPin("0000") is PinVerification.InvalidPin)
+    }
+
+    @Test
+    fun anAbsentSessionReportsInvalidPin() = runBlocking {
+        // No signed-in account: never a distinct state, so this cannot be used to
+        // probe whether an account exists (no enumeration).
+        assertTrue(repository.verifyPin(pin) is PinVerification.InvalidPin)
     }
 }

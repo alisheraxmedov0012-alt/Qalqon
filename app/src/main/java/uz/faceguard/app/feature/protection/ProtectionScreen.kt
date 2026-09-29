@@ -47,6 +47,9 @@ import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -59,6 +62,8 @@ import uz.faceguard.app.core.security.SecurityState
 import uz.faceguard.app.domain.model.AppSettings
 import uz.faceguard.app.domain.model.ScanMode
 import uz.faceguard.app.domain.repository.SettingsRepository
+import uz.faceguard.app.domain.security.PinVerification
+import uz.faceguard.app.domain.security.formatLockoutRemaining
 
 @HiltViewModel
 class ProtectionViewModel @Inject constructor(
@@ -71,10 +76,38 @@ class ProtectionViewModel @Inject constructor(
     val settings: StateFlow<AppSettings> = settingsRepository.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppSettings())
 
+    /**
+     * Phase 8 (PIN lockout UX): the remaining temporary lockout, ticked once a
+     * second while it lasts so the emergency-unlock UI can show a live countdown
+     * instead of a generic failure.
+     */
+    private val _lockoutRemainingMs = MutableStateFlow(0L)
+    val lockoutRemainingMs: StateFlow<Long> = _lockoutRemainingMs
+
+    private var lockoutJob: Job? = null
+
     fun setProtectionEnabled(enabled: Boolean) =
         viewModelScope.launch { settingsRepository.setProtectionEnabled(enabled) }
 
-    fun emergencyUnlock(pin: String, onResult: (Boolean) -> Unit) = runtime.emergencyUnlock(pin, onResult)
+    fun emergencyUnlock(pin: String, onResult: (PinVerification) -> Unit) =
+        runtime.emergencyUnlock(pin) { result ->
+            if (result is PinVerification.LockedOut) startLockoutCountdown(result.remainingMillis)
+            onResult(result)
+        }
+
+    /** Counts the remaining lockout down to zero; a newer lockout replaces an older tick. */
+    private fun startLockoutCountdown(remainingMillis: Long) {
+        lockoutJob?.cancel()
+        lockoutJob = viewModelScope.launch {
+            var remaining = remainingMillis.coerceAtLeast(0L)
+            while (remaining > 0L) {
+                _lockoutRemainingMs.value = remaining
+                delay(1_000L)
+                remaining -= 1_000L
+            }
+            _lockoutRemainingMs.value = 0L
+        }
+    }
 
     fun refreshPermissions() = runtime.refreshPermissions()
 
@@ -102,6 +135,7 @@ fun ProtectionScreen(
     var showTech by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
     var pinError by remember { mutableStateOf(false) }
+    val lockoutRemainingMs by viewModel.lockoutRemainingMs.collectAsStateWithLifecycle()
 
     // Phase 7.1: the screen no longer owns the camera. The process-scoped camera
     // session (owned by ProtectionForegroundService) is the single owner and keeps
@@ -159,11 +193,20 @@ fun ProtectionScreen(
             EmergencyCard(
                 pinInput = pinInput,
                 pinError = pinError,
+                lockoutRemainingMs = lockoutRemainingMs,
                 onPinChange = { pinInput = it; pinError = false },
                 onUnlock = {
-                    viewModel.emergencyUnlock(pinInput) { ok ->
-                        pinError = !ok
-                        if (ok) pinInput = ""
+                    viewModel.emergencyUnlock(pinInput) { result ->
+                        when (result) {
+                            PinVerification.Success -> {
+                                pinError = false
+                                pinInput = ""
+                            }
+                            // Wrong PIN: show the generic error. The ViewModel owns the
+                            // lockout timer, which is rendered when a lockout is active.
+                            PinVerification.InvalidPin -> pinError = true
+                            is PinVerification.LockedOut -> pinError = false
+                        }
                     }
                 },
             )
@@ -351,9 +394,11 @@ private fun RequirementRow(
 private fun EmergencyCard(
     pinInput: String,
     pinError: Boolean,
+    lockoutRemainingMs: Long,
     onPinChange: (String) -> Unit,
     onUnlock: () -> Unit,
 ) {
+    val lockedOut = lockoutRemainingMs > 0L
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(stringResource(R.string.protection_emergency_title), style = MaterialTheme.typography.titleMedium)
@@ -368,9 +413,20 @@ private fun EmergencyCard(
                 value = pinInput,
                 onValueChange = onPinChange,
                 label = { Text(stringResource(R.string.protection_emergency_pin_label)) },
+                enabled = !lockedOut,
                 modifier = Modifier.fillMaxWidth(),
             )
-            if (pinError) {
+            if (lockedOut) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    stringResource(
+                        R.string.protection_emergency_locked_out,
+                        formatLockoutRemaining(lockoutRemainingMs),
+                    ),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            } else if (pinError) {
                 Spacer(Modifier.height(4.dp))
                 Text(
                     stringResource(R.string.protection_emergency_wrong_pin),
@@ -379,7 +435,11 @@ private fun EmergencyCard(
                 )
             }
             Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = onUnlock, modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                onClick = onUnlock,
+                enabled = !lockedOut,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 Text(stringResource(R.string.protection_emergency_unlock))
             }
         }

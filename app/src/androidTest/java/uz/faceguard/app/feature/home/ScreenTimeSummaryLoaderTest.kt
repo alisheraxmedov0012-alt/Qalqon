@@ -42,6 +42,7 @@ import uz.faceguard.app.domain.screentime.ScreenTimeLimitRepository
 import uz.faceguard.app.domain.screentime.ScreenTimeUsageRepository
 import uz.faceguard.app.domain.screentime.UsageDateKey
 import uz.faceguard.app.security.PassthroughTemplateCipher
+import uz.faceguard.app.domain.security.PinVerification
 
 /**
  * Phase 4 Step 2: the presentation loader over the real v8 database and the real evaluator.
@@ -94,7 +95,7 @@ class ScreenTimeSummaryLoaderTest {
             AuthResult.Failure(AuthResult.Reason.INVALID_CREDENTIALS)
         override suspend fun getCurrentAccount(): uz.faceguard.app.domain.model.UserAccount? = null
         override suspend fun logout() = Unit
-        override suspend fun verifyPin(pin: String): Boolean = false
+        override suspend fun verifyPin(pin: String): PinVerification = PinVerification.InvalidPin
     }
 
     @Before

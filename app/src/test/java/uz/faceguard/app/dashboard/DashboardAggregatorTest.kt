@@ -55,6 +55,7 @@ import uz.faceguard.app.domain.request.RequestResolutionResult
 import uz.faceguard.app.feature.home.DashboardAggregator
 import uz.faceguard.app.feature.home.DashboardStatus
 import uz.faceguard.app.feature.home.DashboardUiState
+import uz.faceguard.app.domain.security.PinVerification
 
 /**
  * Phase 10: the dashboard aggregation layer against hand-written fakes.
@@ -75,7 +76,7 @@ class DashboardAggregatorTest {
         override suspend fun register(fullName: String, phoneNumber: String, pin: String) = error("not used")
         override suspend fun login(phoneNumber: String, pin: String) = error("not used")
         override suspend fun logout() { id.value = null }
-        override suspend fun verifyPin(pin: String) = false
+        override suspend fun verifyPin(pin: String): PinVerification = PinVerification.InvalidPin
     }
 
     private class FakeChildren : ChildProfileRepository {

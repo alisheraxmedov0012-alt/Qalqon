@@ -136,6 +136,7 @@
     <string name="protection_emergency_title">Favqulodda ochish</string>
     <string name="protection_emergency_pin_label">PIN</string>
     <string name="protection_emergency_wrong_pin">Noto\'g\'ri PIN</string>
+    <string name="protection_emergency_locked_out">Juda ko\'p urinish. Qayta urinib ko\'rishdan oldin %1$s kuting.</string>
     <string name="protection_emergency_unlock">Ochish</string>
 
     <string name="home_protection_debug">Himoyani tekshirish</string>

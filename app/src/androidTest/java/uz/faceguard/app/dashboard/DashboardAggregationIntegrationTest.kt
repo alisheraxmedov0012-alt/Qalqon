@@ -45,6 +45,7 @@ import uz.faceguard.app.domain.repository.SettingsRepository
 import uz.faceguard.app.feature.home.DashboardAggregator
 import uz.faceguard.app.feature.home.DashboardStatus
 import uz.faceguard.app.feature.home.DashboardUiState
+import uz.faceguard.app.domain.security.PinVerification
 
 /**
  * Phase 10 integration: the dashboard aggregation over the REAL Room-backed
@@ -73,7 +74,7 @@ class DashboardAggregationIntegrationTest {
         override suspend fun register(fullName: String, phoneNumber: String, pin: String) = error("not used")
         override suspend fun login(phoneNumber: String, pin: String) = error("not used")
         override suspend fun logout() { accountId.value = null }
-        override suspend fun verifyPin(pin: String) = false
+        override suspend fun verifyPin(pin: String): PinVerification = PinVerification.InvalidPin
     }
 
     private val settingsRepository = object : SettingsRepository {

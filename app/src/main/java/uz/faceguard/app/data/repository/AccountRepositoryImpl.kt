@@ -13,6 +13,8 @@ import uz.faceguard.app.data.prefs.SessionManager
 import uz.faceguard.app.domain.model.AuthResult
 import uz.faceguard.app.domain.model.UserAccount
 import uz.faceguard.app.domain.repository.AccountRepository
+import uz.faceguard.app.domain.security.PinAttemptPolicy
+import uz.faceguard.app.domain.security.PinVerification
 
 /**
  * Local account storage.
@@ -101,21 +103,25 @@ class AccountRepositoryImpl @Inject constructor(
         sessionManager.clearSession()
     }
 
-    override suspend fun verifyPin(pin: String): Boolean {
-        val id = sessionManager.currentAccountId.first() ?: return false
-        val entity = accountDao.getById(id) ?: return false
+    override suspend fun verifyPin(pin: String): PinVerification {
+        val id = sessionManager.currentAccountId.first() ?: return PinVerification.InvalidPin
+        val entity = accountDao.getById(id) ?: return PinVerification.InvalidPin
 
         val attempts = pinAttemptStore.stateFor(id)
         val now = clock()
-        if (attempts.isLocked(now)) return false
+        if (attempts.isLocked(now)) {
+            return PinVerification.LockedOut(attempts.remainingLockMillis(now))
+        }
 
         if (!PinHasher.verify(pin, entity.pinHash, entity.pinSalt)) {
-            pinAttemptStore.recordFailure(id, now)
-            return false
+            val next = pinAttemptStore.recordFailure(id, now)
+            // A failure that trips the threshold reports the lockout immediately, so
+            // the UI can show the remaining wait instead of a generic "wrong PIN".
+            return PinAttemptPolicy.outcomeForFailure(next, now)
         }
         pinAttemptStore.clear(id)
         upgradeLegacyHashIfNeeded(entity, pin)
-        return true
+        return PinVerification.Success
     }
 
     /**

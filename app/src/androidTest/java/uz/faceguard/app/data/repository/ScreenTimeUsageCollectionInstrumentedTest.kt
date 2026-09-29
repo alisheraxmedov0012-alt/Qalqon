@@ -43,6 +43,7 @@ import uz.faceguard.app.domain.screentime.UsageSnapshotCheckpointRepository
 import uz.faceguard.app.domain.screentime.UsageRange
 import uz.faceguard.app.domain.screentime.UsageSnapshotDeltaEngine
 import uz.faceguard.app.domain.screentime.UsageSourceId
+import uz.faceguard.app.domain.security.PinVerification
 
 /**
  * Phase 4 Step 1B-7: the production collector over the **real** v8 database, the real
@@ -109,7 +110,7 @@ class ScreenTimeUsageCollectionInstrumentedTest {
             AuthResult.Failure(AuthResult.Reason.INVALID_CREDENTIALS)
         override suspend fun getCurrentAccount(): UserAccount? = null
         override suspend fun logout() = Unit
-        override suspend fun verifyPin(pin: String): Boolean = false
+        override suspend fun verifyPin(pin: String): PinVerification = PinVerification.InvalidPin
     }
 
     @Before

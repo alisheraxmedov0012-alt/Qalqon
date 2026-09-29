@@ -29,6 +29,7 @@ import uz.faceguard.app.domain.screentime.UsageSnapshotCheckpoint
 import uz.faceguard.app.domain.screentime.UsageSnapshotCheckpointRepository
 import uz.faceguard.app.domain.screentime.UsageSnapshotDeltaEngine
 import uz.faceguard.app.domain.screentime.UsageSourceId
+import uz.faceguard.app.domain.security.PinVerification
 
 /**
  * Phase 4 Step 1B-7 test fixtures: deterministic stand-ins for the device and the database.
@@ -201,7 +202,7 @@ internal class FakeAccounts(accountId: Long? = 1L) : AccountRepository {
 
     override suspend fun getCurrentAccount(): UserAccount? = null
     override suspend fun logout() = signOut()
-    override suspend fun verifyPin(pin: String): Boolean = false
+    override suspend fun verifyPin(pin: String): PinVerification = PinVerification.InvalidPin
 }
 
 /** The screen-time target, per account — exactly like the persisted store. */

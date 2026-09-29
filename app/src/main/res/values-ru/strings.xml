@@ -135,6 +135,7 @@
     <string name="protection_emergency_title">Аварийная разблокировка</string>
     <string name="protection_emergency_pin_label">PIN</string>
     <string name="protection_emergency_wrong_pin">Неверный PIN</string>
+    <string name="protection_emergency_locked_out">Слишком много попыток. Повторите через %1$s.</string>
     <string name="protection_emergency_unlock">Разблокировать</string>
 
     <string name="home_protection_debug">Проверка защиты</string>

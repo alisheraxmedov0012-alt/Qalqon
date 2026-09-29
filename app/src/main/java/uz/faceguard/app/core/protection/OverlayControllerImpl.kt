@@ -28,15 +28,30 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import uz.faceguard.app.R
+import uz.faceguard.app.core.accessibility.AccessibilityOverlayRegistry
 
 /**
- * WindowManager-based overlay. Requires SYSTEM_ALERT_WINDOW on API 26+.
- * On modern Android this is a special-permission gate; the Settings card
- * explains how to grant it. Interaction blocking is best-effort via
- * FLAG_NOT_TOUCHABLE on the overlay view.
+ * Protection overlay, routed to whichever window mechanism can actually block.
+ *
+ * Phase 7.2: when QALQON's accessibility service is connected it owns a touchable
+ * `TYPE_ACCESSIBILITY_OVERLAY` window ([AccessibilityOverlayHost]) that *consumes*
+ * the child's touches, so the protected app underneath receives nothing. That is
+ * the real input block. The controller only decides *that* a block is required;
+ * the platform window lives in the accessibility layer.
+ *
+ * Fallback: with the accessibility service disabled, the legacy
+ * `TYPE_APPLICATION_OVERLAY` window (requiring SYSTEM_ALERT_WINDOW) is used
+ * exactly as before — a visible, `FLAG_NOT_TOUCHABLE` scrim. It is an honest
+ * visual fallback, **not** a true input-blocking guarantee; the app reports it as
+ * such.
  */
 class OverlayControllerImpl(
     private val context: Context,
+    /**
+     * Phase 7.2: the connected accessibility overlay host, if any. Its presence is
+     * what upgrades the fallback scrim into real touch blocking.
+     */
+    private val accessibilityOverlays: AccessibilityOverlayRegistry,
     /**
      * Phase 11: the child-facing "request extra time" action. Null disables the
      * button (e.g. when no account is signed in). The callback is supplied by the
@@ -54,6 +69,25 @@ class OverlayControllerImpl(
         android.content.Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
 
     override fun show() {
+        // Phase 7.2: prefer the touchable accessibility overlay — it is the only
+        // mechanism that actually blocks the protected app's input. If a host is
+        // present we never also add the legacy window (that would double-block).
+        val host = accessibilityOverlays.current()
+        if (host != null) {
+            host.showBlockingOverlay()
+            return
+        }
+        showLegacy()
+    }
+
+    override fun hide() {
+        // Hide whichever window is up; both calls are idempotent, and hiding the
+        // accessibility overlay also covers a host that reconnected mid-cycle.
+        accessibilityOverlays.current()?.hideBlockingOverlay()
+        hideLegacy()
+    }
+
+    private fun showLegacy() {
         if (!hasPermission()) return
         if (overlayView != null) return
         val view = ComposeView(context).apply {
@@ -73,7 +107,7 @@ class OverlayControllerImpl(
         overlayView = view
     }
 
-    override fun hide() {
+    private fun hideLegacy() {
         overlayView?.let { windowManager.removeView(it) }
         overlayView = null
     }

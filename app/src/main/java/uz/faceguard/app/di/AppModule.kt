@@ -56,6 +56,8 @@ import uz.faceguard.app.core.usage.UsageStatsAppUsageSource
 import uz.faceguard.app.core.time.SystemElapsedTimeSource
 import uz.faceguard.app.core.policy.DefaultPolicyEvaluator
 import uz.faceguard.app.core.protection.AndroidProtectionServiceLauncher
+import uz.faceguard.app.core.protection.CameraSessionBinding
+import uz.faceguard.app.core.protection.CameraXSessionBinding
 import uz.faceguard.app.core.protection.ProtectionServiceLauncher
 import uz.faceguard.app.core.recognition.Recognizer
 import uz.faceguard.app.data.repository.SettingsRepositoryImpl
@@ -355,4 +357,15 @@ object AppModule {
     @Singleton
     fun provideFaceEmbeddingModel(@ApplicationContext context: Context): FaceEmbeddingModel =
         TfLiteMobileFaceNet(context)
+
+    // Phase 7.1: the process-scoped camera session's binding seam. Production binds
+    // the existing FaceCaptureController pipeline to a process-owned lifecycle, so
+    // the camera no longer depends on any screen's lifecycle.
+    @Provides
+    @Singleton
+    fun provideCameraSessionBinding(
+        @ApplicationContext context: Context,
+        recognizer: Recognizer,
+        embeddingModel: FaceEmbeddingModel,
+    ): CameraSessionBinding = CameraXSessionBinding(context, recognizer, embeddingModel)
 }

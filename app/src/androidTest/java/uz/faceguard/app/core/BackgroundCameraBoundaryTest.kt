@@ -6,7 +6,6 @@ import android.content.pm.ServiceInfo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -15,14 +14,17 @@ import uz.faceguard.app.core.accessibility.ProtectionAccessibilityService
 import uz.faceguard.app.core.protection.ProtectionForegroundService
 
 /**
- * Group 8: the background-camera capability boundary.
+ * Phase 7.1: the background-camera capability boundary.
  *
- * Android restricts background camera use (while-in-use camera permission) and
- * rejects camera-type foreground services started from the background, so QALQON
- * deliberately does **not** claim background camera recognition. These guards
- * fail if someone later adds a camera foreground-service type or the matching
- * permission without the required capability work, which would misrepresent the
- * product's real capability.
+ * QALQON now runs a process-scoped camera session owned by the protection
+ * foreground service, so the service must declare the `camera` foreground type
+ * and the app must hold FOREGROUND_SERVICE_CAMERA. The camera type is claimed at
+ * runtime only in the legal while-in-use foreground moment (see
+ * ProtectionForegroundService), which these structural guards cannot assert; what
+ * they protect is that the declaration never drifts:
+ *  - the service also keeps `specialUse` (it is a parental-control keep-alive with
+ *    a special-use subtype), and
+ *  - the accessibility layer still never touches the camera.
  */
 @RunWith(AndroidJUnit4::class)
 class BackgroundCameraBoundaryTest {
@@ -37,19 +39,19 @@ class BackgroundCameraBoundaryTest {
         .orEmpty()
 
     @Test
-    fun protectionForegroundService_doesNotClaimTheCameraType() {
+    fun protectionForegroundService_claimsCameraAndSpecialUse() {
         val service = services().firstOrNull { it.name == ProtectionForegroundService::class.java.name }
 
         assertNotNull("the protection foreground service must be declared", service)
         assertEquals(
-            "only the specialUse type may be claimed",
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
-            service!!.foregroundServiceType and ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+            "the process-scoped camera session requires the camera type",
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA,
+            service!!.foregroundServiceType and ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA,
         )
         assertEquals(
-            "background camera is not claimed",
-            0,
-            service.foregroundServiceType and ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA,
+            "the service is also a parental-control keep-alive, so specialUse stays",
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+            service.foregroundServiceType and ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
         )
     }
 
@@ -66,7 +68,7 @@ class BackgroundCameraBoundaryTest {
     }
 
     @Test
-    fun cameraIsOnlyUsedWhileInUse_neverAsABackgroundForegroundService() {
+    fun cameraForegroundService_permissionsAreRequested() {
         val requested = packageManager
             .getPackageInfo(appContext.packageName, PackageManager.GET_PERMISSIONS)
             .requestedPermissions
@@ -74,8 +76,8 @@ class BackgroundCameraBoundaryTest {
             .orEmpty()
 
         assertTrue("foreground capture needs the camera permission", "android.permission.CAMERA" in requested)
-        assertFalse(
-            "no camera foreground-service permission may be requested while background camera is not implemented",
+        assertTrue(
+            "a camera foreground service requires FOREGROUND_SERVICE_CAMERA on Android 14+",
             "android.permission.FOREGROUND_SERVICE_CAMERA" in requested,
         )
     }

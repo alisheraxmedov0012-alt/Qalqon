@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uz.faceguard.app.core.accessibility.AccessibilityCapability
 import uz.faceguard.app.core.accessibility.AccessibilityForegroundTracker
+import uz.faceguard.app.core.accessibility.AccessibilityOverlayRegistry
 import uz.faceguard.app.core.liveness.LivenessResult
 import uz.faceguard.app.core.security.SecurityState
 import uz.faceguard.app.core.security.SecurityStateHolder
@@ -146,9 +147,11 @@ data class ProtectionRuntimeState(
  * engine into the existing PolicyContext — the evaluator is still the only
  * decision point, and no camera/ML/liveness algorithm lives in this class.
  *
- * Remaining limitation: with no camera bound — e.g. Qalqon backgrounded — the
- * engine sees "no face" and follows the no-face policy, so identity detection is
- * still camera-bound even though foreground detection is now system-wide.
+ * Phase 7.1: the camera is no longer owned by the Protection screen. The
+ * [ProtectionForegroundService] owns a process-scoped [ProtectionCameraSession]
+ * that starts in the legal while-in-use foreground moment ([onUiForeground]) and
+ * then keeps feeding this same [Recognizer] flow after the UI goes away, so the
+ * engine keeps seeing frames instead of "no face" once the screen closes.
  */
 @Singleton
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -165,6 +168,13 @@ class ProtectionRuntime @Inject constructor(
     private val childAppPolicyRepository: ChildAppPolicyRepository,
     private val policyEvaluator: PolicyEvaluator,
     private val serviceLauncher: ProtectionServiceLauncher,
+    /**
+     * Phase 7.2: the connected accessibility overlay host, if any. Its presence
+     * upgrades the legacy visual scrim into a real, touch-consuming
+     * `TYPE_ACCESSIBILITY_OVERLAY` block. One-way dependency: this registry has no
+     * reference back to the runtime, so no service/runtime cycle is created.
+     */
+    private val accessibilityOverlayRegistry: AccessibilityOverlayRegistry,
     private val requestRepository: ParentRequestRepository,
     private val notificationCoordinator: NotificationCoordinator,
     private val notificationDispatcher: AppNotificationDispatcher,
@@ -190,7 +200,11 @@ class ProtectionRuntime @Inject constructor(
 ) {
 
     private val monitor = ForegroundAppMonitor(context)
-    private val overlay = OverlayControllerImpl(context, onRequestExtraTime = { requestExtraTime() })
+    private val overlay = OverlayControllerImpl(
+        context,
+        accessibilityOverlays = accessibilityOverlayRegistry,
+        onRequestExtraTime = { requestExtraTime() },
+    )
     private val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val scheduler = ScanScheduler(context)
     private val engine = ProtectionEngine(
@@ -611,6 +625,31 @@ class ProtectionRuntime @Inject constructor(
         // Phase 9: an explicit stop always drops any pending recovery.
         engine.cancelRecovery()
         _state.update { it.copy(active = false) }
+    }
+
+    /**
+     * Phase 7.1: whether a Qalqon activity is currently visible. This is the
+     * while-in-use moment in which a camera foreground service may legally be
+     * started; the process-scoped camera session starts only here and then keeps
+     * running after the UI leaves. It is deliberately *not* part of
+     * [ProtectionRuntimeState]'s readiness — it describes the UI, not protection.
+     */
+    private val _uiForeground = MutableStateFlow(false)
+    val uiForeground: StateFlow<Boolean> = _uiForeground
+
+    /**
+     * Phase 7.1: the UI became visible. If the earlier foreground-service start was
+     * rejected (Android 12+ background-start restriction) this is the moment to
+     * retry it, because a start is allowed while the app is visible.
+     */
+    fun onUiForeground() {
+        _uiForeground.value = true
+        if (active) serviceLauncher.start()
+    }
+
+    /** Phase 7.1: the UI is no longer visible. The camera session stays latched. */
+    fun onUiBackground() {
+        _uiForeground.value = false
     }
 
     /** PIN-based parent emergency unlock; verified against the stored PIN. */

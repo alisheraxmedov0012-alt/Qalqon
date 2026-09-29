@@ -20,4 +20,19 @@ object AccessibilityEventFilter {
 
         else -> false
     }
+
+    /**
+     * Phase 7.2: true when [packageName] is QALQON's own package, i.e. an event
+     * produced by one of QALQON's own windows — the protection UI or the blocking
+     * accessibility overlay.
+     *
+     * The blocking overlay is a full-screen window; its own window transitions
+     * reach the same event stream. Adopting them as "the foreground app" would
+     * look like the protected app has left the foreground, which would release the
+     * block and hide the very overlay that produced them (self-interception /
+     * flicker). QALQON's own package is never a protected app, so ignoring it is
+     * always correct.
+     */
+    fun isOwnPackage(packageName: String?, ownPackage: String?): Boolean =
+        !packageName.isNullOrBlank() && !ownPackage.isNullOrBlank() && packageName == ownPackage
 }

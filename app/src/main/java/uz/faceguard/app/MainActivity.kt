@@ -7,12 +7,21 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.mutableStateOf
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import uz.faceguard.app.core.notification.NotificationNavigation
+import uz.faceguard.app.core.protection.ProtectionRuntime
 import uz.faceguard.app.core.theme.FaceGuardTheme
 import uz.faceguard.app.navigation.FaceGuardNavHost
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    /**
+     * Phase 7.1: the runtime needs to know when Qalqon is actually visible. That
+     * is the legal while-in-use moment in which the process-scoped camera session
+     * may be started (and, if an earlier background start was rejected, retried).
+     */
+    @Inject lateinit var protectionRuntime: ProtectionRuntime
 
     /**
      * Phase 11: a notification click asks for exactly one destination. It is kept
@@ -32,6 +41,18 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        protectionRuntime.onUiForeground()
+    }
+
+    override fun onStop() {
+        // The camera session is deliberately not stopped here: it is process-scoped
+        // and keeps running while protection is active (Phase 7.1).
+        protectionRuntime.onUiBackground()
+        super.onStop()
     }
 
     override fun onNewIntent(intent: Intent) {

@@ -52,13 +52,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import uz.faceguard.app.R
-import uz.faceguard.app.core.embed.FaceEmbeddingModel
-import uz.faceguard.app.core.pipeline.FaceCaptureController
 import uz.faceguard.app.core.protection.ProtectionRuntime
 import uz.faceguard.app.core.protection.ProtectionRuntimeState
 import uz.faceguard.app.core.protection.ProtectionState
 import uz.faceguard.app.core.security.SecurityState
-import uz.faceguard.app.core.recognition.Recognizer
 import uz.faceguard.app.domain.model.AppSettings
 import uz.faceguard.app.domain.model.ScanMode
 import uz.faceguard.app.domain.repository.SettingsRepository
@@ -66,8 +63,6 @@ import uz.faceguard.app.domain.repository.SettingsRepository
 @HiltViewModel
 class ProtectionViewModel @Inject constructor(
     private val runtime: ProtectionRuntime,
-    private val recognizer: Recognizer,
-    private val embeddingModel: FaceEmbeddingModel,
     private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
@@ -75,20 +70,6 @@ class ProtectionViewModel @Inject constructor(
 
     val settings: StateFlow<AppSettings> = settingsRepository.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppSettings())
-
-    private var controller: FaceCaptureController? = null
-
-    fun attachCamera(value: FaceCaptureController) {
-        controller = value
-        value.setRecognizer(recognizer)
-        value.setEmbeddingModel(embeddingModel)
-        value.startAnalyzerOnly()
-    }
-
-    fun detachCamera() {
-        controller?.stop()
-        controller = null
-    }
 
     fun setProtectionEnabled(enabled: Boolean) =
         viewModelScope.launch { settingsRepository.setProtectionEnabled(enabled) }
@@ -122,15 +103,10 @@ fun ProtectionScreen(
     var pinInput by remember { mutableStateOf("") }
     var pinError by remember { mutableStateOf(false) }
 
-    // Feed live frames to the shared recognizer while protection is active.
-    DisposableEffect(state.active, cameraPermission.status.isGranted) {
-        if (state.active && cameraPermission.status.isGranted) {
-            val owned = FaceCaptureController(context)
-            owned.setLifecycleOwner(lifecycleOwner)
-            viewModel.attachCamera(owned)
-        }
-        onDispose { viewModel.detachCamera() }
-    }
+    // Phase 7.1: the screen no longer owns the camera. The process-scoped camera
+    // session (owned by ProtectionForegroundService) is the single owner and keeps
+    // feeding the shared recognizer after this screen closes, so recognition is no
+    // longer tied to this composable's lifecycle.
 
     // Refresh permission flags whenever the screen resumes (e.g. after granting
     // usage access or overlay permission in system settings).

@@ -47,12 +47,7 @@ import uz.faceguard.app.domain.notification.AppNotificationDispatcher
 import uz.faceguard.app.domain.notification.AppNotificationEvent
 import uz.faceguard.app.domain.notification.NotificationCoordinator
 import uz.faceguard.app.domain.policy.PolicyEvaluator
-import uz.faceguard.app.domain.request.ParentRequest
 import uz.faceguard.app.domain.request.ParentRequestRepository
-import uz.faceguard.app.domain.request.RequestCreationResult
-import uz.faceguard.app.domain.request.RequestDeduplication
-import uz.faceguard.app.domain.request.RequestLimits
-import uz.faceguard.app.domain.request.RequestType
 import uz.faceguard.app.domain.eyesafety.ChildEyeSafetyConfig
 import uz.faceguard.app.domain.eyesafety.EyeSafetyRepository
 import uz.faceguard.app.domain.policy.PolicySettings
@@ -175,7 +170,13 @@ class ProtectionRuntime @Inject constructor(
      * reference back to the runtime, so no service/runtime cycle is created.
      */
     private val accessibilityOverlayRegistry: AccessibilityOverlayRegistry,
-    private val requestRepository: ParentRequestRepository,
+    /**
+     * Phase 7.3: the single seam that turns the child's overlay tap into a durable
+     * request through the existing [ParentRequestRepository]. Injected rather than
+     * built inline so the reachability path is unit-testable without a running
+     * protection session.
+     */
+    private val extraTimeRequester: ExtraTimeRequester,
     private val notificationCoordinator: NotificationCoordinator,
     private val notificationDispatcher: AppNotificationDispatcher,
     private val securityStateHolder: SecurityStateHolder,
@@ -728,49 +729,50 @@ class ProtectionRuntime @Inject constructor(
     }
 
     /**
-     * Phase 11: the child asked for more time on the app that was just blocked
-     * (overlay action). Creates a durable PENDING request — an *authorization
-     * record only*: no usage is measured and nothing is granted here (Phase 4 owns
-     * consumption), and the PolicyEvaluator is never bypassed.
+     * Phase 7.3: turns the child's overlay tap into a durable PENDING request
+     * through the existing request machinery ([ExtraTimeRequester] ->
+     * [ParentRequestRepository]).
+     *
+     * Reachability: the tap is only meaningful with a signed-in account, a
+     * currently blocked app and a recognised child — exactly the context the block
+     * was applied in. Those are read from the live runtime/engine state at tap
+     * time, so the button works for the whole time the overlay is showing.
+     *
+     * It is an *authorization record only*: no usage is measured and nothing is
+     * granted here (Phase 4 owns consumption), the PolicyEvaluator is never
+     * bypassed, and a request can never disable protection. A repository failure
+     * is isolated inside [ExtraTimeRequester] so it cannot disturb protection.
      */
     fun requestExtraTime() {
         val owner = accountId ?: return
         val packageName = engine.blockedApp.value ?: return
         val childId = engine.identity.value?.childId ?: return
         scope.launch {
-            val now = System.currentTimeMillis()
-            val request = ParentRequest(
-                accountId = owner,
-                childId = childId,
-                targetPackageName = packageName,
-                requestType = RequestType.EXTRA_TIME,
-                requestedDurationMinutes = RequestLimits.DEFAULT_REQUEST_MINUTES,
-                createdAt = now,
-                updatedAt = now,
-                deduplicationKey = RequestDeduplication.keyFor(
-                    accountId = owner,
-                    childId = childId,
-                    requestType = RequestType.EXTRA_TIME,
-                    targetPackageName = packageName,
-                ),
-            )
-            when (val result = requestRepository.create(request)) {
-                is RequestCreationResult.Created -> notificationCoordinator.onEvent(
-                    AppNotificationEvent.ParentRequestCreated(
-                        accountId = owner,
-                        requestId = result.request.id,
-                        childId = childId,
-                        targetPackageName = packageName,
-                        requestedDurationMinutes = result.request.requestedDurationMinutes,
-                        at = now,
-                    ),
-                )
+            when (val result = extraTimeRequester.request(owner, childId, packageName)) {
+                is ExtraTimeRequestResult.Created ->
+                    // Notifying the parent is secondary; a delivery failure must
+                    // never be reported as a request failure.
+                    runCatching {
+                        notificationCoordinator.onEvent(
+                            AppNotificationEvent.ParentRequestCreated(
+                                accountId = owner,
+                                requestId = result.request.id,
+                                childId = childId,
+                                targetPackageName = packageName,
+                                requestedDurationMinutes = result.request.requestedDurationMinutes,
+                                at = result.request.createdAt,
+                            ),
+                        )
+                    }.onFailure { Log.w(TAG, "request notification failed", it) }
 
                 // Already pending: a repeated tap must not create a second request.
-                is RequestCreationResult.Duplicate -> Unit
+                ExtraTimeRequestResult.Duplicate -> Unit
 
-                is RequestCreationResult.Rejected ->
-                    Log.w(TAG, "extra-time request rejected: ${result.reason}")
+                // No context to request from; nothing was written.
+                ExtraTimeRequestResult.Unavailable -> Unit
+
+                ExtraTimeRequestResult.Failed ->
+                    Log.w(TAG, "extra-time request could not be created")
             }
         }
     }

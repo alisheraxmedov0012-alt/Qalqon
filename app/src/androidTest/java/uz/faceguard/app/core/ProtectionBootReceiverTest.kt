@@ -3,6 +3,7 @@ package uz.faceguard.app.core
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
@@ -13,6 +14,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import uz.faceguard.app.MainActivity
 import uz.faceguard.app.core.protection.ProtectionBootReceiver
 import uz.faceguard.app.core.protection.ProtectionBootRestorer
 import uz.faceguard.app.core.protection.ProtectionServiceLauncher
@@ -48,6 +50,20 @@ class ProtectionBootReceiverTest {
         var stopCalls = 0
         override fun start() { startCalls++ }
         override fun stop() { stopCalls++ }
+    }
+
+    /**
+     * Enabling protection through the real DataStore is observed by the app-scoped
+     * runtime, which starts the real [uz.faceguard.app.core.protection.ProtectionForegroundService].
+     * Android 12+ only allows a foreground-service start while the app is visible, so
+     * these tests run with the real activity in the foreground — the same pattern
+     * [ProtectionForegroundServiceTest] and [ScreenTimeCollectionLifecycleTest] use.
+     * Without it the start is a background start, and the platform can kill the process
+     * with `ForegroundServiceDidNotStartInTimeException`, aborting the whole
+     * instrumentation run.
+     */
+    private fun withForegroundApp(block: suspend () -> Unit) = runBlocking {
+        ActivityScenario.launch(MainActivity::class.java).use { block() }
     }
 
     @Before
@@ -91,7 +107,7 @@ class ProtectionBootReceiverTest {
     }
 
     @Test
-    fun protectionOnWithASession_restoresStartupFromThePersistedIntent() = runBlocking {
+    fun protectionOnWithASession_restoresStartupFromThePersistedIntent() = withForegroundApp {
         session.setCurrentAccountId(7L)
         settingsRepository.setProtectionEnabled(true)
         val launcher = RecordingLauncher()
@@ -104,7 +120,7 @@ class ProtectionBootReceiverTest {
     }
 
     @Test
-    fun protectionOff_neverAutoEnablesOnBoot() = runBlocking {
+    fun protectionOff_neverAutoEnablesOnBoot() = withForegroundApp {
         session.setCurrentAccountId(7L)
         settingsRepository.setProtectionEnabled(false)
         val launcher = RecordingLauncher()

@@ -2,7 +2,8 @@
 <!-- Offline-first by design: no INTERNET permission. Camera + usage-stats
      power face capture and foreground monitoring; future sync scaffolding
      (uz.faceguard.app.sync) requires no manifest changes while offline. -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
@@ -20,6 +21,14 @@
     <!-- Phase 7.4: restore protection (from the persisted intent) after a reboot. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!-- Phase 14: ML Kit's transitive `com.google.android.datatransport:transport-backend-cct`
+         injects these two permissions and a telemetry backend through manifest merging.
+         QALQON is offline-first and never uses datatransport (face detection runs on the
+         models bundled in the APK), so they are removed rather than shipped. This restores
+         the "no INTERNET permission" privacy contract in the merged release manifest. -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
 
     <application
         android:name=".FaceGuardApp"
@@ -80,5 +89,19 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
+
+        <!-- Phase 14: remove the telemetry backend ML Kit's transitive datatransport
+             dependency contributes. QALQON never calls datatransport (nothing binds or
+             starts these), so removing them shrinks the attack surface and leaves no
+             upload service registered in the release build. -->
+        <service
+            android:name="com.google.android.datatransport.runtime.backends.TransportBackendDiscovery"
+            tools:node="remove" />
+        <service
+            android:name="com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService"
+            tools:node="remove" />
+        <receiver
+            android:name="com.google.android.datatransport.runtime.scheduling.jobscheduling.AlarmManagerSchedulerBroadcastReceiver"
+            tools:node="remove" />
     </application>
 </manifest>

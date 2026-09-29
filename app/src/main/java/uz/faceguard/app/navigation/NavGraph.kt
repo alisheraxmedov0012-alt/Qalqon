@@ -7,6 +7,8 @@ import androidx.navigation.navArgument
 import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import uz.faceguard.app.core.debug.DebugFlags
+import uz.faceguard.app.core.notification.NotificationNavigation
 import uz.faceguard.app.feature.auth.CreatePinScreen
 import uz.faceguard.app.feature.auth.LoginScreen
 import uz.faceguard.app.feature.auth.RegisterScreen
@@ -67,6 +69,27 @@ object Routes {
 }
 
 /**
+ * Phase 12: maps an *untrusted* notification destination extra to a validated
+ * internal route, or `null` when it is not one of the known notification
+ * destinations.
+ *
+ * `MainActivity` is exported (it is the launcher), so this value can originate
+ * from any other app on the device. It was previously navigated verbatim, which
+ * let an external caller drive the app into an arbitrary internal route and skip
+ * the startup/auth gate. Only the single destination that genuinely needs an
+ * explicit route is honoured here; the "dashboard" destination is already
+ * satisfied by the normal start flow (Splash -> Home when signed in, Welcome when
+ * signed out), so it maps to `null` and can never force a signed-out caller past
+ * the auth gate.
+ *
+ * Pure (no Android/NavController), so the validation is unit-testable.
+ */
+fun notificationRouteFor(rawDestination: String?): String? = when (rawDestination) {
+    NotificationNavigation.DESTINATION_REQUESTS -> Routes.REQUESTS
+    else -> null
+}
+
+/**
  * Launch: Splash → Home when a persisted session exists, else → Welcome.
  * Logout (from Settings) clears session and returns to Welcome.
  */
@@ -80,12 +103,14 @@ fun FaceGuardNavHost(
      */
     requestedDestination: String? = null,
 ) {
-    // A notification click opens the app and asks for one destination. Routing is
-    // idempotent and safe for stale/invalid destinations (unknown routes simply
-    // do not resolve); ownership is validated by the destination's own queries.
+    // A notification click opens the app and asks for one destination. The extra is
+    // untrusted (MainActivity is exported) so it is validated against the known
+    // notification destinations before use; anything else — including a crafted
+    // internal route — is ignored. Ownership is still validated by the
+    // destination's own account-scoped queries.
     LaunchedEffect(requestedDestination) {
-        val destination = requestedDestination?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
-        runCatching { navController.navigate(destination) }
+        val route = notificationRouteFor(requestedDestination) ?: return@LaunchedEffect
+        runCatching { navController.navigate(route) }
     }
 
     NavHost(navController = navController, startDestination = Routes.SPLASH) {
@@ -234,8 +259,15 @@ fun FaceGuardNavHost(
         ) {
             RequestsScreen(onBack = { navController.popBackStack() })
         }
-        composable(Routes.RECOGNITION_DEBUG) {
-            RecognitionDebugScreen(onBack = { navController.popBackStack() })
+        // Phase 12: developer-only. Gated by BuildConfig.DEBUG (via DebugFlags) so the
+        // route does not exist in a release build at all — previously it was always
+        // registered, so an internal route (reachable through the exported activity)
+        // could surface QALQON's live recognition diagnostics in production. The
+        // debug build keeps the screen unchanged.
+        if (DebugFlags.DEBUG_SCREENS_ENABLED) {
+            composable(Routes.RECOGNITION_DEBUG) {
+                RecognitionDebugScreen(onBack = { navController.popBackStack() })
+            }
         }
         composable(Routes.PROTECTION) {
             ProtectionScreen(

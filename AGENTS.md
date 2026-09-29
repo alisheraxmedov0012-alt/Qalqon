@@ -309,3 +309,30 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   Room's generated schema, exactly one of every singleton, no parallel Eye Safety
   engine/scheduler/service, `faces.firstOrNull()` unchanged, no eye-safety notification or liveness
   work, and no Room/DAO/suspend on the 500ms evaluation path. JVM total 1041 -> 1075 (+34).
+
+- Phase 12 (settings, system diagnostics & health auditing): new pure
+  `domain/diagnostics/` package - `DiagnosticCheck` (PROTECTION_INTENT,
+  FOREGROUND_SERVICE, OVERLAY_PERMISSION, ACCESSIBILITY_GUARDRAIL, USAGE_ACCESS,
+  NOTIFICATIONS, BOOT_RESTORE, SCHEDULE_SYNC), `DiagnosticStatus`
+  (OK/WARNING/FAILED/UNKNOWN), `SystemHealthLevel` (HEALTHY/DEGRADED/CRITICAL/
+  UNKNOWN), `SystemHealthSnapshot` (primitives only) and the stateless
+  `SystemHealthEvaluator`. Rule: a check is FAILED only while protection is
+  actually requested (signed in AND enabled); a signed-out device is UNKNOWN, and
+  a deliberate protection-OFF device degrades (WARNING) but is never blamed. New
+  `core/diagnostics/`: `PlatformCapabilities` (BOOT_RESTORE_WIRED,
+  SCHEDULE_SYNC_MECHANISM=EVENT_DRIVEN) - the audited facts - plus the pure
+  `RuntimeHealthMapper` (ProtectionRuntimeState -> snapshot, so the audit can
+  never disagree with the protection screen) and `SystemHealthSnapshotSource`
+  (the only Android reader; reads settings intent, `ProtectionForegroundService.running`,
+  `AccessibilityCapability`, `AndroidUsageAccess`, notification dispatcher). The
+  Settings screen gained a fourth `Health` tab that runs the audit on demand and
+  renders one row per check (no evaluation during composition; no raw detail
+  shown as UI text). 23 new strings x3 locales (563 -> 586, full parity).
+  Tests: `SystemHealthEvaluatorTest` (every rule + level), `RuntimeHealthMapperTest`,
+  `SettingsParsingTest` (the pure SettingsStore corruption boundary - enum
+  fallback is fail-closed, recovery-delay bounds, account key namespacing,
+  defaults, copy round trip), `Phase12IntegrationTest` (re-reads AndroidManifest
+  to pin BOOT_COMPLETED + overlay/accessibility wiring, asserts WorkManager is
+  deliberately absent, drives ProtectionBootRestorer -> audit end to end) and
+  `HealthStringsLocalizationTest`. No Room/migration/engine change; WorkManager
+  is still intentionally not a dependency (event-driven ScanScheduler).

@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -51,9 +52,13 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import uz.faceguard.app.R
+import uz.faceguard.app.core.diagnostics.SystemHealthSnapshotSource
 import uz.faceguard.app.core.ui.AppLoadingButton
 import uz.faceguard.app.core.ui.SectionCard
 import uz.faceguard.app.core.ui.UiState
+import uz.faceguard.app.domain.diagnostics.DiagnosticStatus
+import uz.faceguard.app.domain.diagnostics.SystemHealthLevel
+import uz.faceguard.app.domain.diagnostics.SystemHealthReport
 import uz.faceguard.app.domain.model.AppSettings
 import uz.faceguard.app.domain.model.BlockPolicy
 import uz.faceguard.app.domain.model.ProtectedApp
@@ -78,6 +83,8 @@ class SettingsViewModel @Inject constructor(
     private val parentProfileRepository: ParentProfileRepository,
     private val childRepository: ChildProfileRepository,
     private val resetRepository: ResetRepository,
+    /** Phase 12: the Android reader behind the system-health audit. */
+    private val healthSource: SystemHealthSnapshotSource,
 ) : ViewModel() {
 
     /**
@@ -140,6 +147,32 @@ class SettingsViewModel @Inject constructor(
     private val _resetDone = MutableStateFlow(false)
     val resetDone: StateFlow<Boolean> = _resetDone
 
+    /** Phase 12: null until the first audit has run. */
+    private val _healthReport = MutableStateFlow<SystemHealthReport?>(null)
+    val healthReport: StateFlow<SystemHealthReport?> = _healthReport
+
+    private val _healthRunning = MutableStateFlow(false)
+    val healthRunning: StateFlow<Boolean> = _healthRunning
+
+    private val _healthError = MutableStateFlow(false)
+    val healthError: StateFlow<Boolean> = _healthError
+
+    /** Phase 12: reads the live signals and evaluates the health audit. */
+    fun runDiagnostics() {
+        if (_healthRunning.value) return
+        viewModelScope.launch {
+            _healthRunning.value = true
+            _healthError.value = false
+            try {
+                _healthReport.value = healthSource.report()
+            } catch (t: Throwable) {
+                _healthError.value = true
+            } finally {
+                _healthRunning.value = false
+            }
+        }
+    }
+
     init {
         refreshProtectedApps()
         viewModelScope.launch {
@@ -188,6 +221,9 @@ fun SettingsScreen(
     val logoutState by viewModel.logoutState.collectAsStateWithLifecycle()
     val children by viewModel.children.collectAsStateWithLifecycle()
     val resetDone by viewModel.resetDone.collectAsStateWithLifecycle()
+    val healthReport by viewModel.healthReport.collectAsStateWithLifecycle()
+    val healthRunning by viewModel.healthRunning.collectAsStateWithLifecycle()
+    val healthError by viewModel.healthError.collectAsStateWithLifecycle()
 
     LaunchedEffect(logoutState) { if (logoutState is UiState.Success) onLoggedOut() }
     LaunchedEffect(resetDone) { if (resetDone) onLoggedOut() }
@@ -200,6 +236,9 @@ fun SettingsScreen(
         appsRefreshing = appsRefreshing,
         children = children,
         logoutState = logoutState,
+        healthReport = healthReport,
+        healthRunning = healthRunning,
+        healthError = healthError,
         onBack = onBack,
         initialTab = initialTab,
     )
@@ -215,10 +254,13 @@ private fun SettingsContent(
     appsRefreshing: Boolean,
     children: List<ChildProfile>,
     logoutState: UiState,
+    healthReport: SystemHealthReport?,
+    healthRunning: Boolean,
+    healthError: Boolean,
     onBack: () -> Unit,
     initialTab: Int,
 ) {
-    var selectedTab by remember(initialTab) { mutableIntStateOf(initialTab.coerceIn(0, 2)) }
+    var selectedTab by remember(initialTab) { mutableIntStateOf(initialTab.coerceIn(0, 3)) }
 
     Scaffold(
         topBar = {
@@ -247,6 +289,11 @@ private fun SettingsContent(
                         onClick = { selectedTab = 2 },
                         text = { Text(stringResource(R.string.settings_tab_data)) },
                     )
+                    Tab(
+                        selected = selectedTab == 3,
+                        onClick = { selectedTab = 3 },
+                        text = { Text(stringResource(R.string.settings_tab_health)) },
+                    )
                 }
             }
         },
@@ -267,15 +314,87 @@ private fun SettingsContent(
                     onToggle = viewModel::toggleProtectedApp,
                     onRefresh = viewModel::refreshProtectedApps,
                 )
-                else -> DataTab(
+                2 -> DataTab(
                     children = children,
                     onDeleteParentFace = viewModel::deleteParentFace,
                     onDeleteChildFace = viewModel::deleteChildFace,
                     onResetAll = viewModel::resetAll,
                 )
+                else -> HealthTab(
+                    report = healthReport,
+                    running = healthRunning,
+                    error = healthError,
+                    onRun = viewModel::runDiagnostics,
+                )
             }
         }
     }
+}
+
+/**
+ * Phase 12: the system-health audit tab.
+ *
+ * Nothing is evaluated while composing — the parent runs the check explicitly,
+ * so opening Settings never reads portals or touches the service in the
+ * background. Only the last report is rendered, and the raw machine-readable
+ * reason is never shown as UI text.
+ */
+@Composable
+private fun HealthTab(
+    report: SystemHealthReport?,
+    running: Boolean,
+    error: Boolean,
+    onRun: () -> Unit,
+) {
+    Text(stringResource(R.string.health_hint), style = MaterialTheme.typography.bodyMedium)
+
+    OutlinedButton(onClick = onRun, enabled = !running, modifier = Modifier.fillMaxWidth()) {
+        Text(stringResource(if (running) R.string.health_running else R.string.health_run))
+    }
+
+    if (report == null) {
+        SectionCard(title = stringResource(R.string.health_section_title)) {
+            Text(
+                stringResource(if (error) R.string.health_error else R.string.health_not_run),
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (error) MaterialTheme.colorScheme.error
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
+
+    SectionCard(title = stringResource(R.string.health_section_title)) {
+        Text(
+            stringResource(report.level.labelRes()),
+            style = MaterialTheme.typography.titleMedium,
+            color = healthColor(report.level),
+        )
+    }
+
+    report.findings.forEach { finding ->
+        SectionCard(title = stringResource(finding.check.labelRes())) {
+            Text(
+                stringResource(finding.status.labelRes()),
+                style = MaterialTheme.typography.bodyLarge,
+                color = healthColor(finding.status),
+            )
+        }
+    }
+}
+
+private fun healthColor(status: DiagnosticStatus): Color = when (status) {
+    DiagnosticStatus.OK -> Color(0xFF2E7D32)
+    DiagnosticStatus.WARNING -> Color(0xFFF9A825)
+    DiagnosticStatus.FAILED -> Color(0xFFC62828)
+    DiagnosticStatus.UNKNOWN -> Color(0xFF757575)
+}
+
+private fun healthColor(level: SystemHealthLevel): Color = when (level) {
+    SystemHealthLevel.HEALTHY -> Color(0xFF2E7D32)
+    SystemHealthLevel.DEGRADED -> Color(0xFFF9A825)
+    SystemHealthLevel.CRITICAL -> Color(0xFFC62828)
+    SystemHealthLevel.UNKNOWN -> Color(0xFF757575)
 }
 
 @Composable

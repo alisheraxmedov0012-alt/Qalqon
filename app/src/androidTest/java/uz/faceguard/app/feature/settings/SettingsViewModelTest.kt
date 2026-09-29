@@ -20,6 +20,8 @@ import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import uz.faceguard.app.core.diagnostics.SystemHealthSnapshotSource
+import uz.faceguard.app.core.notification.AndroidNotificationDispatcher
 import uz.faceguard.app.core.security.AndroidKeystoreKeyProvider
 import uz.faceguard.app.security.PassthroughTemplateCipher
 import uz.faceguard.app.data.prefs.PinAttemptStore
@@ -108,6 +110,12 @@ class SettingsViewModelTest {
         parentProfileRepository = parentProfileRepository,
         childRepository = childRepository,
         resetRepository = resetRepository,
+        healthSource = SystemHealthSnapshotSource(
+            context = context,
+            settingsRepository = settingsRepository,
+            accountRepository = accountRepository,
+            notificationDispatcher = AndroidNotificationDispatcher(context),
+        ),
     )
 
     private suspend fun awaitSettings(

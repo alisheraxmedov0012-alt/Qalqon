@@ -580,4 +580,29 @@
     <string name="eye_safety_error_confirm_frames">Число кадров подтверждения должно быть больше нуля</string>
     <string name="eye_safety_error_save">Не удалось сохранить параметры</string>
     <string name="eye_safety_error_load">Не удалось загрузить параметры</string>
+
+    <!-- Phase 12: system diagnostics / health auditing -->
+    <string name="settings_tab_health">Здоровье</string>
+    <string name="health_section_title">Состояние системы</string>
+    <string name="health_hint">Проверьте условия, необходимые Qalqon для защиты устройства.</string>
+    <string name="health_run">Проверить</string>
+    <string name="health_running">Проверка…</string>
+    <string name="health_not_run">Ещё не проверено.</string>
+    <string name="health_error">Не удалось проверить. Попробуйте снова.</string>
+    <string name="health_level_healthy">Защита работает полностью</string>
+    <string name="health_level_degraded">Защита работает в ограниченном режиме</string>
+    <string name="health_level_critical">Защита не работает</string>
+    <string name="health_level_unknown">Не удалось определить состояние</string>
+    <string name="health_check_protection_intent">Намерение защиты</string>
+    <string name="health_check_foreground_service">Фоновая служба</string>
+    <string name="health_check_overlay">Разрешение на наложение</string>
+    <string name="health_check_accessibility">Служба спец. возможностей</string>
+    <string name="health_check_usage_access">Доступ к статистике</string>
+    <string name="health_check_notifications">Уведомления</string>
+    <string name="health_check_boot_restore">Восстановление после перезагрузки</string>
+    <string name="health_check_schedule_sync">Синхронизация расписания</string>
+    <string name="health_status_ok">Хорошо</string>
+    <string name="health_status_warning">Предупреждение</string>
+    <string name="health_status_failed">Ошибка</string>
+    <string name="health_status_unknown">Неизвестно</string>
 </resources>

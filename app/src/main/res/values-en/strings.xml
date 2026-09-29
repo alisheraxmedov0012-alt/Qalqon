@@ -580,4 +580,29 @@
     <string name="eye_safety_error_confirm_frames">Confirmation frames must be greater than zero</string>
     <string name="eye_safety_error_save">Could not save the settings</string>
     <string name="eye_safety_error_load">Could not load the settings</string>
+
+    <!-- Phase 12: system diagnostics / health auditing -->
+    <string name="settings_tab_health">Health</string>
+    <string name="health_section_title">System health</string>
+    <string name="health_hint">Check the requirements Qalqon needs to protect this device.</string>
+    <string name="health_run">Run check</string>
+    <string name="health_running">Checking…</string>
+    <string name="health_not_run">Not checked yet.</string>
+    <string name="health_error">Check failed. Please try again.</string>
+    <string name="health_level_healthy">Protection is fully working</string>
+    <string name="health_level_degraded">Protection is running in a limited mode</string>
+    <string name="health_level_critical">Protection is not working</string>
+    <string name="health_level_unknown">Status could not be determined</string>
+    <string name="health_check_protection_intent">Protection intent</string>
+    <string name="health_check_foreground_service">Background service</string>
+    <string name="health_check_overlay">Overlay permission</string>
+    <string name="health_check_accessibility">Accessibility guard</string>
+    <string name="health_check_usage_access">Usage access</string>
+    <string name="health_check_notifications">Notifications</string>
+    <string name="health_check_boot_restore">Restore after reboot</string>
+    <string name="health_check_schedule_sync">Schedule sync</string>
+    <string name="health_status_ok">OK</string>
+    <string name="health_status_warning">Warning</string>
+    <string name="health_status_failed">Failed</string>
+    <string name="health_status_unknown">Unknown</string>
 </resources>

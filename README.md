@@ -104,6 +104,10 @@ user-facing apps.
   protection, count on home
 - Settings: block policy (allow/soft/hard), scan mode, camera threshold,
   recovery delay, low-battery behavior, PIN change, emergency reset, reset tools
+- System health tab in Settings (`feature/settings`, `domain/diagnostics`): an
+  on-demand audit of the background service binding, overlay/accessibility
+  guardrails, usage access, notifications, BOOT_COMPLETED restore and the
+  event-driven schedule sync, reporting a healthy/degraded/critical verdict
 - Privacy screen (local storage, backups, face data, no network), help/about
 - Activity log: recognition/block/unlock events, newest 100, clear action
 - Parent-facing Protection screen (`feature/protection/ProtectionScreen.kt`)

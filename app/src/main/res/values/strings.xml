@@ -581,4 +581,29 @@
     <string name="eye_safety_error_confirm_frames">Tasdiqlash kadrlari soni noldan katta bo\'lishi kerak</string>
     <string name="eye_safety_error_save">Sozlamalarni saqlab bo\'lmadi</string>
     <string name="eye_safety_error_load">Sozlamalarni yuklab bo\'lmadi</string>
+
+    <!-- Phase 12: system diagnostics / health auditing -->
+    <string name="settings_tab_health">Salomatlik</string>
+    <string name="health_section_title">Tizim salomatligi</string>
+    <string name="health_hint">Qalqon himoyasi ishlashi uchun zarur shartlarni tekshiring.</string>
+    <string name="health_run">Tekshirish</string>
+    <string name="health_running">Tekshirilmoqda…</string>
+    <string name="health_not_run">Hali tekshirilmagan.</string>
+    <string name="health_error">Tekshirib bo\'lmadi. Qayta urinib ko\'ring.</string>
+    <string name="health_level_healthy">Himoya to\'liq ishlaydi</string>
+    <string name="health_level_degraded">Himoya cheklangan rejimda ishlaydi</string>
+    <string name="health_level_critical">Himoya ishlamayapti</string>
+    <string name="health_level_unknown">Holatni aniqlab bo\'lmadi</string>
+    <string name="health_check_protection_intent">Himoya niyati</string>
+    <string name="health_check_foreground_service">Fon xizmati</string>
+    <string name="health_check_overlay">Ustki oyna ruxsati</string>
+    <string name="health_check_accessibility">Maxsus imkoniyat himoyasi</string>
+    <string name="health_check_usage_access">Foydalanish statistikasi ruxsati</string>
+    <string name="health_check_notifications">Bildirishnomalar</string>
+    <string name="health_check_boot_restore">Qayta yoqilgach tiklash</string>
+    <string name="health_check_schedule_sync">Jadval sinxronizatsiyasi</string>
+    <string name="health_status_ok">Yaxshi</string>
+    <string name="health_status_warning">Ogohlantirish</string>
+    <string name="health_status_failed">Xato</string>
+    <string name="health_status_unknown">Noma\'lum</string>
 </resources>

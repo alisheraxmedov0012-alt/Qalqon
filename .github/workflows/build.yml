@@ -2,7 +2,8 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "feature/phase4-screen-time-complete" ]
+  pull_request:
   workflow_dispatch:
 
 # Least privilege: checkout + artifact upload need nothing more.
@@ -26,6 +27,12 @@ jobs:
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
+
+    # Phase 13: run the JVM unit tests explicitly instead of relying on the
+    # temporary `assembleDebug -> testDebugUnitTest` bridge in app/build.gradle.kts,
+    # so a test failure is its own step rather than hidden inside the assembly graph.
+    - name: Run JVM unit tests
+      run: ./gradlew :app:testDebugUnitTest --no-daemon
 
     - name: Build Debug APK
       run: ./gradlew assembleDebug --no-daemon

@@ -89,8 +89,10 @@ class ScheduleRepositoryTest {
 
         // And it is genuinely persisted, not just echoed back.
         assertEquals(stored, repository.schedule(1L, 10L, stored.id))
+        // targetPackages is contractually ordered by package name (see the DAO's
+        // `ORDER BY packageName ASC`), so the expectation is alphabetical.
         assertEquals(
-            listOf(tiktok, youtube),
+            listOf(youtube, tiktok),
             repository.targetPackages(1L, 10L, stored.id),
         )
     }
@@ -345,7 +347,8 @@ class ScheduleRepositoryTest {
         val stored = repository.create(1L, 10L, draft(), setOf(youtube, youtube, tiktok))
 
         val storedTargets = repository.targetPackages(1L, 10L, stored.id)
-        assertEquals(listOf(tiktok, youtube), storedTargets)
+        // Ordered by package name (DAO `ORDER BY packageName ASC`).
+        assertEquals(listOf(youtube, tiktok), storedTargets)
         assertEquals(2, storedTargets.size)
     }
 

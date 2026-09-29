@@ -48,9 +48,12 @@ class EyeSafetyRepositoryTest {
         childId: Long = 10L,
         enabled: Boolean = true,
         warningEnter: Float = 0.30f,
-        warningExit: Float = 0.27f,
-        dangerEnter: Float = 0.40f,
-        dangerExit: Float = 0.35f,
+        // Derived from the enter thresholds so overriding `warningEnter`/`dangerEnter`
+        // alone cannot produce a configuration the domain rejects (exit <= enter, and
+        // warningEnter < dangerEnter). An explicit value still wins.
+        warningExit: Float = warningEnter - 0.03f,
+        dangerEnter: Float = maxOf(0.40f, warningEnter + 0.10f),
+        dangerExit: Float = dangerEnter - 0.05f,
         confirmFrames: Int = 3,
         warningAction: ProtectionAction = ProtectionAction.WARNING,
         dangerAction: ProtectionAction = ProtectionAction.SOFT_BLOCK,

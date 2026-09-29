@@ -1,12 +1,16 @@
 package uz.faceguard.app.requests
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import uz.faceguard.app.R
 import uz.faceguard.app.domain.request.ParentRequest
 import uz.faceguard.app.domain.request.RequestStatus
 import uz.faceguard.app.domain.request.RequestType
+import uz.faceguard.app.feature.requests.NOTIFICATION_PERMISSION_SDK
+import uz.faceguard.app.feature.requests.canRequestNotificationPermission
 import uz.faceguard.app.feature.requests.requestRows
 import uz.faceguard.app.feature.requests.requestStatusLabelRes
 
@@ -76,5 +80,27 @@ class RequestPresentationTest {
         assertEquals(7L, row.request.id)
         assertEquals(RequestStatus.PENDING, row.request.status)
         assertEquals(15, row.request.requestedDurationMinutes)
+    }
+
+    // ---- Phase 11: notification permission affordance ----------------------
+
+    @Test
+    fun thePermissionPromptIsOfferedOnlyOnAndroid13AndAboveWhileDisabled() {
+        // Android 13+ (API 33) with notifications off -> the app may prompt.
+        assertTrue(canRequestNotificationPermission(sdkInt = 33, notificationsEnabled = false))
+        assertTrue(canRequestNotificationPermission(sdkInt = 34, notificationsEnabled = false))
+
+        // Already enabled -> nothing to ask for.
+        assertFalse(canRequestNotificationPermission(sdkInt = 33, notificationsEnabled = true))
+
+        // Below API 33 POST_NOTIFICATIONS is not a runtime permission the app can
+        // request (the OS grants it at install), so the app must not pretend to.
+        assertFalse(canRequestNotificationPermission(sdkInt = 32, notificationsEnabled = false))
+        assertFalse(canRequestNotificationPermission(sdkInt = 26, notificationsEnabled = false))
+    }
+
+    @Test
+    fun thePermissionContractTargetsAndroid13() {
+        assertEquals(33, NOTIFICATION_PERMISSION_SDK)
     }
 }

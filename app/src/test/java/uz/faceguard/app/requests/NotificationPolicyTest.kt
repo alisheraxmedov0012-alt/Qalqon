@@ -212,6 +212,29 @@ class NotificationPolicyTest {
     }
 
     @Test
+    fun aRequestCreationIsDeliveredOnceAndNeverTwice() = runBlocking {
+        val dedup = FakeDedup()
+        val dispatcher = FakeDispatcher()
+        val coordinator = coordinator(dedup, dispatcher)
+        val event = AppNotificationEvent.ParentRequestCreated(
+            accountId = 1L,
+            requestId = 42L,
+            childId = 5L,
+            targetPackageName = "com.example.youtube",
+            requestedDurationMinutes = 15,
+            at = 1_000L,
+        )
+
+        assertEquals(DeliveryOutcome.DELIVERED, coordinator.onEvent(event))
+        // Retries / duplicate collectors / repeated taps inside the dedup window must
+        // not re-notify the same request.
+        assertNull(coordinator.onEvent(event.copy(at = 2_000L)))
+
+        assertEquals(1, dispatcher.sentIds.size)
+        assertEquals(DefaultNotificationPolicy.requestNotificationId(42L), dispatcher.sentIds.single())
+    }
+
+    @Test
     fun thePolicyNeverReturnsANotificationForNothing() {
         // Sanity: every modelled event yields a decision (no silent drops), and the
         // type is one of the modelled ones.

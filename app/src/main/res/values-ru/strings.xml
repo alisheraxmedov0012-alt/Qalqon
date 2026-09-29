@@ -391,6 +391,7 @@
     <string name="request_reject">Отклонить</string>
     <string name="request_resolved_note">Запрос уже рассмотрен</string>
     <string name="request_notifications_disabled">Уведомления отключены. Запросы всё равно сохраняются.</string>
+    <string name="request_notifications_enable">Разрешить уведомления</string>
     <string name="request_extra_time">Запросить дополнительное время</string>
     <string name="request_extra_time_sent">Запрос отправлен</string>
     <string name="dashboard_requests_pending">Ожидающих запросов: %1$d</string>

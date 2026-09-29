@@ -392,6 +392,7 @@
     <string name="request_reject">Rad etish</string>
     <string name="request_resolved_note">So\'rov yakunlangan</string>
     <string name="request_notifications_disabled">Bildirishnomalar o\'chirilgan. So\'rovlar baribir saqlanadi.</string>
+    <string name="request_notifications_enable">Bildirishnomalarga ruxsat berish</string>
     <string name="request_extra_time">Qo\'shimcha vaqt so\'rash</string>
     <string name="request_extra_time_sent">So\'rov yuborildi</string>
     <string name="dashboard_requests_pending">Kutilayotgan so\'rovlar: %1$d</string>

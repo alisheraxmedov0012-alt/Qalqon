@@ -467,6 +467,30 @@ class DashboardAggregatorTest {
         assertTrue(ready.children.isEmpty())
     }
 
+    // ---- Phase 11: pending request indicator -------------------------------
+
+    @Test
+    fun theDashboardReflectsThePendingRequestCountAndUpdatesReactively() = withDashboard { state, _ ->
+        accounts.id.value = 1L
+        children.set(1L, listOf(child(5L)))
+
+        val none = await(state) { it.status == DashboardStatus.READY }
+        assertEquals(0, none.pendingRequestCount)
+        assertFalse(none.hasPendingRequests)
+
+        // A child request lands -> the indicator updates from the same repository
+        // flow the dashboard already consumes (no second count).
+        requests.pendingCount.value = 2
+
+        val withRequests = await(state) { it.pendingRequestCount == 2 }
+        assertTrue(withRequests.hasPendingRequests)
+
+        // The parent resolves them -> the indicator clears.
+        requests.pendingCount.value = 0
+        val cleared = await(state) { it.pendingRequestCount == 0 }
+        assertFalse(cleared.hasPendingRequests)
+    }
+
     // ---- Phase 5/10: schedule summary --------------------------------------
 
     @Test

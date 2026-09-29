@@ -391,6 +391,7 @@
     <string name="request_reject">Reject</string>
     <string name="request_resolved_note">This request is resolved</string>
     <string name="request_notifications_disabled">Notifications are off. Requests are still saved.</string>
+    <string name="request_notifications_enable">Allow notifications</string>
     <string name="request_extra_time">Request extra time</string>
     <string name="request_extra_time_sent">Request sent</string>
     <string name="dashboard_requests_pending">Pending requests: %1$d</string>

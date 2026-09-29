@@ -1,10 +1,15 @@
 package uz.faceguard.app.feature.requests
 
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -98,6 +103,25 @@ fun requestRows(
     )
 }
 
+/**
+ * Phase 11: whether the app should offer an in-app *request* for the notification
+ * permission.
+ *
+ * `POST_NOTIFICATIONS` is only a runtime permission from Android 13 (API 33);
+ * below that the OS grants it at install time, so the app cannot prompt and must
+ * not pretend to (the user would have to change a system setting). The prompt is
+ * offered only while notifications are actually unavailable, and it is always
+ * user-initiated (a tap), never automatic, so it is not raised repeatedly.
+ *
+ * Pure (no Android types) so the decision is unit-testable, exactly like the other
+ * presentation helpers here.
+ */
+fun canRequestNotificationPermission(sdkInt: Int, notificationsEnabled: Boolean): Boolean =
+    sdkInt >= NOTIFICATION_PERMISSION_SDK && !notificationsEnabled
+
+/** Android 13 / API 33: the first version where POST_NOTIFICATIONS is a runtime permission. */
+const val NOTIFICATION_PERMISSION_SDK = 33
+
 @HiltViewModel
 class RequestsViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
@@ -182,6 +206,16 @@ class RequestsViewModel @Inject constructor(
         viewModelScope.launch { observeAccount(owner) }
     }
 
+    /**
+     * Phase 11: re-reads whether the OS would show our notifications — called after
+     * the parent answers the permission prompt, so the "notifications are off" notice
+     * clears (or stays, honestly) without any polling. Never touches request state:
+     * a denied permission must not hide or drop a request.
+     */
+    fun refreshNotificationsEnabled() {
+        _state.value = _state.value.copy(notificationsEnabled = notificationsEnabled())
+    }
+
     fun approve(requestId: Long) =
         resolve(requestId) { owner, now -> requestRepository.approve(owner, requestId, null, now) }
 
@@ -226,6 +260,12 @@ fun RequestsScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
+    // Phase 11: the notification permission is requested only when the parent taps
+    // the button, and the state is re-read on the result so the notice is honest.
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { viewModel.refreshNotificationsEnabled() }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -263,6 +303,19 @@ fun RequestsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
+                    // Phase 11: offer the runtime permission prompt where it exists
+                    // (Android 13+). It is user-initiated and shown only while
+                    // notifications are actually unavailable, so it is never repeated.
+                    // Denying it is harmless: requests are still saved and shown here.
+                    if (canRequestNotificationPermission(Build.VERSION.SDK_INT, notificationsEnabled = state.notificationsEnabled)) {
+                        Spacer(Modifier.height(4.dp))
+                        OutlinedButton(
+                            onClick = { notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(stringResource(R.string.request_notifications_enable))
+                        }
+                    }
                 }
             }
 

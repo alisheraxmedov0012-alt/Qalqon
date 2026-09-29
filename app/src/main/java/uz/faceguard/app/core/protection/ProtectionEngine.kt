@@ -587,7 +587,16 @@ class ProtectionEngine(
                 }
 
                 val target = stateFor(decision.action)
-                if (_state.value == target) return
+                if (_state.value == target) {
+                    // Phase 9: the cycle is already blocked, but the protected app the
+                    // block applies to may have changed (A -> B) while the child stays
+                    // in front of the device. Re-point the cycle's restoration target at
+                    // the app currently being held, so nothing stale (an extra-time
+                    // request target, the parent-facing "blocked app", a later release)
+                    // is derived from the previous app.
+                    if (foreground != _blockedApp.value) _blockedApp.value = foreground
+                    return
+                }
 
                 // Phase 9: a (re)block replaces any pending recovery release, so the
                 // old timer is invalidated now instead of lingering until it fires.

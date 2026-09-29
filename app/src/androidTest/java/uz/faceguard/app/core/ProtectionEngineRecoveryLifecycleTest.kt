@@ -409,4 +409,27 @@ class ProtectionEngineRecoveryLifecycleTest {
         // as a recovery release (at most one per cycle, never a false one).
         assertEquals(0, events.count(ActivityEventType.PROTECTION_RELEASED))
     }
+
+    // Phase 9 state consistency: switching between two *protected* apps while the
+    // child stays in front of the device keeps the single block in place, and the
+    // cycle's restoration target follows the app actually being held (so a later
+    // extra-time request / parent-facing "blocked app" is never the stale app).
+    @Test
+    fun switchingProtectedAppWhileBlocked_movesTheCycleTargetWithoutReleasing() = runHarness(150L) {
+        withContext(dispatcher) {
+            engine.updateContext(parent, listOf(child), setOf(protectedApp, otherApp))
+        }
+
+        block()
+        assertEquals(ProtectionState.HARD_BLOCKED, engine.state.value)
+        assertEquals("the cycle starts holding the first protected app", protectedApp, engine.blockedApp.value)
+
+        // The child does not leave; only the foreground protected app changes.
+        withContext(dispatcher) { drive(otherApp, childVec, times = 5, startAt = 900_000L) }
+
+        assertEquals("the block must hold across the app switch", ProtectionState.HARD_BLOCKED, engine.state.value)
+        assertEquals("the cycle target must follow the app now held", otherApp, engine.blockedApp.value)
+        assertEquals("the same cycle was never released", 0, events.count(ActivityEventType.PROTECTION_RELEASED))
+        assertEquals("no duplicate block event for the same cycle", 1, events.count(ActivityEventType.CHILD_BLOCKED))
+    }
 }

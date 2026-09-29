@@ -33,6 +33,7 @@ import uz.faceguard.app.data.prefs.SettingsStore
 import uz.faceguard.app.data.repository.ActivityLogRepositoryImpl
 import uz.faceguard.app.data.repository.ChildAppPolicyRepositoryImpl
 import uz.faceguard.app.data.repository.ChildProfileRepositoryImpl
+import uz.faceguard.app.data.repository.EyeSafetyRepositoryImpl
 import uz.faceguard.app.data.repository.ParentProfileRepositoryImpl
 import uz.faceguard.app.data.repository.ParentRequestRepositoryImpl
 import uz.faceguard.app.data.repository.ProtectedAppsRepositoryImpl
@@ -146,6 +147,7 @@ class ScreenTimeTargetViewModelTest {
         activityLogRepository = ActivityLogRepositoryImpl(db.activityEventDao()),
         settingsRepository = SettingsRepositoryImpl(settingsStore),
         requestRepository = ParentRequestRepositoryImpl(db.parentRequestDao(), children),
+        eyeSafetyRepository = EyeSafetyRepositoryImpl(db.childEyeSafetyDao()),
         screenTimeActiveChildRepository = activeChild,
         // Phase 4 Step 2: the presentation reads these; they are the real implementations over
         // the same database, so the summary shows what the app would really show.

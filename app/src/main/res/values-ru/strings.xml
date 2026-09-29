@@ -311,6 +311,12 @@
     <string name="settings_load_error">Не удалось загрузить настройки. Попробуйте ещё раз.</string>
 
     <string name="dashboard_subtitle">Статус защиты и настройки ребёнка в одном месте</string>
+    <string name="dashboard_schedule_none">Сейчас расписание не действует</string>
+    <string name="dashboard_schedule_active">%1$s · %2$s</string>
+    <string name="dashboard_schedule_conflict">Конфликт расписаний: %1$s</string>
+    <string name="dashboard_schedule_manage">Управление расписаниями</string>
+    <string name="dashboard_eye_safety_actions">Предупреждение: %1$s · Опасность: %2$s</string>
+    <string name="dashboard_eye_safety_manage">Настроить защиту зрения</string>
     <string name="dashboard_error">Не удалось загрузить данные</string>
     <string name="dashboard_error_hint">Попробуйте ещё раз</string>
     <string name="dashboard_retry">Повторить</string>

@@ -33,6 +33,9 @@ import uz.faceguard.app.feature.home.protectionStateLabelRes
 import uz.faceguard.app.feature.home.recentEventSummaries
 import uz.faceguard.app.feature.home.resolveSelectedChild
 import uz.faceguard.app.feature.home.restrictionLevelLabelRes
+import uz.faceguard.app.feature.home.eyeSafetyActionLabelRes
+import uz.faceguard.app.feature.home.scheduleModeLabelRes
+import uz.faceguard.app.domain.schedule.ScheduleMode
 
 /**
  * Phase 10: the pure dashboard presentation mapping and aggregation helpers.
@@ -243,6 +246,43 @@ class DashboardMappingTest {
     @Test
     fun distinctDashboardsAreDistinctStates() {
         assertNotEquals(DashboardUiState(), DashboardUiState(protectionEnabled = true))
+    }
+
+    // ---- Phase 5/10: schedule + Phase 6/10: eye-safety presentation ---------
+
+    @Test
+    fun everyScheduleModeMapsToItsOwnLabel() {
+        val labels = ScheduleMode.entries.map { scheduleModeLabelRes(it) }
+        assertEquals("each schedule mode must have a distinct label", labels.size, labels.toSet().size)
+        assertEquals(R.string.schedule_mode_study, scheduleModeLabelRes(ScheduleMode.STUDY))
+        assertEquals(R.string.schedule_mode_sleep, scheduleModeLabelRes(ScheduleMode.SLEEP))
+    }
+
+    @Test
+    fun eyeSafetyActionsReuseTheEditorsOwnLabels() {
+        assertEquals(R.string.eye_safety_action_allow, eyeSafetyActionLabelRes(ProtectionAction.ALLOW))
+        assertEquals(R.string.eye_safety_action_warning, eyeSafetyActionLabelRes(ProtectionAction.WARNING))
+        assertEquals(R.string.eye_safety_action_soft_block, eyeSafetyActionLabelRes(ProtectionAction.SOFT_BLOCK))
+        assertEquals(R.string.eye_safety_action_hard_block, eyeSafetyActionLabelRes(ProtectionAction.HARD_BLOCK))
+        assertEquals(R.string.eye_safety_action_mute, eyeSafetyActionLabelRes(ProtectionAction.MUTE))
+    }
+
+    @Test
+    fun domainOnlyActionsAreNeverMislabelledAsEyeSafetyActions() {
+        listOf(ProtectionAction.DIM, ProtectionAction.BLUR, ProtectionAction.BLACK_SCREEN).forEach { action ->
+            assertEquals(
+                "a domain-only action must not claim an eye-safety label",
+                R.string.dashboard_value_unknown,
+                eyeSafetyActionLabelRes(action),
+            )
+        }
+    }
+
+    @Test
+    fun theDefaultDashboardClaimsNoScheduleAndNoEyeSafety() {
+        val state = DashboardUiState()
+        assertEquals(uz.faceguard.app.domain.schedule.ScheduleResolution.NoActiveSchedule, state.scheduleResolution)
+        assertNull("eye safety is unknown until it loads", state.eyeSafety)
     }
 
     private fun policy(pkg: String, mode: AppPolicyMode, limit: Int? = null) = AppPolicy(

@@ -27,6 +27,7 @@ import uz.faceguard.app.core.protection.ProtectionRuntimeState
 import uz.faceguard.app.data.db.FaceGuardDatabase
 import uz.faceguard.app.data.repository.ActivityLogRepositoryImpl
 import uz.faceguard.app.data.repository.ChildAppPolicyRepositoryImpl
+import uz.faceguard.app.data.repository.EyeSafetyRepositoryImpl
 import uz.faceguard.app.data.repository.ChildProfileRepositoryImpl
 import uz.faceguard.app.data.repository.ParentRequestRepositoryImpl
 import uz.faceguard.app.domain.model.ActivityEventType
@@ -117,6 +118,7 @@ class DashboardAggregationIntegrationTest {
         activityLogRepository = activityRepository,
         settingsRepository = settingsRepository,
         requestRepository = requestRepository,
+        eyeSafetyRepository = EyeSafetyRepositoryImpl(db.childEyeSafetyDao()),
         runtimeState = flow {
             emitAll(runtimeState)
         },

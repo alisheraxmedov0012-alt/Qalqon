@@ -136,6 +136,8 @@ fun FaceGuardNavHost(
                 onOpenActivity = { navController.navigate(Routes.ACTIVITY_LOG) },
                 onOpenChildPolicy = { childId -> navController.navigate(Routes.childPolicy(childId)) },
                 onOpenRequests = { navController.navigate(Routes.requests()) },
+                onOpenChildSchedules = { childId -> navController.navigate(Routes.childSchedules(childId)) },
+                onOpenChildEyeSafety = { childId -> navController.navigate(Routes.childEyeSafety(childId)) },
             )
         }
         composable(Routes.PARENT_PROFILE) {

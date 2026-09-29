@@ -43,6 +43,15 @@ import uz.faceguard.app.domain.policy.IdentityContext
 import uz.faceguard.app.domain.policy.LivenessState
 import uz.faceguard.app.domain.policy.ProtectionAction
 import uz.faceguard.app.domain.policy.UserIdentity
+import uz.faceguard.app.domain.eyesafety.ChildEyeSafetyConfig
+import uz.faceguard.app.domain.eyesafety.EyeSafetyConfig
+import uz.faceguard.app.domain.eyesafety.EyeSafetyRepository
+import uz.faceguard.app.domain.schedule.ScheduleDays
+import uz.faceguard.app.domain.schedule.ScheduleMode
+import uz.faceguard.app.domain.schedule.ScheduleResolution
+import uz.faceguard.app.domain.schedule.ScheduleRule
+import uz.faceguard.app.domain.schedule.ScheduleWindow
+import java.time.LocalTime
 import uz.faceguard.app.domain.repository.AccountRepository
 import uz.faceguard.app.domain.repository.ActivityLogRepository
 import uz.faceguard.app.domain.repository.ChildProfileRepository
@@ -156,6 +165,20 @@ class DashboardAggregatorTest {
         override suspend fun expireStale(accountId: Long, now: Long): Int = 0
     }
 
+    /** Phase 6/10: child-scoped eye-safety configuration source. */
+    private class FakeEyeSafety : EyeSafetyRepository {
+        val byChild = mutableMapOf<Pair<Long, Long>, MutableStateFlow<ChildEyeSafetyConfig?>>()
+        fun set(accountId: Long, childId: Long, config: ChildEyeSafetyConfig?) {
+            byChild.getOrPut(accountId to childId) { MutableStateFlow(null) }.value = config
+        }
+        override fun observeConfig(accountId: Long, childId: Long): Flow<ChildEyeSafetyConfig?> =
+            byChild.getOrPut(accountId to childId) { MutableStateFlow(null) }
+        override suspend fun config(accountId: Long, childId: Long): ChildEyeSafetyConfig? =
+            byChild[accountId to childId]?.value
+        override suspend fun save(config: ChildEyeSafetyConfig) = error("not used")
+        override suspend fun delete(accountId: Long, childId: Long) = error("not used")
+    }
+
     /** Runtime source that can be made to fail once, to exercise the error path. */
     private class FakeRuntime {
         val state = MutableStateFlow(ProtectionRuntimeState())
@@ -177,6 +200,7 @@ class DashboardAggregatorTest {
     private val activity = FakeActivity()
     private val settings = FakeSettings()
     private val requests = FakeRequests()
+    private val eyeSafety = FakeEyeSafety()
     private val runtime = FakeRuntime()
 
     private fun aggregator() = DashboardAggregator(
@@ -187,6 +211,7 @@ class DashboardAggregatorTest {
         activityLogRepository = activity,
         settingsRepository = settings,
         requestRepository = requests,
+        eyeSafetyRepository = eyeSafety,
         runtimeState = runtime.flow,
     )
 
@@ -441,4 +466,101 @@ class DashboardAggregatorTest {
         assertNull(ready.child)
         assertTrue(ready.children.isEmpty())
     }
+
+    // ---- Phase 5/10: schedule summary --------------------------------------
+
+    @Test
+    fun theDashboardMirrorsTheRuntimesEffectiveSchedule() = withDashboard { state, _ ->
+        accounts.id.value = 1L
+        children.set(1L, listOf(child(5L)))
+        runtime.state.value = ProtectionRuntimeState(
+            enabled = true,
+            active = true,
+            scheduleResolution = ScheduleResolution.ActiveSchedule(schedule(1L, "Study time")),
+        )
+
+        val current = await(state) { it.scheduleResolution is ScheduleResolution.ActiveSchedule }
+        assertEquals(
+            "the dashboard must show the engine's own resolution, never recompute one",
+            "Study time",
+            (current.scheduleResolution as ScheduleResolution.ActiveSchedule).schedule.name,
+        )
+    }
+
+    @Test
+    fun noActiveSchedule_isReportedAsNone() = withDashboard { state, _ ->
+        accounts.id.value = 1L
+        children.set(1L, listOf(child(5L)))
+
+        val ready = await(state) { it.status == DashboardStatus.READY }
+        assertEquals(ScheduleResolution.NoActiveSchedule, ready.scheduleResolution)
+    }
+
+    // ---- Phase 6/10: eye-safety summary ------------------------------------
+
+    @Test
+    fun eyeSafety_isNotConfiguredUntilTheChildHasAConfiguration() = withDashboard { state, _ ->
+        accounts.id.value = 1L
+        children.set(1L, listOf(child(5L)))
+
+        val ready = await(state) { it.status == DashboardStatus.READY && it.child != null }
+        assertEquals(5L, ready.eyeSafety?.childId)
+        assertEquals(false, ready.eyeSafety?.configured)
+        assertEquals(false, ready.eyeSafety?.enabled)
+        assertNull(ready.eyeSafety?.warningAction)
+    }
+
+    @Test
+    fun eyeSafety_configurationIsMirroredForTheSelectedChild() = withDashboard { state, agg ->
+        accounts.id.value = 1L
+        children.set(1L, listOf(child(5L), child(6L)))
+        eyeSafety.set(1L, 5L, eyeSafetyConfig(5L, enabled = true, warning = ProtectionAction.WARNING))
+        eyeSafety.set(1L, 6L, eyeSafetyConfig(6L, enabled = false, warning = ProtectionAction.SOFT_BLOCK))
+
+        val first = await(state) { it.selectedChildId == 5L && it.eyeSafety?.configured == true }
+        assertEquals(true, first.eyeSafety?.enabled)
+        assertEquals(ProtectionAction.WARNING, first.eyeSafety?.warningAction)
+
+        agg.selectChild(6L)
+
+        val second = await(state) { it.selectedChildId == 6L && it.eyeSafety?.configured == true }
+        assertEquals("the other child's configuration must not leak", false, second.eyeSafety?.enabled)
+        assertEquals(ProtectionAction.SOFT_BLOCK, second.eyeSafety?.warningAction)
+    }
+
+    @Test
+    fun eyeSafety_reactsToAConfigurationChange() = withDashboard { state, _ ->
+        accounts.id.value = 1L
+        children.set(1L, listOf(child(5L)))
+
+        await(state) { it.eyeSafety?.configured == false }
+
+        eyeSafety.set(1L, 5L, eyeSafetyConfig(5L, enabled = true, warning = ProtectionAction.HARD_BLOCK))
+
+        val updated = await(state) { it.eyeSafety?.configured == true }
+        assertEquals(true, updated.eyeSafety?.enabled)
+        assertEquals(ProtectionAction.HARD_BLOCK, updated.eyeSafety?.warningAction)
+    }
+
+    private fun schedule(id: Long, name: String) = ScheduleRule(
+        id = id,
+        name = name,
+        mode = ScheduleMode.STUDY,
+        window = ScheduleWindow(LocalTime.of(9, 0), LocalTime.of(12, 0)),
+        days = ScheduleDays.ALL,
+        action = ProtectionAction.HARD_BLOCK,
+    )
+
+    private fun eyeSafetyConfig(
+        childId: Long,
+        enabled: Boolean,
+        warning: ProtectionAction,
+    ) = ChildEyeSafetyConfig(
+        accountId = 1L,
+        childId = childId,
+        config = EyeSafetyConfig.DEFAULT.copy(enabled = enabled),
+        warningAction = warning,
+        dangerAction = ProtectionAction.HARD_BLOCK,
+        updatedAt = 1L,
+    )
 }

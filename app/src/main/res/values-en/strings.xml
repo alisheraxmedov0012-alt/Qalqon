@@ -311,6 +311,12 @@
     <string name="settings_load_error">Couldn\'t load settings. Please try again.</string>
 
     <string name="dashboard_subtitle">Your child\'s protection status and settings in one place</string>
+    <string name="dashboard_schedule_none">No schedule applies right now</string>
+    <string name="dashboard_schedule_active">%1$s · %2$s</string>
+    <string name="dashboard_schedule_conflict">Schedule conflict: %1$s</string>
+    <string name="dashboard_schedule_manage">Manage schedules</string>
+    <string name="dashboard_eye_safety_actions">Warning: %1$s · Danger: %2$s</string>
+    <string name="dashboard_eye_safety_manage">Configure eye safety</string>
     <string name="dashboard_error">Could not load dashboard data</string>
     <string name="dashboard_error_hint">Please try again</string>
     <string name="dashboard_retry">Retry</string>

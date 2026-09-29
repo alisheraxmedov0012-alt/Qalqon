@@ -312,6 +312,12 @@
     <string name="settings_load_error">Sozlamalarni yuklab bo\'lmadi. Qayta urinib ko\'ring.</string>
 
     <string name="dashboard_subtitle">Bola himoyasi holati va sozlamalari bir joyda</string>
+    <string name="dashboard_schedule_none">Hozir jadval ta\'sir qilmayapti</string>
+    <string name="dashboard_schedule_active">%1$s · %2$s</string>
+    <string name="dashboard_schedule_conflict">Jadval ziddiyati: %1$s</string>
+    <string name="dashboard_schedule_manage">Jadvallarni boshqarish</string>
+    <string name="dashboard_eye_safety_actions">Ogohlantirish: %1$s · Xavf: %2$s</string>
+    <string name="dashboard_eye_safety_manage">Ko\'z xavfsizligini sozlash</string>
     <string name="dashboard_error">Ma\'lumotlarni yuklab bo\'lmadi</string>
     <string name="dashboard_error_hint">Iltimos, qayta urinib ko\'ring</string>
     <string name="dashboard_retry">Qayta urinish</string>

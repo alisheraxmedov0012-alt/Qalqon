@@ -9,7 +9,10 @@ import uz.faceguard.app.domain.model.RestrictionLevel
 import uz.faceguard.app.domain.policy.AppPolicy
 import uz.faceguard.app.domain.policy.AppPolicyMode
 import uz.faceguard.app.domain.policy.LivenessState
+import uz.faceguard.app.domain.policy.ProtectionAction
 import uz.faceguard.app.domain.policy.UserIdentity
+import uz.faceguard.app.domain.schedule.ScheduleMode
+import uz.faceguard.app.domain.schedule.ScheduleResolution
 
 /**
  * Phase 10: the Parent Dashboard state and its pure domain -> presentation
@@ -40,6 +43,21 @@ data class ConfiguredLimit(val packageName: String, val dailyLimitMinutes: Int?)
 /** One historical activity-log entry, as shown in the summary. */
 data class EventSummary(val type: ActivityEventType, val detail: String?, val at: Long)
 
+/**
+ * Phase 6/10: the selected child's eye-safety **configuration**, presented as its
+ * child-specific status. It is the parent's own configuration (not a live
+ * per-frame observation), so the dashboard never claims a measurement it does not
+ * have: [configured] false means "no configuration", and a configured-but-disabled
+ * configuration is a distinct state.
+ */
+data class EyeSafetySection(
+    val childId: Long,
+    val configured: Boolean,
+    val enabled: Boolean,
+    val warningAction: ProtectionAction?,
+    val dangerAction: ProtectionAction?,
+)
+
 /** Settings/identity of the selected child: the policy view of the dashboard. */
 data class ChildSection(
     val childId: Long?,
@@ -66,6 +84,19 @@ data class DashboardUiState(
     val identity: UserIdentity? = null,
     val liveness: LivenessState? = null,
     val blockedApp: String? = null,
+    /**
+     * Phase 5/10: the *effective* schedule for the current protection context — the
+     * recognised child plus the protected app in the foreground — exactly as the
+     * runtime's engine already resolved it. The dashboard only renders it; it never
+     * re-resolves a schedule of its own. [ScheduleResolution.NoActiveSchedule] means
+     * no schedule currently applies (so protection is not schedule-affected).
+     */
+    val scheduleResolution: ScheduleResolution = ScheduleResolution.NoActiveSchedule,
+    /**
+     * Phase 6/10: the selected child's eye-safety configuration, or `null` while it
+     * has not loaded. Never fabricated.
+     */
+    val eyeSafety: EyeSafetySection? = null,
     val overlayGranted: Boolean = false,
     val usageAccessGranted: Boolean = false,
     val accessibilityEnabled: Boolean = false,
@@ -138,6 +169,33 @@ fun restrictionLevelLabelRes(level: RestrictionLevel?): Int = when (level) {
     RestrictionLevel.MEDIUM -> R.string.level_medium
     RestrictionLevel.HIGH -> R.string.level_high
     null -> R.string.dashboard_value_unknown
+}
+
+/** Phase 5/10: the descriptive mode of a schedule, reusing the existing labels. */
+fun scheduleModeLabelRes(mode: ScheduleMode): Int = when (mode) {
+    ScheduleMode.NORMAL -> R.string.schedule_mode_normal
+    ScheduleMode.STUDY -> R.string.schedule_mode_study
+    ScheduleMode.SLEEP -> R.string.schedule_mode_sleep
+    ScheduleMode.SCHOOL -> R.string.schedule_mode_school
+    ScheduleMode.CUSTOM -> R.string.schedule_mode_custom
+}
+
+/**
+ * Phase 6/10: an eye-safety action label, reusing the eye-safety editor's own
+ * action labels so the dashboard and the editor can never describe the same action
+ * differently. `DIM`/`BLUR`/`BLACK_SCREEN` have no eye-safety meaning in this build
+ * and are reported as unknown rather than mislabelled.
+ */
+fun eyeSafetyActionLabelRes(action: ProtectionAction): Int = when (action) {
+    ProtectionAction.ALLOW -> R.string.eye_safety_action_allow
+    ProtectionAction.WARNING -> R.string.eye_safety_action_warning
+    ProtectionAction.SOFT_BLOCK -> R.string.eye_safety_action_soft_block
+    ProtectionAction.HARD_BLOCK -> R.string.eye_safety_action_hard_block
+    ProtectionAction.MUTE -> R.string.eye_safety_action_mute
+    ProtectionAction.DIM,
+    ProtectionAction.BLUR,
+    ProtectionAction.BLACK_SCREEN,
+    -> R.string.dashboard_value_unknown
 }
 
 fun eventLabelRes(type: ActivityEventType): Int = when (type) {

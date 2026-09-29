@@ -61,6 +61,7 @@ import uz.faceguard.app.core.monitor.ForegroundAppMonitor
 import uz.faceguard.app.core.protection.ProtectionRuntime
 import uz.faceguard.app.core.protection.ProtectionState
 import uz.faceguard.app.core.ui.SectionCard
+import uz.faceguard.app.domain.eyesafety.EyeSafetyRepository
 import uz.faceguard.app.domain.model.AppSettings
 import uz.faceguard.app.domain.model.ParentProfile
 import uz.faceguard.app.domain.model.UserAccount
@@ -77,6 +78,7 @@ import uz.faceguard.app.domain.screentime.ScreenTimeLimitEvaluator
 import uz.faceguard.app.domain.screentime.ScreenTimeLimitRepository
 import uz.faceguard.app.domain.screentime.ScreenTimeUsageRepository
 import uz.faceguard.app.domain.request.ParentRequestRepository
+import uz.faceguard.app.domain.schedule.ScheduleResolution
 
 /**
  * Phase 10 Parent Dashboard.
@@ -96,6 +98,7 @@ class HomeViewModel @Inject constructor(
     activityLogRepository: ActivityLogRepository,
     settingsRepository: SettingsRepository,
     requestRepository: ParentRequestRepository,
+    eyeSafetyRepository: EyeSafetyRepository,
     private val screenTimeActiveChildRepository: ScreenTimeActiveChildRepository,
     screenTimeUsageRepository: ScreenTimeUsageRepository,
     screenTimeLimitRepository: ScreenTimeLimitRepository,
@@ -113,6 +116,7 @@ class HomeViewModel @Inject constructor(
         activityLogRepository = activityLogRepository,
         settingsRepository = settingsRepository,
         requestRepository = requestRepository,
+        eyeSafetyRepository = eyeSafetyRepository,
         runtimeState = runtime.state,
     )
 
@@ -236,6 +240,8 @@ fun HomeScreen(
     onOpenActivity: () -> Unit,
     onOpenChildPolicy: (Long) -> Unit,
     onOpenRequests: () -> Unit,
+    onOpenChildSchedules: (Long) -> Unit,
+    onOpenChildEyeSafety: (Long) -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val dashboard by viewModel.dashboard.collectAsStateWithLifecycle()
@@ -291,6 +297,14 @@ fun HomeScreen(
                         onOpenChildren = onOpenChildren,
                     )
                     ProtectedAppsSummaryCard(dashboard = dashboard, onOpenProtectedApps = onOpenProtectedApps)
+                    ScheduleSummaryCard(
+                        dashboard = dashboard,
+                        onManage = { dashboard.selectedChildId?.let(onOpenChildSchedules) ?: onOpenChildren() },
+                    )
+                    EyeSafetySummaryCard(
+                        dashboard = dashboard,
+                        onManage = { dashboard.selectedChildId?.let(onOpenChildEyeSafety) ?: onOpenChildren() },
+                    )
                     RequestsSummaryCard(dashboard = dashboard, onOpenRequests = onOpenRequests)
                     ChildProfileSummaryCard(dashboard, onOpenChildren = onOpenChildren)
                     RecentActivityCard(dashboard, onOpenActivity = onOpenActivity)
@@ -592,6 +606,103 @@ private fun ProtectedAppsSummaryCard(dashboard: DashboardUiState, onOpenProtecte
         }
         OutlinedButton(onClick = onOpenProtectedApps, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.dashboard_apps_open))
+        }
+    }
+}
+
+/**
+ * H. Phase 5/10: the schedule summary.
+ *
+ * Renders the *effective* schedule the engine already resolved for the current
+ * protection context — the dashboard never re-resolves one. "No active schedule"
+ * is a real state (protection is not schedule-affected right now), not an error.
+ */
+@Composable
+private fun ScheduleSummaryCard(dashboard: DashboardUiState, onManage: () -> Unit) {
+    SectionCard(title = stringResource(R.string.schedule_title)) {
+        when (val resolution = dashboard.scheduleResolution) {
+            is ScheduleResolution.NoActiveSchedule -> Text(
+                stringResource(R.string.dashboard_schedule_none),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+
+            is ScheduleResolution.ActiveSchedule -> Text(
+                stringResource(
+                    R.string.dashboard_schedule_active,
+                    resolution.schedule.name,
+                    stringResource(scheduleModeLabelRes(resolution.schedule.mode)),
+                ),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+
+            is ScheduleResolution.ScheduleConflict -> Text(
+                stringResource(
+                    R.string.dashboard_schedule_conflict,
+                    resolution.schedules.joinToString(", ") { it.name },
+                ),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        if (dashboard.hasChild) {
+            OutlinedButton(onClick = onManage, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.dashboard_schedule_manage))
+            }
+        }
+    }
+}
+
+/**
+ * I. Phase 6/10: the eye-safety summary.
+ *
+ * Shows the selected child's *configuration* (the parent's own setting) — never a
+ * live measurement or a manufactured warning count. "Not configured" and
+ * "configured but disabled" are distinct states.
+ */
+@Composable
+private fun EyeSafetySummaryCard(dashboard: DashboardUiState, onManage: () -> Unit) {
+    SectionCard(title = stringResource(R.string.eye_safety_title)) {
+        val eyeSafety = dashboard.eyeSafety
+        when {
+            eyeSafety == null -> Text(
+                stringResource(R.string.state_loading),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+
+            !eyeSafety.configured -> Text(
+                stringResource(R.string.eye_safety_status_not_configured),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+
+            !eyeSafety.enabled -> Text(
+                stringResource(R.string.eye_safety_status_disabled),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+
+            else -> {
+                Text(
+                    stringResource(R.string.eye_safety_status_enabled),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                val warning = eyeSafety.warningAction
+                val danger = eyeSafety.dangerAction
+                if (warning != null && danger != null) {
+                    Text(
+                        stringResource(
+                            R.string.dashboard_eye_safety_actions,
+                            stringResource(eyeSafetyActionLabelRes(warning)),
+                            stringResource(eyeSafetyActionLabelRes(danger)),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        if (dashboard.hasChild) {
+            OutlinedButton(onClick = onManage, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.dashboard_eye_safety_manage))
+            }
         }
     }
 }

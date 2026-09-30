@@ -2,12 +2,33 @@
 <!-- Offline-first by design: no INTERNET permission. Camera + usage-stats
      power face capture and foreground monitoring; future sync scaffolding
      (uz.faceguard.app.sync) requires no manifest changes while offline. -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- Background protection foundation: an honest, user-visible foreground
+         service keeps the app-scoped ProtectionRuntime alive while Qalqon is
+         not on screen. Since Phase 7.1 it also owns the process-scoped camera
+         session, so it declares the `camera` type alongside `specialUse`. The
+         camera type is only claimed at runtime in the legal while-in-use
+         foreground moment (see ProtectionForegroundService). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Phase 7.4: restore protection (from the persisted intent) after a reboot. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!-- Phase 14: ML Kit's transitive `com.google.android.datatransport:transport-backend-cct`
+         injects these two permissions and a telemetry backend through manifest merging.
+         QALQON is offline-first and never uses datatransport (face detection runs on the
+         models bundled in the APK), so they are removed rather than shipped. This restores
+         the "no INTERNET permission" privacy contract in the merged release manifest. -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
 
     <application
         android:name=".FaceGuardApp"
@@ -27,5 +48,60 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".core.protection.ProtectionForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="camera|specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="parental_control_protection_state" />
+        </service>
+
+        <!-- Phase 7.4: after a device reboot, ask the existing restorer to restore
+             protection from the persisted intent. It creates nothing of its own —
+             it only triggers the app's existing startup path. BOOT_COMPLETED is a
+             protected broadcast (system-only), and the restore is idempotent.
+             The launched service claims the `specialUse` type only at boot; the
+             camera type is never claimed from a boot context (Android 15 forbids
+             camera/dataSync/media* FGS starts from BOOT_COMPLETED receivers). -->
+        <receiver
+            android:name=".core.protection.ProtectionBootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Group 7: system interaction layer. The system is the only caller
+             (guarded by BIND_ACCESSIBILITY_SERVICE) and only window/app
+             transitions are requested; window content stays unreadable. -->
+        <service
+            android:name=".core.accessibility.ProtectionAccessibilityService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- Phase 14: remove the telemetry backend ML Kit's transitive datatransport
+             dependency contributes. QALQON never calls datatransport (nothing binds or
+             starts these), so removing them shrinks the attack surface and leaves no
+             upload service registered in the release build. -->
+        <service
+            android:name="com.google.android.datatransport.runtime.backends.TransportBackendDiscovery"
+            tools:node="remove" />
+        <service
+            android:name="com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService"
+            tools:node="remove" />
+        <receiver
+            android:name="com.google.android.datatransport.runtime.scheduling.jobscheduling.AlarmManagerSchedulerBroadcastReceiver"
+            tools:node="remove" />
     </application>
 </manifest>

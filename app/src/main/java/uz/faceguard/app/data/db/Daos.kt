@@ -19,6 +19,10 @@ interface UserAccountDao {
     @Query("SELECT * FROM user_accounts WHERE phoneNumber = :phoneNumber LIMIT 1")
     suspend fun getByPhone(phoneNumber: String): UserAccountEntity?
 
+    /** Phase 12: upgrades a legacy PIN hash in place (no schema change). */
+    @Query("UPDATE user_accounts SET pinHash = :pinHash, pinSalt = :pinSalt WHERE id = :id")
+    suspend fun updatePinHash(id: Long, pinHash: String, pinSalt: String)
+
     @Query("DELETE FROM user_accounts")
     suspend fun deleteAll()
 }
@@ -45,6 +49,10 @@ interface ParentProfileDao {
     /** Clears face enrollment metadata without touching the profile itself. */
     @Query("UPDATE parent_profiles SET isFaceEnrolled = 0, faceTemplateRef = NULL, enrollmentStatus = 'NONE', enrollmentVersion = enrollmentVersion + 1, lastEnrollmentAt = NULL, updatedAt = :updatedAt WHERE accountId = :accountId")
     suspend fun clearFaceData(accountId: Long, updatedAt: Long)
+
+    /** Phase 12: rows for the biometric encryption sweep. */
+    @Query("SELECT * FROM parent_profiles")
+    suspend fun all(): List<ParentProfileEntity>
 
     @Query("DELETE FROM parent_profiles")
     suspend fun deleteAll()
@@ -73,6 +81,10 @@ interface ChildProfileDao {
     @Query("UPDATE child_profiles SET isFaceEnrolled = 0, faceTemplateRef = NULL, enrollmentStatus = 'NONE', enrollmentVersion = enrollmentVersion + 1, lastEnrollmentAt = NULL, updatedAt = :updatedAt WHERE id = :id AND accountId = :accountId")
     suspend fun clearFaceData(id: Long, accountId: Long, updatedAt: Long)
 
+    /** Phase 12: rows for the biometric encryption sweep. */
+    @Query("SELECT * FROM child_profiles")
+    suspend fun all(): List<ChildProfileEntity>
+
     @Query("DELETE FROM child_profiles")
     suspend fun deleteAll()
 }
@@ -82,8 +94,12 @@ interface ActivityEventDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(event: ActivityEventEntity): Long
 
-    @Query("SELECT * FROM activity_events ORDER BY at DESC LIMIT 100")
-    fun observeRecent(): Flow<List<ActivityEventEntity>>
+    /** Newest-first events of a single account; the log never leaks across accounts. */
+    @Query("SELECT * FROM activity_events WHERE accountId = :accountId ORDER BY at DESC LIMIT 100")
+    fun observeRecent(accountId: Long): Flow<List<ActivityEventEntity>>
+
+    @Query("DELETE FROM activity_events WHERE accountId = :accountId")
+    suspend fun deleteForAccount(accountId: Long)
 
     @Query("DELETE FROM activity_events")
     suspend fun deleteAll()
@@ -114,4 +130,434 @@ interface ProtectedAppDao {
 
     @Query("DELETE FROM protected_apps")
     suspend fun deleteAll()
+}
+
+/**
+ * Child-scoped app policies. Keeps Room entities out of the domain layer —
+ * mapping to `AppPolicy` happens in the repository implementation.
+ */
+@Dao
+interface ChildAppPolicyDao {
+
+    @Query(
+        "SELECT * FROM child_app_policies WHERE accountId = :accountId AND childId = :childId " +
+            "ORDER BY packageName ASC",
+    )
+    fun observePolicies(accountId: Long, childId: Long): Flow<List<ChildAppPolicyEntity>>
+
+    @Query(
+        "SELECT * FROM child_app_policies WHERE accountId = :accountId AND childId = :childId " +
+            "AND packageName = :packageName LIMIT 1",
+    )
+    suspend fun getPolicy(accountId: Long, childId: Long, packageName: String): ChildAppPolicyEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(policy: ChildAppPolicyEntity)
+
+    @Query(
+        "DELETE FROM child_app_policies WHERE accountId = :accountId AND childId = :childId " +
+            "AND packageName = :packageName",
+    )
+    suspend fun delete(accountId: Long, childId: Long, packageName: String)
+
+    @Query("DELETE FROM child_app_policies WHERE accountId = :accountId AND childId = :childId")
+    suspend fun deleteForChild(accountId: Long, childId: Long)
+
+    @Query("DELETE FROM child_app_policies WHERE accountId = :accountId AND packageName = :packageName")
+    suspend fun deleteForApp(accountId: Long, packageName: String)
+
+    @Query("DELETE FROM child_app_policies")
+    suspend fun deleteAll()
+}
+
+/**
+ * Phase 11: parent requests. All mutations are ownership-checked and
+ * transition-checked in SQL (`WHERE ... status = 'PENDING'`), so concurrent or
+ * repeated decisions cannot produce contradictory states.
+ */
+@Dao
+interface ParentRequestDao {
+
+    @Insert
+    suspend fun insert(request: ParentRequestEntity): Long
+
+    @Query(
+        "SELECT * FROM parent_requests WHERE accountId = :accountId AND status = 'PENDING' " +
+            "ORDER BY createdAt DESC LIMIT :limit",
+    )
+    fun observePending(accountId: Long, limit: Int): Flow<List<ParentRequestEntity>>
+
+    @Query(
+        "SELECT * FROM parent_requests WHERE accountId = :accountId " +
+            "ORDER BY createdAt DESC LIMIT :limit",
+    )
+    fun observeForAccount(accountId: Long, limit: Int): Flow<List<ParentRequestEntity>>
+
+    @Query("SELECT COUNT(*) FROM parent_requests WHERE accountId = :accountId AND status = 'PENDING'")
+    fun observePendingCount(accountId: Long): Flow<Int>
+
+    @Query(
+        "SELECT * FROM parent_requests WHERE accountId = :accountId AND childId = :childId " +
+            "AND status = 'PENDING' ORDER BY createdAt DESC LIMIT :limit",
+    )
+    fun observePendingForChild(accountId: Long, childId: Long, limit: Int): Flow<List<ParentRequestEntity>>
+
+    @Query("SELECT * FROM parent_requests WHERE accountId = :accountId AND id = :id LIMIT 1")
+    suspend fun byId(accountId: Long, id: Long): ParentRequestEntity?
+
+    @Query(
+        "SELECT * FROM parent_requests WHERE accountId = :accountId AND deduplicationKey = :key " +
+            "AND status = 'PENDING' ORDER BY createdAt DESC LIMIT 1",
+    )
+    suspend fun activeByKey(accountId: Long, key: String): ParentRequestEntity?
+
+    /**
+     * Atomic resolution: only a still-PENDING row of *this account* is updated,
+     * so a duplicate/concurrent decision updates zero rows.
+     */
+    @Query(
+        "UPDATE parent_requests SET status = :newStatus, approvedDurationMinutes = :approvedMinutes, " +
+            "resolvedAt = :now, updatedAt = :now, resolutionReason = :reason " +
+            "WHERE accountId = :accountId AND id = :id AND status = 'PENDING'",
+    )
+    suspend fun resolve(
+        accountId: Long,
+        id: Long,
+        newStatus: String,
+        approvedMinutes: Int?,
+        now: Long,
+        reason: String?,
+    ): Int
+
+    /**
+     * Idempotent expiration: only pending rows past their expiry change, and a
+     * second call updates nothing.
+     */
+    @Query(
+        "UPDATE parent_requests SET status = 'EXPIRED', resolvedAt = :now, updatedAt = :now, " +
+            "resolutionReason = 'expired' " +
+            "WHERE accountId = :accountId AND status = 'PENDING' AND expiresAt IS NOT NULL " +
+            "AND expiresAt <= :now",
+    )
+    suspend fun expireStale(accountId: Long, now: Long): Int
+
+    @Query("DELETE FROM parent_requests")
+    suspend fun deleteAll()
+}
+
+/** Phase 11: durable notification dedup keys + delivery status. */
+@Dao
+interface NotificationRecordDao {
+
+    /** IGNORE on conflict: an existing dedup key means "already notified". */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insert(record: NotificationRecordEntity): Long
+
+    @Query(
+        "UPDATE notification_records SET delivered = :delivered, deliveryAt = :at " +
+            "WHERE deduplicationKey = :key",
+    )
+    suspend fun markDelivered(key: String, delivered: Boolean, at: Long)
+
+    @Query("SELECT * FROM notification_records WHERE deduplicationKey = :key LIMIT 1")
+    suspend fun byKey(key: String): NotificationRecordEntity?
+
+    @Query("DELETE FROM notification_records")
+    suspend fun deleteAll()
+}
+
+/**
+ * Phase 4: screen-time usage. Every statement is account + child scoped and the
+ * increment is a single SQL statement (`usedMs = usedMs + :deltaMs`) so concurrent
+ * increments accumulate instead of losing updates.
+ */
+@Dao
+interface DailyAppUsageDao {
+
+    @Query(
+        "SELECT * FROM daily_app_usage WHERE accountId = :accountId AND childId = :childId " +
+            "AND dateKey = :dateKey ORDER BY packageName ASC",
+    )
+    fun observeDay(accountId: Long, childId: Long, dateKey: String): Flow<List<DailyAppUsageEntity>>
+
+    @Query(
+        "SELECT * FROM daily_app_usage WHERE accountId = :accountId AND childId = :childId " +
+            "AND dateKey = :dateKey ORDER BY packageName ASC",
+    )
+    suspend fun dayUsage(accountId: Long, childId: Long, dateKey: String): List<DailyAppUsageEntity>
+
+    @Query(
+        "SELECT * FROM daily_app_usage WHERE accountId = :accountId AND childId = :childId " +
+            "AND dateKey = :dateKey AND packageName = :packageName LIMIT 1",
+    )
+    suspend fun packageUsage(accountId: Long, childId: Long, dateKey: String, packageName: String): DailyAppUsageEntity?
+
+    @Query(
+        "SELECT SUM(usedMs) FROM daily_app_usage WHERE accountId = :accountId AND childId = :childId " +
+            "AND dateKey = :dateKey AND category = :category",
+    )
+    suspend fun categoryUsedMs(accountId: Long, childId: Long, dateKey: String, category: String): Long?
+
+    @Query(
+        "SELECT SUM(usedMs) FROM daily_app_usage WHERE accountId = :accountId AND childId = :childId " +
+            "AND dateKey = :dateKey",
+    )
+    suspend fun totalUsedMs(accountId: Long, childId: Long, dateKey: String): Long?
+
+    /** Atomic accumulate; returns the number of rows updated (0 when the row is absent). */
+    @Query(
+        "UPDATE daily_app_usage SET usedMs = usedMs + :deltaMs, updatedAt = :now " +
+            "WHERE accountId = :accountId AND childId = :childId AND dateKey = :dateKey " +
+            "AND packageName = :packageName AND :deltaMs >= 0 AND usedMs + :deltaMs >= 0",
+    )
+    suspend fun incrementUsage(
+        accountId: Long,
+        childId: Long,
+        dateKey: String,
+        packageName: String,
+        deltaMs: Long,
+        now: Long,
+    ): Int
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertIfAbsent(row: DailyAppUsageEntity): Long
+
+    @Query(
+        "DELETE FROM daily_app_usage WHERE accountId = :accountId AND childId = :childId AND dateKey = :dateKey",
+    )
+    suspend fun deleteDay(accountId: Long, childId: Long, dateKey: String)
+
+    @Query("DELETE FROM daily_app_usage WHERE accountId = :accountId AND childId = :childId")
+    suspend fun deleteChildUsage(accountId: Long, childId: Long)
+
+    @Query("DELETE FROM daily_app_usage WHERE accountId = :accountId")
+    suspend fun deleteAccountUsage(accountId: Long)
+
+    @Query("DELETE FROM daily_app_usage")
+    suspend fun deleteAll()
+}
+
+/** Phase 4: TOTAL / CATEGORY limits (per-app limits stay in child_app_policies). */
+@Dao
+interface ChildScreenTimeLimitDao {
+
+    @Query(
+        "SELECT * FROM child_screen_time_limits WHERE accountId = :accountId AND childId = :childId " +
+            "ORDER BY scope ASC, category ASC",
+    )
+    fun observeLimits(accountId: Long, childId: Long): Flow<List<ChildScreenTimeLimitEntity>>
+
+    @Query(
+        "SELECT * FROM child_screen_time_limits WHERE accountId = :accountId AND childId = :childId " +
+            "ORDER BY scope ASC, category ASC",
+    )
+    suspend fun limits(accountId: Long, childId: Long): List<ChildScreenTimeLimitEntity>
+
+    @Query(
+        "SELECT * FROM child_screen_time_limits WHERE accountId = :accountId AND childId = :childId " +
+            "AND scope = :scope AND category = :category LIMIT 1",
+    )
+    suspend fun limit(accountId: Long, childId: Long, scope: String, category: String): ChildScreenTimeLimitEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(limit: ChildScreenTimeLimitEntity)
+
+    @Query(
+        "DELETE FROM child_screen_time_limits WHERE accountId = :accountId AND childId = :childId " +
+            "AND scope = :scope AND category = :category",
+    )
+    suspend fun delete(accountId: Long, childId: Long, scope: String, category: String)
+
+    @Query("DELETE FROM child_screen_time_limits WHERE accountId = :accountId AND childId = :childId")
+    suspend fun deleteChildLimits(accountId: Long, childId: Long)
+
+    @Query("DELETE FROM child_screen_time_limits WHERE accountId = :accountId")
+    suspend fun deleteAccountLimits(accountId: Long)
+
+    @Query("DELETE FROM child_screen_time_limits")
+    suspend fun deleteAll()
+}
+
+/**
+ * Phase 4 Step 1B-6: the snapshot checkpoints used to turn a UsageStats counter into a
+ * delta. Every query is account + child scoped, so one account's (or child's) baseline can
+ * never be read or overwritten by another.
+ */
+@Dao
+interface UsageSnapshotCheckpointDao {
+
+    @Query(
+        "SELECT * FROM usage_snapshot_checkpoints WHERE accountId = :accountId " +
+            "AND childId = :childId AND source = :source AND windowStartMs = :windowStartMs " +
+            "AND windowEndMs = :windowEndMs AND packageName = :packageName LIMIT 1",
+    )
+    suspend fun checkpoint(
+        accountId: Long,
+        childId: Long,
+        source: String,
+        windowStartMs: Long,
+        windowEndMs: Long,
+        packageName: String,
+    ): UsageSnapshotCheckpointEntity?
+
+    /** Every checkpoint of one window: that is the previous snapshot for the window. */
+    @Query(
+        "SELECT * FROM usage_snapshot_checkpoints WHERE accountId = :accountId " +
+            "AND childId = :childId AND source = :source AND windowStartMs = :windowStartMs " +
+            "AND windowEndMs = :windowEndMs ORDER BY packageName ASC",
+    )
+    suspend fun checkpointsForWindow(
+        accountId: Long,
+        childId: Long,
+        source: String,
+        windowStartMs: Long,
+        windowEndMs: Long,
+    ): List<UsageSnapshotCheckpointEntity>
+
+    /** Overwrites the row with exactly this identity; never touches another key. */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(checkpoint: UsageSnapshotCheckpointEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(checkpoints: List<UsageSnapshotCheckpointEntity>)
+
+    @Query(
+        "DELETE FROM usage_snapshot_checkpoints WHERE accountId = :accountId " +
+            "AND childId = :childId AND source = :source AND windowStartMs = :windowStartMs " +
+            "AND windowEndMs = :windowEndMs AND packageName = :packageName",
+    )
+    suspend fun delete(
+        accountId: Long,
+        childId: Long,
+        source: String,
+        windowStartMs: Long,
+        windowEndMs: Long,
+        packageName: String,
+    )
+
+    @Query("DELETE FROM usage_snapshot_checkpoints WHERE accountId = :accountId AND childId = :childId")
+    suspend fun deleteForChild(accountId: Long, childId: Long)
+
+    @Query("DELETE FROM usage_snapshot_checkpoints WHERE accountId = :accountId")
+    suspend fun deleteForAccount(accountId: Long)
+
+    @Query("DELETE FROM usage_snapshot_checkpoints")
+    suspend fun deleteAll()
+}
+
+/**
+ * Phase 5 Step 2: schedule persistence.
+ *
+ * Every statement is scoped by `accountId` + `childId`, so no statement can read or write a
+ * schedule across an account or child boundary — a schedule id is never enough on its own.
+ * This DAO only stores and retrieves: it never evaluates a schedule, never reads a clock and
+ * never decides which schedule is active (that is [uz.faceguard.app.domain.schedule.ScheduleResolver]'s
+ * job, in a later step).
+ *
+ * `update`/`delete`/`deleteTargets` return the number of rows affected, so the repository can
+ * tell "changed this child's row" from "not this account/child's row" instead of assuming.
+ */
+@Dao
+interface ScheduleDao {
+
+    @Query(
+        "SELECT * FROM schedule_rules WHERE accountId = :accountId AND childId = :childId " +
+            "ORDER BY createdAt ASC, id ASC",
+    )
+    fun observeSchedules(accountId: Long, childId: Long): Flow<List<ScheduleRuleEntity>>
+
+    @Query(
+        "SELECT * FROM schedule_rules WHERE accountId = :accountId AND childId = :childId " +
+            "ORDER BY createdAt ASC, id ASC",
+    )
+    suspend fun schedules(accountId: Long, childId: Long): List<ScheduleRuleEntity>
+
+    @Query(
+        "SELECT * FROM schedule_rules WHERE accountId = :accountId AND childId = :childId " +
+            "AND id = :scheduleId LIMIT 1",
+    )
+    suspend fun schedule(accountId: Long, childId: Long, scheduleId: Long): ScheduleRuleEntity?
+
+    /** ABORT: a schedule id must be generated by SQLite, never silently coalesced. */
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insert(schedule: ScheduleRuleEntity): Long
+
+    /** Returns the number of rows updated (0 when the row is not this account/child's). */
+    @Query(
+        "UPDATE schedule_rules SET name = :name, mode = :mode, enabled = :enabled, " +
+            "startMinuteOfDay = :startMinuteOfDay, endMinuteOfDay = :endMinuteOfDay, " +
+            "daysMask = :daysMask, priority = :priority, action = :action, updatedAt = :updatedAt " +
+            "WHERE accountId = :accountId AND childId = :childId AND id = :scheduleId",
+    )
+    suspend fun update(
+        accountId: Long,
+        childId: Long,
+        scheduleId: Long,
+        name: String,
+        mode: String,
+        enabled: Boolean,
+        startMinuteOfDay: Int,
+        endMinuteOfDay: Int,
+        daysMask: Int,
+        priority: Int,
+        action: String,
+        updatedAt: Long,
+    ): Int
+
+    @Query("DELETE FROM schedule_rules WHERE accountId = :accountId AND childId = :childId AND id = :scheduleId")
+    suspend fun delete(accountId: Long, childId: Long, scheduleId: Long): Int
+
+    @Query("DELETE FROM schedule_rules WHERE accountId = :accountId AND childId = :childId")
+    suspend fun deleteForChild(accountId: Long, childId: Long): Int
+
+    @Query(
+        "SELECT packageName FROM schedule_app_targets WHERE accountId = :accountId " +
+            "AND childId = :childId AND scheduleId = :scheduleId ORDER BY packageName ASC",
+    )
+    fun observeTargetPackages(accountId: Long, childId: Long, scheduleId: Long): Flow<List<String>>
+
+    @Query(
+        "SELECT packageName FROM schedule_app_targets WHERE accountId = :accountId " +
+            "AND childId = :childId AND scheduleId = :scheduleId ORDER BY packageName ASC",
+    )
+    suspend fun targetPackages(accountId: Long, childId: Long, scheduleId: Long): List<String>
+
+    /** IGNORE: the composite key already makes a repeated target the same relation. */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertTargets(targets: List<ScheduleAppTargetEntity>)
+
+    @Query(
+        "DELETE FROM schedule_app_targets WHERE accountId = :accountId " +
+            "AND childId = :childId AND scheduleId = :scheduleId",
+    )
+    suspend fun deleteTargets(accountId: Long, childId: Long, scheduleId: Long): Int
+
+    @Query("DELETE FROM schedule_app_targets WHERE accountId = :accountId AND childId = :childId")
+    suspend fun deleteTargetsForChild(accountId: Long, childId: Long): Int
+}
+
+/**
+ * Phase 6 Step 3: a child's eye-safety configuration.
+ *
+ * Every statement is scoped by `accountId` + `childId`, which is also the composite primary key,
+ * so one child's settings can never be read, overwritten or deleted as another's. There is no
+ * `deleteAll`/global statement: configuration is per child, and a stray global statement would be
+ * the one way to cross the boundary.
+ */
+@Dao
+interface ChildEyeSafetyDao {
+
+    @Query("SELECT * FROM child_eye_safety WHERE accountId = :accountId AND childId = :childId LIMIT 1")
+    suspend fun config(accountId: Long, childId: Long): ChildEyeSafetyEntity?
+
+    @Query("SELECT * FROM child_eye_safety WHERE accountId = :accountId AND childId = :childId LIMIT 1")
+    fun observeConfig(accountId: Long, childId: Long): Flow<ChildEyeSafetyEntity?>
+
+    /** REPLACE: the composite key identifies one configuration, and a save overwrites it. */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(config: ChildEyeSafetyEntity)
+
+    /** Returns the number of rows deleted (0 when this child had no configuration). */
+    @Query("DELETE FROM child_eye_safety WHERE accountId = :accountId AND childId = :childId")
+    suspend fun delete(accountId: Long, childId: Long): Int
 }

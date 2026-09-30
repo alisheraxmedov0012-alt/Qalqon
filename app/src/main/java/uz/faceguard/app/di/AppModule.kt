@@ -1,33 +1,100 @@
 package uz.faceguard.app.di
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.room.Room
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import java.time.ZoneId
 import javax.inject.Singleton
 import uz.faceguard.app.data.db.ActivityEventDao
+import uz.faceguard.app.data.db.ChildAppPolicyDao
 import uz.faceguard.app.data.db.ChildProfileDao
+import uz.faceguard.app.data.db.ChildScreenTimeLimitDao
+import uz.faceguard.app.data.db.DailyAppUsageDao
 import uz.faceguard.app.data.db.FaceGuardDatabase
+import uz.faceguard.app.data.db.MIGRATION_3_4
+import uz.faceguard.app.data.db.MIGRATION_4_5
+import uz.faceguard.app.data.db.MIGRATION_5_6
+import uz.faceguard.app.data.db.MIGRATION_6_7
+import uz.faceguard.app.data.db.MIGRATION_7_8
+import uz.faceguard.app.data.db.MIGRATION_8_9
+import uz.faceguard.app.data.db.MIGRATION_9_10
 import uz.faceguard.app.data.db.ParentProfileDao
+import uz.faceguard.app.data.db.NotificationRecordDao
+import uz.faceguard.app.data.db.ParentRequestDao
 import uz.faceguard.app.data.db.ProtectedAppDao
+import uz.faceguard.app.data.db.ChildEyeSafetyDao
+import uz.faceguard.app.data.db.ScheduleDao
 import uz.faceguard.app.data.db.UserAccountDao
+import uz.faceguard.app.data.db.UsageSnapshotCheckpointDao
+import uz.faceguard.app.data.prefs.settingsDataStore
 import uz.faceguard.app.data.repository.AccountRepositoryImpl
 import uz.faceguard.app.data.repository.ActivityLogRepositoryImpl
+import uz.faceguard.app.data.repository.ChildAppPolicyRepositoryImpl
+import uz.faceguard.app.data.repository.NotificationRepositoryImpl
+import uz.faceguard.app.data.repository.ParentRequestRepositoryImpl
+import uz.faceguard.app.data.repository.PolicySettingsRepositoryImpl
 import uz.faceguard.app.data.repository.ResetRepositoryImpl
 import uz.faceguard.app.data.repository.ChildProfileRepositoryImpl
 import uz.faceguard.app.data.repository.ParentProfileRepositoryImpl
 import uz.faceguard.app.data.repository.ProtectedAppsRepositoryImpl
+import uz.faceguard.app.data.repository.EyeSafetyRepositoryImpl
+import uz.faceguard.app.data.repository.ScheduleRepositoryImpl
+import uz.faceguard.app.data.repository.ScreenTimeUsageRepositoryImpl
+import uz.faceguard.app.data.repository.ScreenTimeActiveChildRepositoryImpl
+import uz.faceguard.app.data.repository.ScreenTimeLimitRepositoryImpl
+import uz.faceguard.app.data.repository.RoomUsageAccountingTransaction
+import uz.faceguard.app.data.repository.UsageSnapshotCheckpointRepositoryImpl
 import uz.faceguard.app.core.embed.FaceEmbeddingModel
 import uz.faceguard.app.core.embed.TfLiteMobileFaceNet
+import uz.faceguard.app.core.usage.UsageStatsAppUsageSource
+import uz.faceguard.app.core.time.SystemElapsedTimeSource
+import uz.faceguard.app.core.policy.DefaultPolicyEvaluator
+import uz.faceguard.app.core.protection.AndroidProtectionServiceLauncher
+import uz.faceguard.app.core.protection.CameraSessionBinding
+import uz.faceguard.app.core.protection.CameraXSessionBinding
+import uz.faceguard.app.core.protection.ProtectionServiceLauncher
 import uz.faceguard.app.core.recognition.Recognizer
 import uz.faceguard.app.data.repository.SettingsRepositoryImpl
 import uz.faceguard.app.domain.repository.AccountRepository
 import uz.faceguard.app.domain.repository.ActivityLogRepository
 import uz.faceguard.app.domain.repository.ResetRepository
 import uz.faceguard.app.domain.repository.ChildProfileRepository
+import uz.faceguard.app.domain.policy.ChildAppPolicyRepository
+import uz.faceguard.app.domain.policy.PolicyEvaluator
+import uz.faceguard.app.domain.policy.PolicySettingsRepository
+import uz.faceguard.app.domain.notification.AppNotificationDispatcher
+import uz.faceguard.app.domain.notification.DefaultNotificationPolicy
+import uz.faceguard.app.domain.notification.NotificationContentFactory
+import uz.faceguard.app.domain.notification.NotificationCoordinator
+import uz.faceguard.app.domain.notification.NotificationPolicy
+import uz.faceguard.app.domain.notification.NotificationRepository
+import uz.faceguard.app.domain.request.ParentRequestRepository
+import uz.faceguard.app.domain.eyesafety.EyeSafetyRepository
+import uz.faceguard.app.domain.schedule.ScheduleRepository
+import uz.faceguard.app.domain.screentime.AppUsageSource
+import uz.faceguard.app.domain.screentime.ElapsedTimeSource
+import uz.faceguard.app.domain.screentime.ScreenTimeUsageRepository
+import uz.faceguard.app.domain.screentime.ScreenTimeActiveChildRepository
+import uz.faceguard.app.domain.screentime.ScreenTimeLimitRepository
+import uz.faceguard.app.domain.screentime.UsageAccountingTransaction
+import uz.faceguard.app.domain.screentime.UsageSnapshotCheckpointRepository
+import uz.faceguard.app.domain.screentime.UsageSourceId
+import uz.faceguard.app.core.notification.AndroidNotificationContentFactory
+import uz.faceguard.app.core.notification.AppLabelResolver
+import uz.faceguard.app.core.security.AesGcmSecureCrypto
+import uz.faceguard.app.core.security.AndroidKeystoreKeyProvider
+import uz.faceguard.app.core.security.KeystoreBiometricTemplateCipher
+import uz.faceguard.app.core.security.SecureCrypto
+import uz.faceguard.app.core.security.SecureKeyProvider
+import uz.faceguard.app.core.security.SecurityStateHolder
+import uz.faceguard.app.domain.security.BiometricTemplateCipher
+import uz.faceguard.app.core.notification.AndroidNotificationDispatcher
 import uz.faceguard.app.domain.repository.ParentProfileRepository
 import uz.faceguard.app.domain.repository.ProtectedAppsRepository
 import uz.faceguard.app.domain.repository.SettingsRepository
@@ -47,7 +114,7 @@ object AppModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): FaceGuardDatabase =
         Room.databaseBuilder(context, FaceGuardDatabase::class.java, "faceguard.db")
-            .fallbackToDestructiveMigration() // MVP only; add real migrations before release.
+            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10) // additive v3 -> v10; keeps existing user data
             .build()
 
     @Provides fun provideUserAccountDao(db: FaceGuardDatabase): UserAccountDao = db.userAccountDao()
@@ -55,6 +122,14 @@ object AppModule {
     @Provides fun provideChildProfileDao(db: FaceGuardDatabase): ChildProfileDao = db.childProfileDao()
     @Provides fun provideProtectedAppDao(db: FaceGuardDatabase): ProtectedAppDao = db.protectedAppDao()
     @Provides fun provideActivityEventDao(db: FaceGuardDatabase): ActivityEventDao = db.activityEventDao()
+    @Provides fun provideChildAppPolicyDao(db: FaceGuardDatabase): ChildAppPolicyDao = db.childAppPolicyDao()
+    @Provides fun provideParentRequestDao(db: FaceGuardDatabase): ParentRequestDao = db.parentRequestDao()
+    @Provides fun provideNotificationRecordDao(db: FaceGuardDatabase): NotificationRecordDao = db.notificationRecordDao()
+    @Provides fun provideDailyAppUsageDao(db: FaceGuardDatabase): DailyAppUsageDao = db.dailyAppUsageDao()
+    @Provides fun provideUsageSnapshotCheckpointDao(db: FaceGuardDatabase): UsageSnapshotCheckpointDao = db.usageSnapshotCheckpointDao()
+    @Provides fun provideChildScreenTimeLimitDao(db: FaceGuardDatabase): ChildScreenTimeLimitDao = db.childScreenTimeLimitDao()
+    @Provides fun provideScheduleDao(db: FaceGuardDatabase): ScheduleDao = db.scheduleDao()
+    @Provides fun provideChildEyeSafetyDao(db: FaceGuardDatabase): ChildEyeSafetyDao = db.childEyeSafetyDao()
 
     @Provides
     @Singleton
@@ -70,7 +145,38 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideChildAppPolicyRepository(
+        impl: ChildAppPolicyRepositoryImpl,
+    ): ChildAppPolicyRepository = impl
+
+    @Provides
+    @Singleton
+    fun provideSettingsDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
+        context.settingsDataStore
+
+    @Provides
+    @Singleton
     fun provideSettingsRepository(impl: SettingsRepositoryImpl): SettingsRepository = impl
+
+    @Provides
+    @Singleton
+    fun providePolicySettingsRepository(
+        impl: PolicySettingsRepositoryImpl,
+    ): PolicySettingsRepository = impl
+
+    // Single policy decision point for the whole app; the protection engine
+    // depends on the interface, so it must be bound here.
+    @Provides
+    @Singleton
+    fun providePolicyEvaluator(): PolicyEvaluator = DefaultPolicyEvaluator()
+
+    // Group 6: the runtime owns active protection and delegates the process
+    // lifecycle (foreground service) to this launcher.
+    @Provides
+    @Singleton
+    fun provideProtectionServiceLauncher(
+        @ApplicationContext context: Context,
+    ): ProtectionServiceLauncher = AndroidProtectionServiceLauncher(context)
 
     @Provides
     @Singleton
@@ -83,6 +189,78 @@ object AppModule {
     @Provides
     @Singleton
     fun provideResetRepository(impl: ResetRepositoryImpl): ResetRepository = impl
+
+    // Phase 4 Step 1B-2: screen-time usage accounting over the v7 database.
+    @Provides
+    @Singleton
+    fun provideScreenTimeUsageRepository(
+        impl: ScreenTimeUsageRepositoryImpl,
+    ): ScreenTimeUsageRepository = impl
+
+    // Phase 4 Step 1B-3: what the accounting layer measures and dates against.
+    // The device's own zone is what "today" means to the user (see UsageDateKey).
+    @Provides
+    @Singleton
+    fun provideZoneId(): ZoneId = ZoneId.systemDefault()
+
+    // Durations are measured against the monotonic clock, never the wall clock.
+    @Provides
+    @Singleton
+    fun provideElapsedTimeSource(impl: SystemElapsedTimeSource): ElapsedTimeSource = impl
+
+    // Phase 4 Step 1B-4: the device's aggregate usage, behind a domain seam. It reads
+    // nothing until asked and persists nothing; accounting stays in ScreenTimeUsageAccounting.
+    @Provides
+    @Singleton
+    fun provideAppUsageSource(@ApplicationContext context: Context): AppUsageSource =
+        UsageStatsAppUsageSource(context)
+
+    // Phase 4 Step 1B-6: the baselines that let a snapshot become a delta after a restart.
+    // The source identity is fixed next to the source binding above, so a baseline can never
+    // be filed under the wrong source.
+    @Provides
+    @Singleton
+    fun provideUsageSourceId(): UsageSourceId = UsageSourceId.USAGE_STATS
+
+    @Provides
+    @Singleton
+    fun provideUsageSnapshotCheckpointRepository(
+        impl: UsageSnapshotCheckpointRepositoryImpl,
+    ): UsageSnapshotCheckpointRepository = impl
+
+    // Both checkpoint and usage writes go through this one transaction, so the pair cannot
+    // be observed half-applied.
+    @Provides
+    @Singleton
+    fun provideUsageAccountingTransaction(
+        impl: RoomUsageAccountingTransaction,
+    ): UsageAccountingTransaction = impl
+
+    // Phase 4 Step 1B-7: the account-scoped screen-time target, stored in the existing
+    // settings DataStore (no new storage, no schema change).
+    @Provides
+    @Singleton
+    fun provideScreenTimeActiveChildRepository(
+        impl: ScreenTimeActiveChildRepositoryImpl,
+    ): ScreenTimeActiveChildRepository = impl
+
+    // Phase 4 Step 1C: reads the TOTAL/CATEGORY limits Step 1A already stores, so the
+    // evaluator never touches Room directly.
+    @Provides
+    @Singleton
+    fun provideScreenTimeLimitRepository(
+        impl: ScreenTimeLimitRepositoryImpl,
+    ): ScreenTimeLimitRepository = impl
+
+    // Phase 5 Step 2: per-child schedule persistence (schedule_rules + schedule_app_targets).
+    @Provides
+    @Singleton
+    fun provideScheduleRepository(impl: ScheduleRepositoryImpl): ScheduleRepository = impl
+
+    // Phase 6 Step 3: per-child eye-safety configuration persistence (child_eye_safety).
+    @Provides
+    @Singleton
+    fun provideEyeSafetyRepository(impl: EyeSafetyRepositoryImpl): EyeSafetyRepository = impl
 
     // Future backend sync: bound to offline no-ops by default; swap these
     // bindings to enable sync without touching any call site.
@@ -102,6 +280,75 @@ object AppModule {
     @Singleton
     fun provideSyncCoordinator(coordinator: SyncCoordinator): SyncCoordinator = coordinator
 
+    // Phase 11: durable parent requests + notification dedup/delivery.
+    @Provides
+    @Singleton
+    fun provideParentRequestRepository(impl: ParentRequestRepositoryImpl): ParentRequestRepository = impl
+
+    @Provides
+    @Singleton
+    fun provideNotificationRepository(impl: NotificationRepositoryImpl): NotificationRepository = impl
+
+    @Provides
+    @Singleton
+    fun provideNotificationPolicy(): NotificationPolicy = DefaultNotificationPolicy()
+
+    /** Phase 12: injectable wall clock (PIN lockout timing is testable). */
+    @Provides
+    @Singleton
+    fun provideClock(): () -> Long = { System.currentTimeMillis() }
+
+    // Phase 12: Keystore-backed biometric-at-rest protection.
+    @Provides
+    @Singleton
+    fun provideAndroidKeystoreKeyProvider(): AndroidKeystoreKeyProvider = AndroidKeystoreKeyProvider()
+
+    @Provides
+    @Singleton
+    fun provideSecureKeyProvider(impl: AndroidKeystoreKeyProvider): SecureKeyProvider = impl
+
+    @Provides
+    @Singleton
+    fun provideSecurityStateHolder(): SecurityStateHolder = SecurityStateHolder()
+
+    @Provides
+    @Singleton
+    fun provideSecureCrypto(keyProvider: SecureKeyProvider): SecureCrypto = AesGcmSecureCrypto(keyProvider)
+
+    @Provides
+    @Singleton
+    fun provideBiometricTemplateCipher(
+        crypto: SecureCrypto,
+        securityState: SecurityStateHolder,
+    ): BiometricTemplateCipher = KeystoreBiometricTemplateCipher(crypto, securityState)
+
+    @Provides
+    @Singleton
+    fun provideAppLabelResolver(
+        @ApplicationContext context: Context,
+    ): AppLabelResolver = AppLabelResolver(context)
+
+    @Provides
+    @Singleton
+    fun provideNotificationContentFactory(
+        @ApplicationContext context: Context,
+    ): NotificationContentFactory = AndroidNotificationContentFactory(context)
+
+    @Provides
+    @Singleton
+    fun provideNotificationDispatcher(
+        @ApplicationContext context: Context,
+    ): AppNotificationDispatcher = AndroidNotificationDispatcher(context)
+
+    @Provides
+    @Singleton
+    fun provideNotificationCoordinator(
+        policy: NotificationPolicy,
+        repository: NotificationRepository,
+        dispatcher: AppNotificationDispatcher,
+        contentFactory: NotificationContentFactory,
+    ): NotificationCoordinator = NotificationCoordinator(policy, repository, dispatcher, contentFactory)
+
     @Provides
     @Singleton
     fun provideRecognizer(): Recognizer = Recognizer()
@@ -110,4 +357,15 @@ object AppModule {
     @Singleton
     fun provideFaceEmbeddingModel(@ApplicationContext context: Context): FaceEmbeddingModel =
         TfLiteMobileFaceNet(context)
+
+    // Phase 7.1: the process-scoped camera session's binding seam. Production binds
+    // the existing FaceCaptureController pipeline to a process-owned lifecycle, so
+    // the camera no longer depends on any screen's lifecycle.
+    @Provides
+    @Singleton
+    fun provideCameraSessionBinding(
+        @ApplicationContext context: Context,
+        recognizer: Recognizer,
+        embeddingModel: FaceEmbeddingModel,
+    ): CameraSessionBinding = CameraXSessionBinding(context, recognizer, embeddingModel)
 }

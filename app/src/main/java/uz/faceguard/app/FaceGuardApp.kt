@@ -5,7 +5,12 @@ import androidx.camera.camera2.Camera2Config
 import androidx.camera.core.CameraXConfig
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import uz.faceguard.app.core.protection.ProtectionRuntime
+import uz.faceguard.app.data.repository.BiometricMigrationService
 
 
 /**
@@ -19,6 +24,12 @@ class FaceGuardApp : Application(), CameraXConfig.Provider {
     @Inject
     lateinit var protectionRuntime: ProtectionRuntime
 
+    @Inject
+    lateinit var biometricMigration: BiometricMigrationService
+
+    /** App-scoped, IO confined: the encryption sweep must never block startup. */
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     /**
      * CameraX requires a configured [CameraXConfig.Provider]; without one,
      * `ProcessCameraProvider` throws "CameraX is not configured properly".
@@ -31,5 +42,11 @@ class FaceGuardApp : Application(), CameraXConfig.Provider {
     override fun onCreate() {
         super.onCreate()
         protectionRuntime.start()
+        // Phase 12: encrypt any pre-existing plaintext biometric rows. Idempotent,
+        // off the main thread, and a failure never blocks the app (the security state
+        // reports RECOVERY_REQUIRED instead).
+        appScope.launch {
+            runCatching { biometricMigration.migrateLegacyTemplates() }
+        }
     }
 }

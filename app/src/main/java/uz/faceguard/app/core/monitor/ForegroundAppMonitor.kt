@@ -19,8 +19,12 @@ import kotlinx.coroutines.launch
 /**
  * Polling foreground monitor. Best-practical MVP: uses UsageStats events
  * (USAGE_ACCESS) and falls back to null when permission is missing. Documented
- * limitation: event delivery can lag on some OEMs; accessibility-based
- * monitoring lands in the protection phase.
+ * limitation: event delivery can lag on some OEMs.
+ *
+ * Group 7 adds the accessibility layer as a second, more responsive source:
+ * while [setAccessibilityActive] is true the accessibility service's window
+ * transitions are authoritative and the usage-stats poll no longer overwrites
+ * them (it would otherwise clobber a real package with a stale/null value).
  */
 class ForegroundAppMonitor(private val context: Context) {
 
@@ -29,6 +33,10 @@ class ForegroundAppMonitor(private val context: Context) {
 
     private var job: Job? = null
     private var lastFallbackAt = 0L
+
+    /** True while the accessibility service is bound and feeding transitions. */
+    @Volatile
+    private var accessibilityActive = false
 
     fun hasUsageAccess(): Boolean {
         val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
@@ -46,7 +54,8 @@ class ForegroundAppMonitor(private val context: Context) {
         if (job != null) return
         job = scope.launch(Dispatchers.Default) {
             while (true) {
-                _current.value = pollForeground()
+                // Accessibility, when bound, is the authoritative source.
+                if (!accessibilityActive) _current.value = pollForeground()
                 delay(intervalMs)
             }
         }
@@ -55,6 +64,19 @@ class ForegroundAppMonitor(private val context: Context) {
     fun stop() {
         job?.cancel()
         job = null
+    }
+
+    /**
+     * Marks the accessibility layer as the authoritative foreground source (or
+     * hands control back to usage-stats polling when it is unbound).
+     */
+    fun setAccessibilityActive(active: Boolean) {
+        accessibilityActive = active
+    }
+
+    /** Foreground package reported by the accessibility service (metadata only). */
+    fun updateFromAccessibility(packageName: String) {
+        _current.value = packageName
     }
 
     private fun pollForeground(): String? {

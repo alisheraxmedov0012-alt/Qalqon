@@ -10,8 +10,17 @@ import androidx.room.RoomDatabase
         ChildProfileEntity::class,
         ProtectedAppEntity::class,
         ActivityEventEntity::class,
+        ChildAppPolicyEntity::class,
+        ParentRequestEntity::class,
+        NotificationRecordEntity::class,
+        DailyAppUsageEntity::class,
+        ChildScreenTimeLimitEntity::class,
+        UsageSnapshotCheckpointEntity::class,
+        ScheduleRuleEntity::class,
+        ScheduleAppTargetEntity::class,
+        ChildEyeSafetyEntity::class,
     ],
-    version = 3,
+    version = 10,
     exportSchema = false,
 )
 abstract class FaceGuardDatabase : RoomDatabase() {
@@ -20,4 +29,12 @@ abstract class FaceGuardDatabase : RoomDatabase() {
     abstract fun childProfileDao(): ChildProfileDao
     abstract fun protectedAppDao(): ProtectedAppDao
     abstract fun activityEventDao(): ActivityEventDao
+    abstract fun childAppPolicyDao(): ChildAppPolicyDao
+    abstract fun parentRequestDao(): ParentRequestDao
+    abstract fun notificationRecordDao(): NotificationRecordDao
+    abstract fun dailyAppUsageDao(): DailyAppUsageDao
+    abstract fun childScreenTimeLimitDao(): ChildScreenTimeLimitDao
+    abstract fun usageSnapshotCheckpointDao(): UsageSnapshotCheckpointDao
+    abstract fun scheduleDao(): ScheduleDao
+    abstract fun childEyeSafetyDao(): ChildEyeSafetyDao
 }

@@ -2,6 +2,7 @@ package uz.faceguard.app.feature.enrollment
 
 import android.widget.Toast
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -28,6 +31,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
@@ -44,7 +48,6 @@ import com.google.accompanist.permissions.rememberPermissionState
 import com.google.accompanist.permissions.shouldShowRationale
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
-import kotlin.math.abs
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -52,11 +55,21 @@ import kotlinx.coroutines.launch
 import uz.faceguard.app.R
 import uz.faceguard.app.core.embed.FaceEmbeddable
 import uz.faceguard.app.core.embed.FaceEmbeddingModel
+import uz.faceguard.app.core.embed.FaceFeatureExtractor
 import uz.faceguard.app.core.embed.MeanFaceEmbeddingCollector
+import uz.faceguard.app.core.enrollment.EnrollmentFrameMapper
 import uz.faceguard.app.core.pipeline.FaceCaptureController
-import uz.faceguard.app.core.pipeline.FaceQuality
 import uz.faceguard.app.core.pipeline.FrameEvent
+import uz.faceguard.app.core.protection.CameraBindingCoordinator
 import uz.faceguard.app.core.recognition.Recognizer
+import uz.faceguard.app.domain.enrollment.EnrollmentFrame
+import uz.faceguard.app.domain.enrollment.EnrollmentProgress
+import uz.faceguard.app.domain.enrollment.EnrollmentQualityConfig
+import uz.faceguard.app.domain.enrollment.EnrollmentQualityGate
+import uz.faceguard.app.domain.enrollment.EnrollmentRejection
+import uz.faceguard.app.domain.enrollment.EnrollmentStage
+import uz.faceguard.app.domain.enrollment.FaceEmbeddingValidator
+import uz.faceguard.app.domain.enrollment.FrontalEnrollmentCollector
 import uz.faceguard.app.domain.repository.AccountRepository
 import uz.faceguard.app.domain.repository.ChildProfileRepository
 import uz.faceguard.app.domain.repository.ParentProfileRepository
@@ -65,12 +78,16 @@ const val SUBJECT_PARENT = "ota-ona"
 const val SUBJECT_CHILD = "bola"
 
 /**
- * Guided, real-time face enrollment.
+ * Guided, robust frontal face enrollment.
  *
- * Frames are evaluated as they arrive: the UI shows a live hint (no face, look
- * straight, too far, too dark, hold still) and a template is stored **only**
- * once the face is present, well lit, close enough and held straight for
- * [HOLD_DURATION_MS]. Nothing is saved merely because the camera opened.
+ * The user does one thing: face the camera naturally for a moment. Every frame
+ * is quality-checked (single face, size, position, frontal pose, light, focus,
+ * occlusion, valid embedding) and only frames that pass are accumulated. A
+ * template is stored **only** once enough quality frames have been held over a
+ * short span and their embeddings agree with each other — never because a single
+ * good-looking frame appeared or merely because the camera opened.
+ *
+ * The user is never asked to turn left/right/up/down, and never taps to capture.
  */
 @HiltViewModel
 class FaceEnrollmentViewModel @Inject constructor(
@@ -79,31 +96,49 @@ class FaceEnrollmentViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
     val recognizer: Recognizer,
     val embeddingModel: FaceEmbeddingModel,
+    private val cameraCoordinator: CameraBindingCoordinator,
 ) : ViewModel() {
 
     enum class Phase { IDLE, CAPTURING, SAVED, FAILED, CANCELED }
 
-    /** What the user should do right now. */
-    enum class Guidance { NO_FACE, TOO_DARK, TOO_FAR, LOOK_STRAIGHT, HOLDING }
-
     data class Ui(
         val phase: Phase = Phase.CAPTURING,
-        val hintRes: Int = R.string.enroll_hint_no_face,
+        val stage: EnrollmentStage = EnrollmentStage.SEARCHING,
+        val hintRes: Int = R.string.enroll_hint_initial,
         val holdProgress: Float = 0f,
+        val captured: Int = 0,
+        val required: Int = 0,
         val template: String? = null,
         val errorRes: Int? = null,
     )
 
-    private val _ui = MutableStateFlow(Ui())
+    private val qualityConfig = buildQualityConfig()
+    private val collector = FrontalEnrollmentCollector(
+        config = qualityConfig,
+        gate = EnrollmentQualityGate(
+            config = qualityConfig,
+            validator = FaceEmbeddingValidator(
+                expectedDimension = qualityConfig.expectedEmbeddingDimension,
+                requireUnitNorm = qualityConfig.requireUnitNorm,
+                unitNormTolerance = qualityConfig.unitNormTolerance,
+            ),
+        ),
+    )
+
+    private val _ui = MutableStateFlow(Ui(required = qualityConfig.framesRequired))
     val ui: StateFlow<Ui> = _ui
 
     /** Last failure text, surfaced as a Toast; cleared by [consumeError]. */
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage
 
-    /** Kept small: only the tail of the steady window feeds the template. */
-    private val holdFrames = ArrayDeque<FrameEvent>()
-    private var holdStartedAt = 0L
+    /**
+     * The live frames behind the collector's selected samples. EnrollmentFrame is
+     * identity-keyed, so this maps each selected sample back to the FrameEvent the
+     * existing [FaceEmbeddable] aggregates. Bounded by the collector's window.
+     */
+    private val capturedFrames = HashMap<EnrollmentFrame, FrameEvent>()
+
     private var finishing = false
 
     var controller: FaceCaptureController? = null
@@ -159,6 +194,7 @@ class FaceEnrollmentViewModel @Inject constructor(
     }
 
     fun stopCamera() {
+        val hadCamera = controller != null
         startedPreview = null
         pendingPreview = null
         try {
@@ -166,56 +202,65 @@ class FaceEnrollmentViewModel @Inject constructor(
         } catch (t: Throwable) {
             reportError(t)
         }
+        // Q-1 fix: this transient screen has taken and now released the shared
+        // camera. If protection is still active it must get its binding back —
+        // only announce when this screen actually held the camera.
+        if (hadCamera) cameraCoordinator.onTransientCameraReleased()
     }
 
     fun onFrame(frame: FrameEvent) {
         try {
             if (_ui.value.phase != Phase.CAPTURING || finishing) return
 
-            val guidance = guidanceFor(frame.quality)
-            if (guidance != Guidance.HOLDING) {
-                resetHold()
-                _ui.update { it.copy(hintRes = hintResFor(guidance), holdProgress = 0f) }
+            val mapped = EnrollmentFrameMapper.map(
+                quality = frame.quality,
+                faceCount = frame.faceCount,
+                embedding = frame.features,
+                timestampMs = frame.timestamp,
+            )
+            if (mapped.embedding != null) capturedFrames[mapped] = frame
+
+            val progress = collector.onFrame(mapped)
+            if (progress.complete) {
+                finishCapture(collector.selected())
                 return
             }
-
-            if (holdStartedAt == 0L) holdStartedAt = frame.timestamp
-            if (frame.features != null) {
-                holdFrames.addLast(frame)
-                while (holdFrames.size > MAX_TEMPLATE_FRAMES) holdFrames.removeFirst()
-            }
-
-            val elapsed = frame.timestamp - holdStartedAt
-            if (elapsed >= HOLD_DURATION_MS) {
-                finishCapture()
-            } else {
-                _ui.update {
-                    it.copy(
-                        hintRes = hintResFor(Guidance.HOLDING),
-                        holdProgress = (elapsed.toFloat() / HOLD_DURATION_MS).coerceIn(0f, 1f),
-                    )
-                }
+            _ui.update {
+                it.copy(
+                    stage = progress.stage,
+                    hintRes = hintResFor(progress),
+                    holdProgress = progress.progressFraction,
+                    captured = progress.acceptedFrames,
+                    required = progress.requiredFrames,
+                )
             }
         } catch (t: Throwable) {
             reportError(t)
         }
     }
 
-    /** Stores the template — only reached after a steady, well-positioned hold. */
-    private fun finishCapture() {
+    /**
+     * Aggregates the selected best frames into the stored template — only reached
+     * after the collector has confirmed enough consistent, quality-checked samples.
+     */
+    private fun finishCapture(selected: List<EnrollmentFrame>) {
         if (finishing) return
         finishing = true
-        _ui.update { it.copy(hintRes = hintResFor(Guidance.HOLDING), holdProgress = 1f) }
+        _ui.update {
+            it.copy(
+                stage = EnrollmentStage.VALIDATING,
+                hintRes = R.string.enroll_hint_preparing,
+                holdProgress = 1f,
+            )
+        }
 
-        val captured = holdFrames.toList()
+        val frames = selected.mapNotNull { capturedFrames[it] }
         viewModelScope.launch {
             try {
-                val template = embeddable.collect(captured)
+                val template = embeddable.collect(frames)
                 if (template.isEmpty()) {
-                    // Not enough usable frames: keep guiding instead of saving.
-                    finishing = false
-                    resetHold()
-                    _ui.update { it.copy(hintRes = hintResFor(Guidance.NO_FACE), holdProgress = 0f) }
+                    // No usable embedding survived: keep guiding instead of saving.
+                    clearCollection(R.string.enroll_hint_quality_retry, EnrollmentStage.QUALITY_CHECK)
                     return@launch
                 }
 
@@ -227,25 +272,36 @@ class FaceEnrollmentViewModel @Inject constructor(
                     }
                     else -> Unit
                 }
-                resetHold()
-                _ui.update { it.copy(phase = Phase.SAVED, template = template, holdProgress = 1f) }
+                clearCollection()
+                _ui.update {
+                    it.copy(
+                        phase = Phase.SAVED,
+                        stage = EnrollmentStage.SUCCESS,
+                        hintRes = R.string.enroll_success_message,
+                        template = template,
+                        holdProgress = 1f,
+                    )
+                }
             } catch (t: Throwable) {
-                finishing = false
-                resetHold()
+                clearCollection()
                 reportError(t)
-                _ui.update { it.copy(phase = Phase.FAILED, errorRes = R.string.enroll_failure_message) }
+                _ui.update {
+                    it.copy(
+                        phase = Phase.FAILED,
+                        stage = EnrollmentStage.FAILED,
+                        errorRes = R.string.enroll_failure_message,
+                    )
+                }
             }
         }
     }
 
     fun restart() {
-        finishing = false
-        resetHold()
+        clearCollection(R.string.enroll_hint_initial, EnrollmentStage.SEARCHING)
         _ui.update {
             it.copy(
                 phase = Phase.CAPTURING,
-                hintRes = R.string.enroll_hint_no_face,
-                holdProgress = 0f,
+                hintRes = R.string.enroll_hint_initial,
                 template = null,
                 errorRes = null,
             )
@@ -264,39 +320,63 @@ class FaceEnrollmentViewModel @Inject constructor(
         _errorMessage.value = detail
     }
 
-    private fun resetHold() {
-        holdStartedAt = 0L
-        holdFrames.clear()
-    }
-
-    private fun guidanceFor(quality: FaceQuality?): Guidance {
-        if (quality == null || quality.faceCount == 0) return Guidance.NO_FACE
-        if (quality.brightness < MIN_BRIGHTNESS) return Guidance.TOO_DARK
-        if (quality.faceWidthRatio < MIN_FACE_WIDTH_RATIO) return Guidance.TOO_FAR
-        if (abs(quality.headEulerAngleY) > MAX_HEAD_EULER_Y ||
-            abs(quality.headEulerAngleZ) > MAX_HEAD_EULER_Z
-        ) {
-            return Guidance.LOOK_STRAIGHT
+    private fun clearCollection(hintRes: Int? = null, stage: EnrollmentStage? = null) {
+        collector.reset()
+        capturedFrames.clear()
+        finishing = false
+        _ui.update {
+            it.copy(
+                stage = stage ?: EnrollmentStage.STABILIZING,
+                hintRes = hintRes ?: R.string.enroll_hint_initial,
+                holdProgress = 0f,
+                captured = 0,
+                required = qualityConfig.framesRequired,
+            )
         }
-        return Guidance.HOLDING
     }
 
-    private fun hintResFor(guidance: Guidance): Int = when (guidance) {
-        Guidance.NO_FACE -> R.string.enroll_hint_no_face
-        Guidance.TOO_DARK -> R.string.enroll_hint_too_dark
-        Guidance.TOO_FAR -> R.string.enroll_hint_too_far
-        Guidance.LOOK_STRAIGHT -> R.string.enroll_hint_look_straight
-        Guidance.HOLDING -> R.string.enroll_hint_hold
+    /**
+     * The expected embedding shape follows whichever extractor is actually
+     * running: MobileFaceNet's L2-normalized vectors when the model is ready,
+     * otherwise the fixed-size, non-normalized geometry fallback.
+     */
+    private fun buildQualityConfig(): EnrollmentQualityConfig {
+        val ready = runCatching { embeddingModel.isReady() }.getOrDefault(false)
+        return if (ready) {
+            EnrollmentQualityConfig(
+                expectedEmbeddingDimension = runCatching { embeddingModel.embeddingSize() }.getOrDefault(0),
+                requireUnitNorm = true,
+            )
+        } else {
+            EnrollmentQualityConfig(expectedEmbeddingDimension = FaceFeatureExtractor.DIM)
+        }
     }
 
-    private companion object {
-        const val HOLD_DURATION_MS = 1_000L
-        const val MAX_TEMPLATE_FRAMES = 3
-        const val MIN_FACE_WIDTH_RATIO = 0.22f
-        const val MAX_HEAD_EULER_Y = 12f
-        const val MAX_HEAD_EULER_Z = 12f
-        const val MIN_BRIGHTNESS = 0.22f
-    }
+    private fun hintResFor(progress: EnrollmentProgress): Int =
+        when (progress.rejection) {
+            EnrollmentRejection.NO_FACE -> R.string.enroll_hint_no_face
+            EnrollmentRejection.MULTIPLE_FACES -> R.string.enroll_hint_multiple_faces
+            EnrollmentRejection.TOO_SMALL -> R.string.enroll_hint_too_far
+            EnrollmentRejection.TOO_CLOSE -> R.string.enroll_hint_too_close
+            EnrollmentRejection.OFF_CENTER -> R.string.enroll_hint_off_center
+            EnrollmentRejection.NOT_FRONTAL -> R.string.enroll_hint_look_straight
+            EnrollmentRejection.TOO_DARK -> R.string.enroll_hint_too_dark
+            EnrollmentRejection.TOO_BRIGHT -> R.string.enroll_hint_too_bright
+            EnrollmentRejection.BLURRY -> R.string.enroll_hint_hold_still
+            EnrollmentRejection.OCCLUDED -> R.string.enroll_hint_occluded
+            EnrollmentRejection.INVALID_EMBEDDING -> R.string.enroll_hint_quality_retry
+            EnrollmentRejection.INCONSISTENT_SAMPLES -> R.string.enroll_hint_unstable
+            null -> when (progress.stage) {
+                EnrollmentStage.STABILIZING -> R.string.enroll_hint_hold
+                EnrollmentStage.VALIDATING -> R.string.enroll_hint_preparing
+                EnrollmentStage.SUCCESS -> R.string.enroll_success_message
+                EnrollmentStage.FAILED -> R.string.enroll_failure_message
+                EnrollmentStage.SEARCHING -> R.string.enroll_hint_initial
+                EnrollmentStage.POSITIONING -> R.string.enroll_hint_off_center
+                EnrollmentStage.FRONTAL_REQUIRED -> R.string.enroll_hint_look_straight
+                EnrollmentStage.QUALITY_CHECK -> R.string.enroll_hint_quality_retry
+            }
+        }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
@@ -449,6 +529,34 @@ private fun PreviewCard(viewModel: FaceEnrollmentViewModel, ui: FaceEnrollmentVi
             },
             style = MaterialTheme.typography.titleLarge,
         )
+        if (ui.phase == FaceEnrollmentViewModel.Phase.CAPTURING && ui.required > 0) {
+            Spacer(Modifier.height(8.dp))
+            CaptureProgressDots(captured = ui.captured, required = ui.required)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(R.string.enroll_progress, ui.captured, ui.required),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** The "dot dot dot circle circle" progress the enrollment spec asks for. */
+@Composable
+private fun CaptureProgressDots(captured: Int, required: Int) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        repeat(required) { index ->
+            Spacer(
+                modifier = Modifier
+                    .size(12.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (index < captured) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.surfaceVariant,
+                    ),
+            )
+        }
     }
 }
 

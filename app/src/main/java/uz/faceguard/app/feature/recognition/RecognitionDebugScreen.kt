@@ -49,6 +49,7 @@ import uz.faceguard.app.R
 import uz.faceguard.app.core.embed.FaceEmbeddingModel
 import uz.faceguard.app.core.pipeline.FaceCaptureController
 import uz.faceguard.app.core.pipeline.FrameEvent
+import uz.faceguard.app.core.protection.CameraBindingCoordinator
 import uz.faceguard.app.core.recognition.RecognitionResult
 import uz.faceguard.app.core.recognition.Recognizer
 import uz.faceguard.app.domain.model.ChildProfile
@@ -65,6 +66,7 @@ class RecognitionDebugViewModel @Inject constructor(
     private val parentRepository: ParentProfileRepository,
     private val childRepository: ChildProfileRepository,
     private val accountRepository: AccountRepository,
+    private val cameraCoordinator: CameraBindingCoordinator,
 ) : ViewModel() {
 
     private var controller: FaceCaptureController? = null
@@ -127,7 +129,13 @@ class RecognitionDebugViewModel @Inject constructor(
         }
     }
 
-    fun stop() = controller?.stop()
+    fun stop() {
+        val hadCamera = controller != null
+        controller?.stop()
+        // Q-1 fix: this developer screen took and now releases the shared camera; if
+        // protection is still active it must get its binding back.
+        if (hadCamera) cameraCoordinator.onTransientCameraReleased()
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)

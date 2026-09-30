@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Privacy-conscious config: we do NOT retrieve window content
-     (canRetrieveWindowContent=false). We only need foreground package-change events. -->
+<!-- Privacy-conscious config: QALQON only reacts to foreground window/app
+     transitions and never retrieves window content
+     (canRetrieveWindowContent=false), so no screen text, chat, password or
+     notification content is ever read. -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeWindowStateChanged|typeWindowsChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
-    android:accessibilityFlags="flagRetrieveInteractiveWindows"
+    android:accessibilityFlags="flagDefault"
     android:canRetrieveWindowContent="false"
     android:description="@string/accessibility_service_description"
     android:notificationTimeout="50" />

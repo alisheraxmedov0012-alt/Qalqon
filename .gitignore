@@ -1,5 +1,6 @@
 *.iml
 .gradle
+.kotlin
 /local.properties
 /.idea
 .DS_Store
@@ -8,3 +9,17 @@
 /captures
 .externalNativeBuild
 .cxx
+# Phase 14: never commit signing keys or secret-bearing files. No such file is
+# tracked today; these rules prevent a future accidental commit of a keystore or
+# a local secret. (local.properties is already ignored above.)
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+.env
+# Release signing material and its credentials must never be committed.
+/keystore
+/keystore.properties
+/signing.properties
+/upload-keystore.jks

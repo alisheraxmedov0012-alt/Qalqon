@@ -1,0 +1,293 @@
+package uz.faceguard.app.data.db
+
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+
+/**
+ * v3 -> v4: adds child-scoped app policies.
+ *
+ * Purely additive: no existing table is altered or dropped, so accounts,
+ * parent/child profiles, protected apps and the activity log all survive the
+ * upgrade. The statement mirrors Room's generated schema for
+ * [ChildAppPolicyEntity] (column order follows the constructor).
+ */
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `child_app_policies` (" +
+                "`accountId` INTEGER NOT NULL, " +
+                "`childId` INTEGER NOT NULL, " +
+                "`packageName` TEXT NOT NULL, " +
+                "`mode` TEXT NOT NULL, " +
+                "`action` TEXT NOT NULL, " +
+                "`dailyLimitMinutes` INTEGER, " +
+                "`activationDelayMs` INTEGER NOT NULL, " +
+                "`recoveryDelayMs` INTEGER NOT NULL, " +
+                "`enabled` INTEGER NOT NULL, " +
+                "`createdAt` INTEGER NOT NULL, " +
+                "`updatedAt` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`accountId`, `childId`, `packageName`))",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_child_app_policies_accountId_childId` " +
+                "ON `child_app_policies` (`accountId`, `childId`)",
+        )
+    }
+}
+
+/**
+ * v4 -> v5: account-scopes the activity log.
+ *
+ * `activity_events` gains `accountId` so one account can never see another
+ * account's events. Legacy rows had no owner: when the device has exactly one
+ * account they are unambiguously that account's and are carried over (their id
+ * and timestamp are preserved); with zero or several accounts they cannot be
+ * attributed safely and are dropped instead of being shown to the wrong
+ * account. The recreate-table statement mirrors Room's generated schema for
+ * [ActivityEventEntity] (column order follows the constructor).
+ */
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `activity_events_new` (" +
+                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`accountId` INTEGER NOT NULL, " +
+                "`type` TEXT NOT NULL, " +
+                "`detail` TEXT, " +
+                "`at` INTEGER NOT NULL)",
+        )
+        db.execSQL(
+            "INSERT INTO `activity_events_new` (`id`, `accountId`, `type`, `detail`, `at`) " +
+                "SELECT `id`, (SELECT `id` FROM `user_accounts` LIMIT 1), `type`, `detail`, `at` " +
+                "FROM `activity_events` " +
+                "WHERE (SELECT COUNT(*) FROM `user_accounts`) = 1",
+        )
+        db.execSQL("DROP TABLE `activity_events`")
+        db.execSQL("ALTER TABLE `activity_events_new` RENAME TO `activity_events`")
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_activity_events_at` " +
+                "ON `activity_events` (`at`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_activity_events_accountId_at` " +
+                "ON `activity_events` (`accountId`, `at`)",
+        )
+    }
+}
+
+/**
+ * v5 -> v6: adds durable parent requests and notification dedup records.
+ *
+ * Purely additive: no existing table is altered or dropped, so accounts,
+ * profiles, protected apps, policies and the activity log all survive the
+ * upgrade. Statements mirror Room's generated schema for [ParentRequestEntity]
+ * and [NotificationRecordEntity] (column order follows the constructor).
+ */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `parent_requests` (" +
+                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`accountId` INTEGER NOT NULL, " +
+                "`childId` INTEGER NOT NULL, " +
+                "`targetPackageName` TEXT NOT NULL, " +
+                "`requestType` TEXT NOT NULL, " +
+                "`requestedDurationMinutes` INTEGER NOT NULL, " +
+                "`approvedDurationMinutes` INTEGER, " +
+                "`status` TEXT NOT NULL, " +
+                "`createdAt` INTEGER NOT NULL, " +
+                "`updatedAt` INTEGER NOT NULL, " +
+                "`expiresAt` INTEGER, " +
+                "`resolvedAt` INTEGER, " +
+                "`resolutionReason` TEXT, " +
+                "`source` TEXT NOT NULL, " +
+                "`deduplicationKey` TEXT NOT NULL)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_parent_requests_accountId_createdAt` " +
+                "ON `parent_requests` (`accountId`, `createdAt`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_parent_requests_accountId_status_createdAt` " +
+                "ON `parent_requests` (`accountId`, `status`, `createdAt`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_parent_requests_accountId_childId_status` " +
+                "ON `parent_requests` (`accountId`, `childId`, `status`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_parent_requests_accountId_deduplicationKey_status` " +
+                "ON `parent_requests` (`accountId`, `deduplicationKey`, `status`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `notification_records` (" +
+                "`deduplicationKey` TEXT NOT NULL, " +
+                "`accountId` INTEGER NOT NULL, " +
+                "`type` TEXT NOT NULL, " +
+                "`relatedRequestId` INTEGER, " +
+                "`createdAt` INTEGER NOT NULL, " +
+                "`delivered` INTEGER NOT NULL, " +
+                "`deliveryAt` INTEGER, " +
+                "PRIMARY KEY(`deduplicationKey`))",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_notification_records_accountId_createdAt` " +
+                "ON `notification_records` (`accountId`, `createdAt`)",
+        )
+    }
+}
+
+/**
+ * v6 -> v7: adds Phase 4 screen-time persistence.
+ *
+ * Purely additive: no existing table is altered or dropped, so accounts,
+ * profiles, protected apps, policies, activity events, parent requests,
+ * notification records and all Phase 12 security data survive the upgrade.
+ * Statements mirror Room's generated schema for [DailyAppUsageEntity] and
+ * [ChildScreenTimeLimitEntity] (column order follows the constructor).
+ */
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `daily_app_usage` (" +
+                "`accountId` INTEGER NOT NULL, " +
+                "`childId` INTEGER NOT NULL, " +
+                "`dateKey` TEXT NOT NULL, " +
+                "`packageName` TEXT NOT NULL, " +
+                "`usedMs` INTEGER NOT NULL, " +
+                "`category` TEXT NOT NULL, " +
+                "`updatedAt` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`accountId`, `childId`, `dateKey`, `packageName`))",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_daily_app_usage_accountId_childId_dateKey` " +
+                "ON `daily_app_usage` (`accountId`, `childId`, `dateKey`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_daily_app_usage_accountId_childId_dateKey_category` " +
+                "ON `daily_app_usage` (`accountId`, `childId`, `dateKey`, `category`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `child_screen_time_limits` (" +
+                "`accountId` INTEGER NOT NULL, " +
+                "`childId` INTEGER NOT NULL, " +
+                "`scope` TEXT NOT NULL, " +
+                "`category` TEXT NOT NULL, " +
+                "`limitMinutes` INTEGER, " +
+                "`updatedAt` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`accountId`, `childId`, `scope`, `category`))",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_child_screen_time_limits_accountId_childId` " +
+                "ON `child_screen_time_limits` (`accountId`, `childId`)",
+        )
+    }
+}
+
+/**
+ * v7 -> v8: adds the usage snapshot checkpoints (Phase 4 Step 1B-6).
+ *
+ * Purely additive: no existing table is altered or dropped, so accounts, profiles,
+ * protected apps, policies, activity events, parent requests, notification records,
+ * screen-time usage and limits all survive the upgrade. The statement mirrors Room's
+ * generated schema for [UsageSnapshotCheckpointEntity] (column order follows the
+ * constructor). `packageName` is the last primary-key column so the "every checkpoint of
+ * this window" lookup is a primary-key prefix and needs no separate index.
+ */
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `usage_snapshot_checkpoints` (" +
+                "`accountId` INTEGER NOT NULL, " +
+                "`childId` INTEGER NOT NULL, " +
+                "`source` TEXT NOT NULL, " +
+                "`windowStartMs` INTEGER NOT NULL, " +
+                "`windowEndMs` INTEGER NOT NULL, " +
+                "`packageName` TEXT NOT NULL, " +
+                "`cumulativeForegroundMs` INTEGER NOT NULL, " +
+                "`observedAtMs` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`accountId`, `childId`, `source`, `windowStartMs`, `windowEndMs`, `packageName`))",
+        )
+    }
+}
+
+/**
+ * v8 -> v9: adds Phase 5 schedule persistence.
+ *
+ * Purely additive: no existing table is altered or dropped, so accounts, profiles, protected
+ * apps, policies, activity events, parent requests, notification records, screen-time usage,
+ * limits and snapshot checkpoints all survive the upgrade. Statements mirror Room's generated
+ * schema for [ScheduleRuleEntity] and [ScheduleAppTargetEntity] (column order follows the
+ * constructors).
+ *
+ * No index is created for `schedule_app_targets`: every query against it filters on a prefix
+ * of its composite primary key, so SQLite already has the index it needs. There are no foreign
+ * keys, matching the rest of this database; deleting a schedule deletes its target rows in the
+ * same repository transaction instead.
+ */
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `schedule_rules` (" +
+                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`accountId` INTEGER NOT NULL, " +
+                "`childId` INTEGER NOT NULL, " +
+                "`name` TEXT NOT NULL, " +
+                "`mode` TEXT NOT NULL, " +
+                "`enabled` INTEGER NOT NULL, " +
+                "`startMinuteOfDay` INTEGER NOT NULL, " +
+                "`endMinuteOfDay` INTEGER NOT NULL, " +
+                "`daysMask` INTEGER NOT NULL, " +
+                "`priority` INTEGER NOT NULL, " +
+                "`action` TEXT NOT NULL, " +
+                "`createdAt` INTEGER NOT NULL, " +
+                "`updatedAt` INTEGER NOT NULL)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_schedule_rules_accountId_childId` " +
+                "ON `schedule_rules` (`accountId`, `childId`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `schedule_app_targets` (" +
+                "`accountId` INTEGER NOT NULL, " +
+                "`childId` INTEGER NOT NULL, " +
+                "`scheduleId` INTEGER NOT NULL, " +
+                "`packageName` TEXT NOT NULL, " +
+                "PRIMARY KEY(`accountId`, `childId`, `scheduleId`, `packageName`))",
+        )
+    }
+}
+
+/**
+ * v9 -> v10: adds child-scoped eye-safety configuration.
+ *
+ * Purely additive: no existing table is altered, renamed or dropped, so accounts, profiles,
+ * protected apps, policies, activity events, parent requests, notification records, screen-time
+ * usage, limits, snapshot checkpoints, schedules and schedule targets all survive the upgrade. The
+ * statement mirrors Room's generated schema for [ChildEyeSafetyEntity] (column order follows the
+ * constructor).
+ *
+ * Thresholds are stored as integer percentages, and a missing row means the child is
+ * unconfigured — nothing is seeded here, so the upgrade cannot invent a setting for any child.
+ * `(accountId, childId)` is the primary key, which is also the lookup index, so no separate index
+ * is created; there are no foreign keys, matching the rest of this database.
+ */
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `child_eye_safety` (" +
+                "`accountId` INTEGER NOT NULL, " +
+                "`childId` INTEGER NOT NULL, " +
+                "`enabled` INTEGER NOT NULL, " +
+                "`warningEnterThresholdPercent` INTEGER NOT NULL, " +
+                "`warningExitThresholdPercent` INTEGER NOT NULL, " +
+                "`dangerEnterThresholdPercent` INTEGER NOT NULL, " +
+                "`dangerExitThresholdPercent` INTEGER NOT NULL, " +
+                "`confirmFrames` INTEGER NOT NULL, " +
+                "`warningAction` TEXT NOT NULL, " +
+                "`dangerAction` TEXT NOT NULL, " +
+                "`updatedAt` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`accountId`, `childId`))",
+        )
+    }
+}

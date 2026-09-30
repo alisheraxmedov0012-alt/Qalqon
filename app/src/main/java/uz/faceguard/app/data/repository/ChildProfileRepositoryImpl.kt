@@ -10,10 +10,13 @@ import uz.faceguard.app.domain.model.ChildProfile
 import uz.faceguard.app.domain.model.EnrollmentStatus
 import uz.faceguard.app.domain.model.RestrictionLevel
 import uz.faceguard.app.domain.repository.ChildProfileRepository
+import uz.faceguard.app.domain.security.BiometricTemplateCipher
+import uz.faceguard.app.domain.security.TemplateRecovery
 
 @Singleton
 class ChildProfileRepositoryImpl @Inject constructor(
     private val dao: ChildProfileDao,
+    private val templateCipher: BiometricTemplateCipher,
 ) : ChildProfileRepository {
 
     override fun observeChildren(accountId: Long): Flow<List<ChildProfile>> =
@@ -39,15 +42,21 @@ class ChildProfileRepositoryImpl @Inject constructor(
         dao.clearFaceData(childId, accountId, System.currentTimeMillis())
     }
 
-    override suspend fun saveFaceEnrollment(accountId: Long, childId: Long, templateRef: String) =
-        dao.saveFaceEnrollment(childId, accountId, templateRef, EnrollmentStatus.ENROLLED.name, System.currentTimeMillis())
+    /**
+     * Phase 12: encrypted before persistence, scoped by account + child. A missing
+     * key writes nothing (fail closed) instead of storing plaintext.
+     */
+    override suspend fun saveFaceEnrollment(accountId: Long, childId: Long, templateRef: String) {
+        val protectedRef = templateCipher.protect(templateRef) ?: return
+        dao.saveFaceEnrollment(childId, accountId, protectedRef, EnrollmentStatus.ENROLLED.name, System.currentTimeMillis())
+    }
 
     private fun ChildProfileEntity.toDomain() = ChildProfile(
         id = id,
         accountId = accountId,
         childName = childName,
         isFaceEnrolled = isFaceEnrolled,
-        faceTemplateRef = faceTemplateRef,
+        faceTemplateRef = recoverTemplateRef(faceTemplateRef),
         restrictionLevel = runCatching { RestrictionLevel.valueOf(restrictionLevel) }
             .getOrDefault(RestrictionLevel.MEDIUM),
         enrollmentStatus = runCatching { EnrollmentStatus.valueOf(enrollmentStatus) }
@@ -57,4 +66,11 @@ class ChildProfileRepositoryImpl @Inject constructor(
         createdAt = createdAt,
         updatedAt = updatedAt,
     )
+
+    /** Decrypts for transient use; null when unreadable (no plaintext fallback). */
+    private fun recoverTemplateRef(stored: String?): String? = when (val recovery = stored?.let { templateCipher.recover(it) }) {
+        is TemplateRecovery.Recovered -> recovery.plainRef
+        is TemplateRecovery.LegacyPlaintext -> recovery.plainRef
+        else -> null
+    }
 }

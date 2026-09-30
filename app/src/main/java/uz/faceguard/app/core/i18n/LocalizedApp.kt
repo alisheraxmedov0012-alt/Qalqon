@@ -11,10 +11,16 @@ import androidx.compose.ui.platform.LocalContext
  *
  * It provides a locale-aware [android.content.Context] and the matching
  * [android.content.res.Configuration] as the composition locals that
- * `stringResource(...)` and `LocalContext.current.getString(...)` actually read.
- * Changing [language] therefore re-renders every user-facing string immediately,
- * with **no activity restart**, and works on every supported API level (this is
- * plain Android resource resolution, not a platform-version-specific API).
+ * `stringResource(...)` and `LocalContext.current.getString(...)` actually read
+ * (`stringResource` resolves through `LocalContext.current.resources`). Changing
+ * [language] therefore re-renders every user-facing string immediately, with **no
+ * activity restart**, and works on every supported API level.
+ *
+ * The provided context is **Activity-rooted** (`AppLocale.localizedAppContext`), so
+ * `hiltViewModel()` — which reads `LocalContext.current` and requires a
+ * `ComponentActivity` in its context chain — keeps working. Providing a bare
+ * `createConfigurationContext(...)` result here is what crashed the app, because
+ * that context has no Activity to find.
  *
  * When [language] is null (nothing selected yet, or still loading) the system
  * locale is left untouched, so a fresh install shows the picker in the device
@@ -37,7 +43,7 @@ fun LocalizedApp(
     }
 
     val localized = remember(language, baseContext, baseConfiguration) {
-        AppLocale.localizedContext(baseContext, language) to
+        AppLocale.localizedAppContext(baseContext, language) to
             AppLocale.configurationFor(baseConfiguration, language)
     }
 

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,6 +7,51 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
 }
+
+// ---------------------------------------------------------------------------
+// Production release signing.
+//
+// The signing secrets are NEVER stored in this file. They are read, in order of
+// precedence, from:
+//   1. environment variables (how CI supplies them, via repository secrets), or
+//   2. `local.properties` (machine-local, gitignored), for a developer machine.
+//
+// The keystore itself lives outside the repository. If neither source provides a
+// complete set, the release build is not signed here — and `assembleRelease` then
+// fails loudly rather than quietly emitting an unsigned APK that could be
+// mistaken for a production release.
+// ---------------------------------------------------------------------------
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
+/** Environment variable first, then `local.properties`; never logged. */
+fun signingSecret(environmentName: String, propertyName: String): String? =
+    System.getenv(environmentName)?.takeIf { it.isNotBlank() }
+        ?: localProperties.getProperty(propertyName)?.takeIf { it.isNotBlank() }
+
+val releaseStoreFile = signingSecret("QALQON_RELEASE_STORE_FILE", "qalqon.storeFile")
+val releaseStorePassword = signingSecret("QALQON_RELEASE_STORE_PASSWORD", "qalqon.storePassword")
+val releaseKeyAlias = signingSecret("QALQON_RELEASE_KEY_ALIAS", "qalqon.keyAlias")
+val releaseKeyPassword = signingSecret("QALQON_RELEASE_KEY_PASSWORD", "qalqon.keyPassword")
+
+val hasReleaseSigning = listOf(
+    releaseStoreFile,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+).all { !it.isNullOrBlank() } && file(releaseStoreFile!!).exists()
+
+// Version source of truth. The values below are the defaults; a release pipeline
+// may override them for a single build without editing this file, e.g.
+//   ./gradlew :app:assembleRelease -PqalqonVersionCode=2 -PqalqonVersionName=0.1.1
+val defaultVersionCode = 1
+val defaultVersionName = "0.1.0"
+val resolvedVersionCode = (project.findProperty("qalqonVersionCode") as String?)?.toIntOrNull()
+    ?: defaultVersionCode
+val resolvedVersionName = (project.findProperty("qalqonVersionName") as String?)?.takeIf { it.isNotBlank() }
+    ?: defaultVersionName
 
 android {
     namespace = "uz.faceguard.app"
@@ -14,15 +61,38 @@ android {
         applicationId = "uz.faceguard.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = resolvedVersionCode
+        versionName = resolvedVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        // Only created when a real identity is available, so a machine without the
+        // secrets can still build debug/tests without any signing material.
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+                // v1 is unnecessary at minSdk 26; v2 covers installation and v3 adds
+                // the rotation lineage a long-lived release identity will want.
+                enableV1Signing = false
+                enableV2Signing = true
+                enableV3Signing = true
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // A permanent release identity, deliberately separate from the debug
+            // key, so successive release APKs update over one another.
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     compileOptions {
@@ -79,6 +149,23 @@ dependencies {
     androidTestImplementation(libs.androidx.test.core.ktx)
     androidTestImplementation(libs.androidx.room.testing)
     debugImplementation(libs.compose.ui.tooling)
+}
+
+// A release APK must never be produced unsigned and then distributed as if it
+// were a production build. When no signing identity is available the release
+// packaging fails with an actionable message instead. Debug builds, JVM tests
+// and lint are unaffected, so a machine without the secrets still works.
+tasks.matching { it.name == "assembleRelease" || it.name == "packageRelease" }.configureEach {
+    doFirst {
+        if (!hasReleaseSigning) {
+            throw GradleException(
+                "Release signing is not configured, so no release APK can be produced. " +
+                    "Provide QALQON_RELEASE_STORE_FILE, QALQON_RELEASE_STORE_PASSWORD, " +
+                    "QALQON_RELEASE_KEY_ALIAS and QALQON_RELEASE_KEY_PASSWORD as environment " +
+                    "variables, or set the equivalent qalqon.* keys in local.properties.",
+            )
+        }
+    }
 }
 
 // TEMPORARY verification bridge.

@@ -368,3 +368,27 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   covering the 30 required scenarios; JVM total 1221 -> 1287, 0 failures, 0
   skipped (debug + release). Q-1 camera lifecycle, recognition semantics, policy,
   anti-spoof and every out-of-scope area untouched.
+
+- Production release signing + APK update compatibility: `app/build.gradle.kts`
+  now reads a permanent release identity from environment variables
+  (`QALQON_RELEASE_STORE_FILE`, `QALQON_RELEASE_STORE_PASSWORD`,
+  `QALQON_RELEASE_KEY_ALIAS`, `QALQON_RELEASE_KEY_PASSWORD`) with a
+  `local.properties` fallback (`qalqon.storeFile|storePassword|keyAlias|
+  keyPassword`); the keystore lives OUTSIDE the repo and no secret is ever
+  committed. The release signing config is created only when the full set is
+  present, so machines/PRs without it still build debug/tests/lint. SIGNING IS
+  MANDATORY FOR RELEASE: `assembleRelease`/`packageRelease` fail with an
+  actionable message when signing is absent, so an unsigned APK can never be
+  shipped as production (the former `app-release-unsigned.apk` is gone). Release
+  is signed with v2+v3 (v1 off; minSdk 26) and is deliberately a different
+  identity from the auto-generated debug key. Versioning keeps a single source of
+  truth in `defaultConfig` (versionCode 1 / versionName 0.1.0) with an optional
+  per-build override `-PqalqonVersionCode` / `-PqalqonVersionName` for the release
+  pipeline. `.gitignore` blocks `/keystore`, `keystore.properties`,
+  `signing.properties`, `*.p12|*.jks|*.keystore|*.pem|*.key`. CI gained a
+  `release` job (tag push / workflow_dispatch only) that decodes the keystore
+  from repository secrets `QALQON_KEYSTORE_BASE64|QALQON_KEYSTORE_PASSWORD|
+  QALQON_KEY_ALIAS|QALQON_KEY_PASSWORD`, builds the signed APK and uploads it;
+  it warns and skips when the secrets are not configured, so existing CI is
+  unaffected. No Room/DataStore/migration/schema change - an APK update is not an
+  uninstall, so all local data is preserved.

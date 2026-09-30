@@ -18,3 +18,8 @@
 *.pem
 *.key
 .env
+# Release signing material and its credentials must never be committed.
+/keystore
+/keystore.properties
+/signing.properties
+/upload-keystore.jks

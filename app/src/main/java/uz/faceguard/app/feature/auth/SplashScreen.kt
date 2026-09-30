@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.first
 import uz.faceguard.app.R
 import uz.faceguard.app.core.i18n.StartupDestination
 import uz.faceguard.app.core.i18n.startupDestination
+import uz.faceguard.app.core.security.AppLockState
 import uz.faceguard.app.data.prefs.AppLanguageStore
 import uz.faceguard.app.domain.repository.AccountRepository
 
@@ -28,18 +29,23 @@ import uz.faceguard.app.domain.repository.AccountRepository
 class SplashViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
     private val languageStore: AppLanguageStore,
+    private val appLockState: AppLockState,
 ) : ViewModel() {
-    /** Session exists only when an account id is persisted in DataStore. */
-    suspend fun hasSession(): Boolean = accountRepository.currentAccountId.first() != null
+    /** A registered account exists when an account id is persisted in DataStore. */
+    suspend fun hasRegisteredAccount(): Boolean = accountRepository.currentAccountId.first() != null
 
     /**
-     * The single startup decision: the persisted language (if any) plus the
-     * session decide whether the first-launch picker, Home or Welcome comes next.
+     * The single startup decision: the persisted language, whether an account is
+     * registered, and whether this process has been unlocked.
+     *
+     * A registered account alone is **not** enough to reach Home — the parent UI
+     * must have been unlocked in this process, otherwise the PIN screen comes first.
      */
     suspend fun resolveDestination(): StartupDestination =
         startupDestination(
             language = languageStore.read(),
-            hasSession = hasSession(),
+            hasRegisteredAccount = hasRegisteredAccount(),
+            isUnlocked = appLockState.isUnlocked(),
         )
 }
 

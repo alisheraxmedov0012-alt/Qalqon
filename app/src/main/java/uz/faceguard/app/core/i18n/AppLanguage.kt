@@ -48,21 +48,40 @@ sealed interface LanguageState {
     }
 }
 
-/** Where the app should go once startup has resolved the language and session. */
-enum class StartupDestination { LANGUAGE_SELECTION, HOME, WELCOME }
+/** Where the app should go once startup has resolved the language, session and lock. */
+enum class StartupDestination {
+    LANGUAGE_SELECTION,
+
+    /** A registered account exists but the parent UI is not unlocked for this process. */
+    PIN_UNLOCK,
+
+    HOME,
+    WELCOME,
+}
 
 /**
- * The single first-launch rule.
+ * The single first-launch / startup rule.
  *
  * Language selection comes before anything else: with no persisted language the
  * user is sent to the picker regardless of session state, so a fresh install can
  * never silently fall back to a device language. The choice is deliberately
  * independent of authentication — it is a UI preference, not a credential.
+ *
+ * [hasRegisteredAccount] (a persisted account id exists) and [isUnlocked] (this
+ * process has passed the PIN check) are deliberately separate: a registered
+ * account on a later launch is **not** the same as an unlocked UI. "Registered but
+ * not unlocked" must land on the PIN screen, so re-opening QALQON never exposes the
+ * parental controls, and a restored navigation stack cannot skip the gate either.
  */
-fun startupDestination(language: AppLanguage?, hasSession: Boolean): StartupDestination = when {
+fun startupDestination(
+    language: AppLanguage?,
+    hasRegisteredAccount: Boolean,
+    isUnlocked: Boolean,
+): StartupDestination = when {
     language == null -> StartupDestination.LANGUAGE_SELECTION
-    hasSession -> StartupDestination.HOME
-    else -> StartupDestination.WELCOME
+    !hasRegisteredAccount -> StartupDestination.WELCOME
+    isUnlocked -> StartupDestination.HOME
+    else -> StartupDestination.PIN_UNLOCK
 }
 
 /**

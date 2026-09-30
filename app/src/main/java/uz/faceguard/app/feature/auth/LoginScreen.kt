@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uz.faceguard.app.R
+import uz.faceguard.app.core.security.AppLockState
 import uz.faceguard.app.core.ui.AppLoadingButton
 import uz.faceguard.app.core.ui.AppPhoneField
 import uz.faceguard.app.core.ui.AppPinField
@@ -46,6 +47,8 @@ data class LoginUiState(
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
+    /** A successful login authenticates this process. */
+    private val appLockState: AppLockState,
 ) : ViewModel() {
 
     private val _ui = MutableStateFlow(LoginUiState())
@@ -79,8 +82,12 @@ class LoginViewModel @Inject constructor(
         viewModelScope.launch {
             val result = accountRepository.login(state.phoneNumber, state.pin)
             when (result) {
-                is AuthResult.Success ->
+                is AuthResult.Success -> {
+                    // Credentials verified (PBKDF2 + lockout in the repository): the
+                    // parent UI may be shown for the rest of this process.
+                    appLockState.onAuthenticated()
                     _ui.update { it.copy(state = UiState.Success) }
+                }
                 is AuthResult.Failure ->
                     _ui.update {
                         it.copy(

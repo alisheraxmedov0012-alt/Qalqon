@@ -627,4 +627,11 @@
     <string name="language_select_subtitle">Qalqon will use this language. You can change it later in Settings.</string>
     <string name="language_section">App language</string>
     <string name="language_section_hint">Chooses the language Qalqon\'s interface is shown in.</string>
+
+    <!-- Startup PIN gate: QALQON's parent UI is locked on every launch -->
+    <string name="lock_title">Enter your PIN</string>
+    <string name="lock_subtitle">Enter your PIN to open Qalqon\'s controls.</string>
+    <string name="lock_wrong_pin">Wrong PIN</string>
+    <string name="lock_locked_out">Too many attempts. Wait %1$s before trying again.</string>
+    <string name="lock_unlock">Unlock</string>
 </resources>

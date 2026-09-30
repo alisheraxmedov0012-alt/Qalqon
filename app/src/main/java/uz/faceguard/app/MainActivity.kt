@@ -14,6 +14,7 @@ import uz.faceguard.app.core.i18n.LanguageState
 import uz.faceguard.app.core.i18n.LocalizedApp
 import uz.faceguard.app.core.notification.NotificationNavigation
 import uz.faceguard.app.core.protection.ProtectionRuntime
+import uz.faceguard.app.core.security.AppLockState
 import uz.faceguard.app.core.theme.FaceGuardTheme
 import uz.faceguard.app.data.prefs.AppLanguageStore
 import uz.faceguard.app.navigation.FaceGuardNavHost
@@ -31,6 +32,9 @@ class MainActivity : ComponentActivity() {
     /** The app language, applied to the whole Compose tree at the root. */
     @Inject lateinit var languageStore: AppLanguageStore
 
+    /** Whether the parent UI is unlocked for this process (runtime-only, not persisted). */
+    @Inject lateinit var appLockState: AppLockState
+
     /**
      * Phase 11: a notification click asks for exactly one destination. It is kept
      * as state so the running composition (singleTop re-launch) can route it too.
@@ -46,6 +50,7 @@ class MainActivity : ComponentActivity() {
             val navController = rememberNavController()
             val languageState by languageStore.state.collectAsStateWithLifecycle()
             val language = (languageState as? LanguageState.Selected)?.language
+            val unlocked by appLockState.unlocked.collectAsStateWithLifecycle()
 
             FaceGuardTheme {
                 // Applying the selected language here makes every string in the
@@ -55,6 +60,10 @@ class MainActivity : ComponentActivity() {
                     FaceGuardNavHost(
                         navController = navController,
                         requestedDestination = requestedDestination.value,
+                        isUnlocked = unlocked,
+                        // Authoritative read for the gate itself, so a navigation in
+                        // the same frame as a successful unlock is never bounced back.
+                        isUnlockedNow = { appLockState.isUnlocked() },
                     )
                 }
             }

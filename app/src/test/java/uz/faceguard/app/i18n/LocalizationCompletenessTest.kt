@@ -85,6 +85,37 @@ class LocalizationCompletenessTest {
         }
     }
 
+    @Test
+    fun theStartupPinGateStringsExistEverywhere() {
+        val required = setOf(
+            "lock_title",
+            "lock_subtitle",
+            "lock_wrong_pin",
+            "lock_locked_out",
+            "lock_unlock",
+        )
+        locales.forEach { locale ->
+            val missing = required - keys(locale)
+            assertTrue("$locale is missing: ${missing.sorted()}", missing.isEmpty())
+        }
+    }
+
+    @Test
+    fun thePinGatePromptIsLocalizedInAllThreeLanguages() {
+        // The startup PIN prompt must read in the selected language.
+        assertEquals("PIN-kodni kiriting", values("values")["lock_title"])
+        assertEquals("Enter your PIN", values("values-en")["lock_title"])
+        assertEquals("Введите PIN-код", values("values-ru")["lock_title"])
+    }
+
+    @Test
+    fun theLockoutMessageKeepsItsTimePlaceholderInEveryLocale() {
+        locales.forEach { locale ->
+            val message = values(locale)["lock_locked_out"]
+            assertTrue("$locale lock_locked_out must format the remaining wait", message!!.contains("%1\$s"))
+        }
+    }
+
     private fun stringsFile(locale: String): File =
         File(repoRoot(), "app/src/main/res/$locale/strings.xml")
 

@@ -628,4 +628,11 @@
     <string name="language_select_subtitle">Qalqon shu tilda ishlaydi. Keyin uni sozlamalardan o\'zgartirish mumkin.</string>
     <string name="language_section">Ilova tili</string>
     <string name="language_section_hint">Qalqon interfeysi qaysi tilda ko\'rinishini tanlaydi.</string>
+
+    <!-- Startup PIN gate: QALQON's parent UI is locked on every launch -->
+    <string name="lock_title">PIN-kodni kiriting</string>
+    <string name="lock_subtitle">Qalqon boshqaruvini ochish uchun PIN-kodingizni kiriting.</string>
+    <string name="lock_wrong_pin">PIN-kod noto\'g\'ri</string>
+    <string name="lock_locked_out">Juda ko\'p urinish. Qayta urinib ko\'rishdan oldin %1$s kuting.</string>
+    <string name="lock_unlock">Ochish</string>
 </resources>

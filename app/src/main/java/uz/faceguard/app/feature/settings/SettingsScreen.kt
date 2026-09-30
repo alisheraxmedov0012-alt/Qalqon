@@ -58,6 +58,7 @@ import uz.faceguard.app.core.i18n.LanguageState
 import uz.faceguard.app.core.ui.AppLoadingButton
 import uz.faceguard.app.core.ui.SectionCard
 import uz.faceguard.app.core.ui.UiState
+import uz.faceguard.app.core.security.AppLockState
 import uz.faceguard.app.data.prefs.AppLanguageStore
 import uz.faceguard.app.feature.language.LanguageOptions
 import uz.faceguard.app.domain.diagnostics.DiagnosticStatus
@@ -91,6 +92,8 @@ class SettingsViewModel @Inject constructor(
     private val healthSource: SystemHealthSnapshotSource,
     /** The single source of truth for the application language. */
     private val languageStore: AppLanguageStore,
+    /** Process-scoped parent UI lock; cleared on logout and full reset. */
+    private val appLockState: AppLockState,
 ) : ViewModel() {
 
     /** The currently selected language (null until one has been chosen). */
@@ -208,6 +211,8 @@ class SettingsViewModel @Inject constructor(
     /** Full local wipe; caller navigates back to the welcome flow. */
     fun resetAll() = viewModelScope.launch {
         resetRepository.resetAll()
+        // A wiped install must not leave the UI unlocked.
+        appLockState.lock()
         _resetDone.value = true
     }
 
@@ -216,6 +221,9 @@ class SettingsViewModel @Inject constructor(
         _logoutState.value = UiState.Loading
         viewModelScope.launch {
             accountRepository.logout()
+            // Logging out ends the unlocked UI session too; the next launch asks for
+            // the PIN (or shows Welcome, matching the existing sign-out flow).
+            appLockState.lock()
             _logoutState.value = UiState.Success
         }
     }

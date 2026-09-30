@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uz.faceguard.app.R
+import uz.faceguard.app.core.security.AppLockState
 import uz.faceguard.app.core.ui.AppLoadingButton
 import uz.faceguard.app.core.ui.AppPinField
 import uz.faceguard.app.core.ui.UiState
@@ -50,6 +51,8 @@ data class CreatePinUiState(
 class CreatePinViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
     private val parentProfileRepository: ParentProfileRepository,
+    /** Marked unlocked because registration + PIN creation *is* the first authentication. */
+    private val appLockState: AppLockState,
 ) : ViewModel() {
 
     private val _ui = MutableStateFlow(CreatePinUiState())
@@ -83,6 +86,9 @@ class CreatePinViewModel @Inject constructor(
             when (val result = accountRepository.register(name, phone, state.pin)) {
                 is AuthResult.Success -> {
                     parentProfileRepository.createIfMissing(result.account.id, name)
+                    // Registration + PIN creation authenticates this process, so the
+                    // user goes straight to Home without a second PIN prompt.
+                    appLockState.onAuthenticated()
                     _ui.update { it.copy(state = UiState.Success) }
                 }
                 is AuthResult.Failure -> {

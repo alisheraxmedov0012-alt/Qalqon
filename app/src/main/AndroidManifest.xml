@@ -30,6 +30,22 @@
     <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
 
+    <!-- Android 11+ package visibility. QALQON's protected-app picker enumerates
+         exactly the apps that respond to the launcher intent
+         (`ProtectedAppsRepositoryImpl` queries ACTION_MAIN + CATEGORY_LAUNCHER),
+         but without a visibility declaration the platform hides every
+         third-party package from that query, so user-installed apps such as
+         Instagram or Telegram never reached the list. This targeted declaration
+         grants visibility to precisely that launchable set — it is NOT the broad
+         "all packages" permission, and QALQON remains offline-first (no
+         INTERNET). The app's own system-utility filtering is unchanged. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <application
         android:name=".FaceGuardApp"
         android:label="@string/app_name"

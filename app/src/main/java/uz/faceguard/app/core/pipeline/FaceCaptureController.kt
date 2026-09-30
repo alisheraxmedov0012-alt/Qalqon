@@ -18,7 +18,6 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetector
-import com.google.mlkit.vision.face.FaceDetectorOptions
 import java.util.concurrent.Executors
 import uz.faceguard.app.core.embed.FaceEmbeddingModel
 import uz.faceguard.app.core.embed.FaceFeatureExtractor
@@ -70,12 +69,7 @@ class FaceCaptureController(
 
     /** Null when ML Kit could not create a detector; the pipeline then stays idle. */
     private val detector: FaceDetector? = runCatching {
-        FaceDetection.getClient(
-            FaceDetectorOptions.Builder()
-                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
-                .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_NONE)
-                .build(),
-        )
+        FaceDetection.getClient(FaceDetectorConfig.DEFAULT.toMlKitOptions())
     }.onFailure { reportError(it) }.getOrNull()
 
     private val analysisExecutor = Executors.newSingleThreadExecutor()

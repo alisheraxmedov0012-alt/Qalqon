@@ -32,7 +32,7 @@ object FaceFeatureExtractor {
      * natural hair, and drop when a hand or a mask covers a large part of the
      * face.
      */
-    private val VISIBILITY_LANDMARK_TYPES = intArrayOf(
+    internal val VISIBILITY_LANDMARK_TYPES = intArrayOf(
         FaceLandmark.LEFT_EYE,
         FaceLandmark.RIGHT_EYE,
         FaceLandmark.NOSE_BASE,
@@ -40,11 +40,18 @@ object FaceFeatureExtractor {
         FaceLandmark.MOUTH_RIGHT,
     )
 
-    /** Fraction (0..1) of the core landmarks present on [face]. */
-    fun landmarkVisibility(face: Face): Float {
-        val present = VISIBILITY_LANDMARK_TYPES.count { face.getLandmark(it) != null }
-        return present.toFloat() / VISIBILITY_LANDMARK_TYPES.size
-    }
+    /**
+     * Fraction (0..1) of the core landmarks present on [face].
+     *
+     * Requires landmark detection to be enabled on the detector; with ML Kit's
+     * default `LANDMARK_MODE_NONE` every lookup returns null and this is 0.0.
+     */
+    fun landmarkVisibility(face: Face): Float =
+        visibilityOf(VISIBILITY_LANDMARK_TYPES.count { face.getLandmark(it) != null })
+
+    /** Fraction of [VISIBILITY_LANDMARK_TYPES] present: 5/5 -> 1.0, 0/5 -> 0.0. */
+    internal fun visibilityOf(presentCount: Int): Float =
+        presentCount.toFloat() / VISIBILITY_LANDMARK_TYPES.size
 
     fun extract(face: Face, imageWidth: Int, imageHeight: Int): FloatArray? {
         val box = face.boundingBox ?: return null

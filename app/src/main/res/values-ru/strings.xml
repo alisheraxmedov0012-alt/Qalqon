@@ -618,4 +618,13 @@
     <string name="enroll_hint_unstable">Держите лицо ровно и устойчиво перед камерой.</string>
     <string name="enroll_hint_preparing">Подготовка данных лица…</string>
     <string name="enroll_progress">Заснятых кадров: %1$d / %2$d</string>
+
+    <!-- First-launch language selection -->
+    <string name="language_name_uzbek">O\'zbekcha</string>
+    <string name="language_name_english">English</string>
+    <string name="language_name_russian">Русский</string>
+    <string name="language_select_title">Выберите язык</string>
+    <string name="language_select_subtitle">Qalqon будет использовать этот язык. Позже его можно изменить в настройках.</string>
+    <string name="language_section">Язык приложения</string>
+    <string name="language_section_hint">Выбирает язык интерфейса Qalqon.</string>
 </resources>

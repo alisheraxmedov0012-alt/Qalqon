@@ -25,6 +25,7 @@ import uz.faceguard.app.core.notification.AndroidNotificationDispatcher
 import uz.faceguard.app.core.security.AndroidKeystoreKeyProvider
 import uz.faceguard.app.security.PassthroughTemplateCipher
 import uz.faceguard.app.data.prefs.PinAttemptStore
+import uz.faceguard.app.data.prefs.AppLanguageStore
 import uz.faceguard.app.data.db.FaceGuardDatabase
 import uz.faceguard.app.data.prefs.SessionManager
 import uz.faceguard.app.data.prefs.SettingsStore
@@ -116,6 +117,7 @@ class SettingsViewModelTest {
             accountRepository = accountRepository,
             notificationDispatcher = AndroidNotificationDispatcher(context),
         ),
+        languageStore = AppLanguageStore(dataStore),
     )
 
     private suspend fun awaitSettings(

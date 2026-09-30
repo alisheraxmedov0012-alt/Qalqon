@@ -619,4 +619,13 @@
     <string name="enroll_hint_unstable">Yuzingizni kameraga to\'g\'ri va barqaror tuting.</string>
     <string name="enroll_hint_preparing">Yuz ma\'lumotlari tayyorlanmoqda\u2026</string>
     <string name="enroll_progress">Aniqlangan yuz kadrlari: %1$d / %2$d</string>
+
+    <!-- First-launch language selection -->
+    <string name="language_name_uzbek">O\'zbekcha</string>
+    <string name="language_name_english">English</string>
+    <string name="language_name_russian">Русский</string>
+    <string name="language_select_title">Tilni tanlang</string>
+    <string name="language_select_subtitle">Qalqon shu tilda ishlaydi. Keyin uni sozlamalardan o\'zgartirish mumkin.</string>
+    <string name="language_section">Ilova tili</string>
+    <string name="language_section_hint">Qalqon interfeysi qaysi tilda ko\'rinishini tanlaydi.</string>
 </resources>

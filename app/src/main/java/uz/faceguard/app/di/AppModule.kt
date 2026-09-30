@@ -32,6 +32,7 @@ import uz.faceguard.app.data.db.ChildEyeSafetyDao
 import uz.faceguard.app.data.db.ScheduleDao
 import uz.faceguard.app.data.db.UserAccountDao
 import uz.faceguard.app.data.db.UsageSnapshotCheckpointDao
+import uz.faceguard.app.data.prefs.AppLanguageStore
 import uz.faceguard.app.data.prefs.settingsDataStore
 import uz.faceguard.app.data.repository.AccountRepositoryImpl
 import uz.faceguard.app.data.repository.ActivityLogRepositoryImpl
@@ -326,19 +327,27 @@ object AppModule {
     @Singleton
     fun provideAppLabelResolver(
         @ApplicationContext context: Context,
-    ): AppLabelResolver = AppLabelResolver(context)
+        languageStore: AppLanguageStore,
+    ): AppLabelResolver = AppLabelResolver(context) { languageStore.current() }
 
     @Provides
     @Singleton
     fun provideNotificationContentFactory(
         @ApplicationContext context: Context,
-    ): NotificationContentFactory = AndroidNotificationContentFactory(context)
+        languageStore: AppLanguageStore,
+    ): NotificationContentFactory =
+        AndroidNotificationContentFactory(
+            context = context,
+            appLabels = AppLabelResolver(context) { languageStore.current() },
+            languageProvider = { languageStore.current() },
+        )
 
     @Provides
     @Singleton
     fun provideNotificationDispatcher(
         @ApplicationContext context: Context,
-    ): AppNotificationDispatcher = AndroidNotificationDispatcher(context)
+        languageStore: AppLanguageStore,
+    ): AppNotificationDispatcher = AndroidNotificationDispatcher(context) { languageStore.current() }
 
     @Provides
     @Singleton

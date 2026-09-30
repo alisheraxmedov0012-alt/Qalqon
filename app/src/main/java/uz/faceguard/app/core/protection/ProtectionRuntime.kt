@@ -32,6 +32,7 @@ import uz.faceguard.app.core.monitor.ForegroundAppMonitor
 import uz.faceguard.app.core.recognition.Recognizer
 import uz.faceguard.app.core.scan.ScanScheduler
 import uz.faceguard.app.core.screentime.ScreenTimeUsageCollectionRunner
+import uz.faceguard.app.data.prefs.AppLanguageStore
 import uz.faceguard.app.domain.screentime.AppUsageSource
 import uz.faceguard.app.domain.screentime.ScreenTimeUsageRepository
 import uz.faceguard.app.domain.screentime.ScreenTimeLimits
@@ -197,6 +198,8 @@ class ProtectionRuntime @Inject constructor(
      * value, never this repository.
      */
     private val eyeSafetyRepository: EyeSafetyRepository,
+    /** The selected application language, used for user-visible overlay text. */
+    private val languageStore: AppLanguageStore,
     private val zone: ZoneId,
     private val clock: () -> Long,
 ) {
@@ -206,6 +209,7 @@ class ProtectionRuntime @Inject constructor(
         context,
         accessibilityOverlays = accessibilityOverlayRegistry,
         onRequestExtraTime = { requestExtraTime() },
+        languageProvider = { languageStore.current() },
     )
     private val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val scheduler = ScanScheduler(context)

@@ -19,24 +19,38 @@ import javax.inject.Inject
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import uz.faceguard.app.R
+import uz.faceguard.app.core.i18n.StartupDestination
+import uz.faceguard.app.core.i18n.startupDestination
+import uz.faceguard.app.data.prefs.AppLanguageStore
 import uz.faceguard.app.domain.repository.AccountRepository
 
 @HiltViewModel
 class SplashViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
+    private val languageStore: AppLanguageStore,
 ) : ViewModel() {
     /** Session exists only when an account id is persisted in DataStore. */
     suspend fun hasSession(): Boolean = accountRepository.currentAccountId.first() != null
+
+    /**
+     * The single startup decision: the persisted language (if any) plus the
+     * session decide whether the first-launch picker, Home or Welcome comes next.
+     */
+    suspend fun resolveDestination(): StartupDestination =
+        startupDestination(
+            language = languageStore.read(),
+            hasSession = hasSession(),
+        )
 }
 
 @Composable
 fun SplashScreen(
-    onReady: (hasSession: Boolean) -> Unit,
+    onReady: (StartupDestination) -> Unit,
     viewModel: SplashViewModel = hiltViewModel(),
 ) {
     LaunchedEffect(Unit) {
         delay(700) // short branding pause
-        onReady(viewModel.hasSession())
+        onReady(viewModel.resolveDestination())
     }
 
     Column(

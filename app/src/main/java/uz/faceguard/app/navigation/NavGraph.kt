@@ -8,12 +8,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import uz.faceguard.app.core.debug.DebugFlags
+import uz.faceguard.app.core.i18n.StartupDestination
 import uz.faceguard.app.core.notification.NotificationNavigation
 import uz.faceguard.app.feature.auth.CreatePinScreen
 import uz.faceguard.app.feature.auth.LoginScreen
 import uz.faceguard.app.feature.auth.RegisterScreen
 import uz.faceguard.app.feature.auth.SplashScreen
 import uz.faceguard.app.feature.auth.WelcomeScreen
+import uz.faceguard.app.feature.language.LanguageScreen
 import uz.faceguard.app.feature.child.ChildProfilesScreen
 import uz.faceguard.app.feature.enrollment.FaceEnrollmentScreen
 import uz.faceguard.app.feature.enrollment.SUBJECT_CHILD
@@ -37,6 +39,7 @@ import uz.faceguard.app.feature.settings.SettingsScreen
 
 object Routes {
     const val SPLASH = "splash"
+    const val LANGUAGE = "language"
     const val WELCOME = "welcome"
     const val REGISTER = "register"
     const val LOGIN = "login"
@@ -116,9 +119,23 @@ fun FaceGuardNavHost(
     NavHost(navController = navController, startDestination = Routes.SPLASH) {
         composable(Routes.SPLASH) {
             SplashScreen(
-                onReady = { hasSession ->
-                    val target = if (hasSession) Routes.HOME else Routes.WELCOME
+                onReady = { destination ->
+                    val target = when (destination) {
+                        StartupDestination.LANGUAGE_SELECTION -> Routes.LANGUAGE
+                        StartupDestination.HOME -> Routes.HOME
+                        StartupDestination.WELCOME -> Routes.WELCOME
+                    }
                     navController.navigate(target) { popUpTo(Routes.SPLASH) { inclusive = true } }
+                },
+            )
+        }
+        composable(Routes.LANGUAGE) {
+            LanguageScreen(
+                onDone = {
+                    // Resume the normal onboarding flow. Registration/login is the
+                    // correct entry point here: the picker only appears before a
+                    // language exists, which is always before an account does.
+                    navController.navigate(Routes.WELCOME) { popUpTo(0) { inclusive = true } }
                 },
             )
         }

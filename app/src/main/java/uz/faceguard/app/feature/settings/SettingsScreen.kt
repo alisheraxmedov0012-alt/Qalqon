@@ -53,9 +53,13 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import uz.faceguard.app.R
 import uz.faceguard.app.core.diagnostics.SystemHealthSnapshotSource
+import uz.faceguard.app.core.i18n.AppLanguage
+import uz.faceguard.app.core.i18n.LanguageState
 import uz.faceguard.app.core.ui.AppLoadingButton
 import uz.faceguard.app.core.ui.SectionCard
 import uz.faceguard.app.core.ui.UiState
+import uz.faceguard.app.data.prefs.AppLanguageStore
+import uz.faceguard.app.feature.language.LanguageOptions
 import uz.faceguard.app.domain.diagnostics.DiagnosticStatus
 import uz.faceguard.app.domain.diagnostics.SystemHealthLevel
 import uz.faceguard.app.domain.diagnostics.SystemHealthReport
@@ -85,7 +89,17 @@ class SettingsViewModel @Inject constructor(
     private val resetRepository: ResetRepository,
     /** Phase 12: the Android reader behind the system-health audit. */
     private val healthSource: SystemHealthSnapshotSource,
+    /** The single source of truth for the application language. */
+    private val languageStore: AppLanguageStore,
 ) : ViewModel() {
+
+    /** The currently selected language (null until one has been chosen). */
+    val language: StateFlow<LanguageState> = languageStore.state
+
+    /** Changing the language takes effect immediately and survives restarts. */
+    fun setLanguage(language: AppLanguage) {
+        viewModelScope.launch { languageStore.setLanguage(language) }
+    }
 
     /**
      * Null until the first persisted value is available, so the UI never shows
@@ -404,6 +418,19 @@ private fun RulesTab(
     settingsLoadError: Boolean,
     logoutState: UiState,
 ) {
+    // Language is an app preference, available even while settings are loading, and
+    // it goes through the same single store the first-launch picker uses.
+    val languageState by viewModel.language.collectAsStateWithLifecycle()
+    SectionCard(
+        title = stringResource(R.string.language_section),
+        subtitle = stringResource(R.string.language_section_hint),
+    ) {
+        LanguageOptions(
+            selected = (languageState as? LanguageState.Selected)?.language,
+            onSelect = viewModel::setLanguage,
+        )
+    }
+
     if (settings == null) {
         // Null means "not loaded yet" (or a read failure), never "defaults".
         SectionCard(title = stringResource(R.string.settings_title)) {

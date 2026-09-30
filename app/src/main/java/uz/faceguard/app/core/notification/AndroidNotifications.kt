@@ -9,6 +9,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import uz.faceguard.app.MainActivity
 import uz.faceguard.app.R
+import uz.faceguard.app.core.i18n.AppLanguage
+import uz.faceguard.app.core.i18n.AppLocale
 import uz.faceguard.app.domain.notification.AppNotificationDispatcher
 import uz.faceguard.app.domain.notification.AppNotificationEvent
 import uz.faceguard.app.domain.notification.DeliveryOutcome
@@ -54,17 +56,18 @@ object NotificationChannels {
         NotificationChannelKind.PARENT_REQUESTS -> PARENT_REQUESTS
     }
 
-    fun ensure(context: Context) {
+    fun ensure(context: Context, languageProvider: () -> AppLanguage? = { null }) {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
+        val strings = localizedStringsContext(context, languageProvider())
         runCatching {
             if (manager.getNotificationChannel(PROTECTION_ALERTS) == null) {
                 manager.createNotificationChannel(
                     NotificationChannel(
                         PROTECTION_ALERTS,
-                        context.getString(R.string.notification_channel_protection_name),
+                        strings.getString(R.string.notification_channel_protection_name),
                         NotificationManager.IMPORTANCE_DEFAULT,
                     ).apply {
-                        description = context.getString(R.string.notification_channel_protection_description)
+                        description = strings.getString(R.string.notification_channel_protection_description)
                         setShowBadge(true)
                     },
                 )
@@ -73,10 +76,10 @@ object NotificationChannels {
                 manager.createNotificationChannel(
                     NotificationChannel(
                         PARENT_REQUESTS,
-                        context.getString(R.string.notification_channel_requests_name),
+                        strings.getString(R.string.notification_channel_requests_name),
                         NotificationManager.IMPORTANCE_HIGH,
                     ).apply {
-                        description = context.getString(R.string.notification_channel_requests_description)
+                        description = strings.getString(R.string.notification_channel_requests_description)
                         setShowBadge(true)
                     },
                 )
@@ -86,25 +89,41 @@ object NotificationChannels {
 }
 
 /**
+ * The context to resolve user-visible notification text against: the selected
+ * application language when one exists, otherwise the device default. This is a
+ * consumption point of the single `AppLanguageStore` value, not a second
+ * language system.
+ */
+internal fun localizedStringsContext(context: Context, language: AppLanguage?): Context =
+    if (language == null) context else AppLocale.localizedContext(context, language)
+
+/**
  * Single implementation of the "safe app label" rule used by both notifications
  * and the requests UI: the installed app label when available, otherwise a
  * localized fallback. Never throws, never reads app content.
  */
-class AppLabelResolver(private val context: Context) {
+class AppLabelResolver(
+    private val context: Context,
+    private val languageProvider: () -> AppLanguage? = { null },
+) {
     fun labelFor(packageName: String?): String {
+        val strings = localizedStringsContext(context, languageProvider())
         val pkg = packageName?.trim().orEmpty()
-        if (pkg.isEmpty()) return context.getString(R.string.notification_app_unknown)
+        if (pkg.isEmpty()) return strings.getString(R.string.notification_app_unknown)
         return runCatching {
             val info = context.packageManager.getApplicationInfo(pkg, 0)
             context.packageManager.getApplicationLabel(info).toString()
-        }.getOrElse { context.getString(R.string.notification_app_unknown) }
+        }.getOrElse { strings.getString(R.string.notification_app_unknown) }
     }
 }
 
 /** NotificationManagerCompat-backed delivery. */
-class AndroidNotificationDispatcher(private val context: Context) : AppNotificationDispatcher {
+class AndroidNotificationDispatcher(
+    private val context: Context,
+    private val languageProvider: () -> AppLanguage? = { null },
+) : AppNotificationDispatcher {
 
-    override fun ensureChannels() = NotificationChannels.ensure(context)
+    override fun ensureChannels() = NotificationChannels.ensure(context, languageProvider)
 
     override fun areNotificationsEnabled(): Boolean =
         runCatching { NotificationManagerCompat.from(context).areNotificationsEnabled() }.getOrDefault(false)
@@ -163,36 +182,42 @@ class AndroidNotificationDispatcher(private val context: Context) : AppNotificat
 class AndroidNotificationContentFactory(
     private val context: Context,
     private val appLabels: AppLabelResolver = AppLabelResolver(context),
+    private val languageProvider: () -> AppLanguage? = { null },
 ) : NotificationContentFactory {
 
     override fun contentFor(
         decision: NotificationDecision,
         event: AppNotificationEvent,
-    ): NotificationContent = when (decision.type) {
-        NotificationType.PROTECTION_BLOCKED -> NotificationContent(
-            title = context.getString(R.string.notification_protection_blocked_title),
-            body = context.getString(
-                R.string.notification_protection_blocked_body,
-                appLabels.labelFor((event as? AppNotificationEvent.ProtectionBlocked)?.targetPackageName),
-            ),
-        )
+    ): NotificationContent {
+        // Resolve against the selected application language (same single store the
+        // UI uses), so notification text matches the in-app language.
+        val strings = localizedStringsContext(context, languageProvider())
 
-        NotificationType.PROTECTION_RELEASED -> NotificationContent(
-            title = context.getString(R.string.notification_protection_released_title),
-            body = context.getString(R.string.notification_protection_released_body),
-        )
-
-        NotificationType.PARENT_REQUEST_CREATED -> {
-            val request = event as? AppNotificationEvent.ParentRequestCreated
-            NotificationContent(
-                title = context.getString(R.string.notification_request_created_title),
-                body = context.getString(
-                    R.string.notification_request_created_body,
-                    appLabels.labelFor(request?.targetPackageName),
-                    request?.requestedDurationMinutes ?: 0,
+        return when (decision.type) {
+            NotificationType.PROTECTION_BLOCKED -> NotificationContent(
+                title = strings.getString(R.string.notification_protection_blocked_title),
+                body = strings.getString(
+                    R.string.notification_protection_blocked_body,
+                    appLabels.labelFor((event as? AppNotificationEvent.ProtectionBlocked)?.targetPackageName),
                 ),
             )
+
+            NotificationType.PROTECTION_RELEASED -> NotificationContent(
+                title = strings.getString(R.string.notification_protection_released_title),
+                body = strings.getString(R.string.notification_protection_released_body),
+            )
+
+            NotificationType.PARENT_REQUEST_CREATED -> {
+                val request = event as? AppNotificationEvent.ParentRequestCreated
+                NotificationContent(
+                    title = strings.getString(R.string.notification_request_created_title),
+                    body = strings.getString(
+                        R.string.notification_request_created_body,
+                        appLabels.labelFor(request?.targetPackageName),
+                        request?.requestedDurationMinutes ?: 0,
+                    ),
+                )
+            }
         }
     }
-
 }

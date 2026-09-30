@@ -4,13 +4,18 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import uz.faceguard.app.core.i18n.LanguageState
+import uz.faceguard.app.core.i18n.LocalizedApp
 import uz.faceguard.app.core.notification.NotificationNavigation
 import uz.faceguard.app.core.protection.ProtectionRuntime
 import uz.faceguard.app.core.theme.FaceGuardTheme
+import uz.faceguard.app.data.prefs.AppLanguageStore
 import uz.faceguard.app.navigation.FaceGuardNavHost
 
 @AndroidEntryPoint
@@ -23,6 +28,9 @@ class MainActivity : ComponentActivity() {
      */
     @Inject lateinit var protectionRuntime: ProtectionRuntime
 
+    /** The app language, applied to the whole Compose tree at the root. */
+    @Inject lateinit var languageStore: AppLanguageStore
+
     /**
      * Phase 11: a notification click asks for exactly one destination. It is kept
      * as state so the running composition (singleTop re-launch) can route it too.
@@ -33,12 +41,22 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         requestedDestination.value = intent?.getStringExtra(NotificationNavigation.EXTRA_DESTINATION)
         setContent {
+            // Created outside LocalizedApp: the NavController must keep the real
+            // Activity context (it resolves the Activity for navigation).
+            val navController = rememberNavController()
+            val languageState by languageStore.state.collectAsStateWithLifecycle()
+            val language = (languageState as? LanguageState.Selected)?.language
+
             FaceGuardTheme {
-                val navController = rememberNavController()
-                FaceGuardNavHost(
-                    navController = navController,
-                    requestedDestination = requestedDestination.value,
-                )
+                // Applying the selected language here makes every string in the
+                // tree — including the first-launch picker itself — re-render in
+                // the chosen language immediately, with no activity restart.
+                LocalizedApp(language) {
+                    FaceGuardNavHost(
+                        navController = navController,
+                        requestedDestination = requestedDestination.value,
+                    )
+                }
             }
         }
     }

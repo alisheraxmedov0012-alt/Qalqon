@@ -29,6 +29,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import uz.faceguard.app.R
 import uz.faceguard.app.core.accessibility.AccessibilityOverlayRegistry
+import uz.faceguard.app.core.i18n.AppLanguage
+import uz.faceguard.app.core.i18n.LocalizedApp
 
 /**
  * Protection overlay, routed to whichever window mechanism can actually block.
@@ -58,6 +60,11 @@ class OverlayControllerImpl(
      * runtime, which owns the account and the currently blocked package.
      */
     private val onRequestExtraTime: (() -> Unit)? = null,
+    /**
+     * The selected application language, so the blocking overlay is shown in the
+     * parent's chosen language. Reads the same single store as the rest of the UI.
+     */
+    private val languageProvider: () -> AppLanguage? = { null },
 ) : ProtectionEngine.OverlayController {
 
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -91,7 +98,11 @@ class OverlayControllerImpl(
         if (!hasPermission()) return
         if (overlayView != null) return
         val view = ComposeView(context).apply {
-            setContent { ProtectionOverlay(onRequestExtraTime = onRequestExtraTime) }
+            setContent {
+                LocalizedApp(languageProvider()) {
+                    ProtectionOverlay(onRequestExtraTime = onRequestExtraTime)
+                }
+            }
         }
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,

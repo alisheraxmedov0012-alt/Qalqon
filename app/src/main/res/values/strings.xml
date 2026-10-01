@@ -32,11 +32,7 @@
     <string name="error_duplicate_phone">Bu telefon raqami allaqachon ro\'yxatdan o\'tgan</string>
     <string name="error_invalid_credentials">Telefon raqami yoki PIN-kod noto\'g\'ri</string>
     <string name="home_title">Bosh sahifa</string>
-    <string name="home_status_on">Himoya yoqilgan</string>
-    <string name="home_status_off">Himoya o\'chirilgan</string>
-    <string name="home_menu_parent">Ota-ona profili</string>
     <string name="home_menu_children">Bolalar profillari</string>
-    <string name="home_menu_settings">Sozlamalar</string>
     <string name="parent_title">Ota-ona profili</string>
     <string name="parent_display_name_hint">Ko\'rsatilgan nom</string>
     <string name="parent_saved">Saqlandi</string>
@@ -70,8 +66,6 @@
     <string name="children_face_off">Yuz ro\'yxatdan o\'tmagan</string>
     <string name="children_delete_title">Bolani o\'chirish</string>
     <string name="children_delete_message">%1$s bolani o\'chirilsinmi?</string>
-    <string name="settings_tab_rules">Qoidalar</string>
-    <string name="settings_tab_apps">Ilovalar</string>
     <string name="scan_balanced">Muvozanat</string>
     <string name="scan_battery_saver">Batareyani tejash</string>
     <string name="scan_strict">Aniq</string>
@@ -89,8 +83,6 @@
     <string name="papps_refreshing">Yangilanmoqda...</string>
     <string name="papps_selected_count">Himoyalanganlar soni: %1$d</string>
     <string name="papps_marked">Tanlangan</string>
-    <string name="home_scan_mode_label">Skanerlash rejimi</string>
-    <string name="home_unknown_policy_label">Noma\'lum foydalanuvchi siyosati</string>
 
     <string name="enroll_title">Yuzni ro\'yxatga olish</string>
     <string name="enroll_parent_hint">Ota-ona profili uchun yuzni ro\'yxatga oling</string>
@@ -117,12 +109,7 @@
     <string name="recognition_permission_title">Kamera ruxsati</string>
     <string name="recognition_permission_message">Tanib olish uchun kamera kerak</string>
 
-    <string name="home_protected_count">Himoyalangan ilovalar: %1$d</string>
-    <string name="home_foreground_title">Joriy ilova</string>
     <string name="home_foreground_current">Joriy ilova: %1$s</string>
-    <string name="home_foreground_unknown">noma\'lum</string>
-    <string name="home_usage_access_hint">Foydalanish statistikasiga ruxsat kerak</string>
-    <string name="home_usage_access_grant">Ruxsat berish</string>
     <string name="papps_refresh">Ilovalarni yangilash</string>
 
     <string name="protection_debug_title">Himoya holati</string>
@@ -139,7 +126,6 @@
     <string name="protection_emergency_locked_out">Juda ko\'p urinish. Qayta urinib ko\'rishdan oldin %1$s kuting.</string>
     <string name="protection_emergency_unlock">Ochish</string>
 
-    <string name="home_protection_debug">Himoyani tekshirish</string>
 
     <string name="protection_scan_debug_title">Skanerlash holati</string>
     <string name="protection_scan_mode">Rejim: %1$s</string>
@@ -162,17 +148,8 @@
     <string name="welcome_point_offline">Ilova internetsiz ishlaydi. Barcha ma\'lumotlar faqat telefonda saqlanadi.</string>
     <string name="welcome_point_on_device">Yuzni tanish telefonning o\'zida bajariladi.</string>
     <string name="welcome_point_battery">Kamera faqat kerakli paytda yoqiladi, shuning uchun batareya tejaladi.</string>
-    <string name="setup_title">Sozlash holati</string>
     <string name="setup_done_mark">✓</string>
     <string name="setup_todo_mark">○</string>
-    <string name="setup_account">Hisob yaratildi</string>
-    <string name="setup_parent_profile">Ota-ona profili yaratildi</string>
-    <string name="setup_parent_face">Ota-ona yuzi kiritildi</string>
-    <string name="setup_child_added">Kamida bitta bola qo\'shildi</string>
-    <string name="setup_child_face">Bola yuzi kiritildi</string>
-    <string name="setup_protected_apps">Himoyalangan ilovalar tanlandi</string>
-    <string name="setup_protection_enabled">Himoya yoqildi</string>
-    <string name="home_menu_activity">Faoliyat jurnali</string>
     <string name="home_menu_privacy">Maxfiylik</string>
     <string name="home_menu_help">Yordam</string>
     <string name="privacy_title">Maxfiylik</string>
@@ -188,7 +165,6 @@
     <string name="help_steps_body">1. Hisob yarating. 2. Ota-ona profilini to\'ldiring va yuzingizni kiriting. 3. Bola qo\'shing va uning yuzini kiriting. 4. Himoyalangan ilovalarni tanlang. 5. Himoyani yoqing.</string>
     <string name="help_version">%1$s — MVP namoyish versiyasi</string>
     <string name="activity_title">Faoliyat jurnali</string>
-    <string name="activity_empty">Hozircha hodisalar yo\'q</string>
     <string name="activity_clear">Jurnalni tozalash</string>
     <string name="activity_child_recognized">Bola tanildi</string>
     <string name="activity_parent_recognized">Ota-ona tanildi</string>
@@ -205,7 +181,6 @@
     <string name="protection_service_channel_description">Qalqon fonda ishlayotganda himoya holati ko\'rsatiladi.</string>
     <string name="protection_service_notification_title">Qalqon himoyasi faol</string>
     <string name="protection_service_notification_text">Qalqon tanlangan qoidalarni kuzatmoqda.</string>
-    <string name="settings_tab_data">Ma\'lumotlar</string>
     <string name="data_section_faces">Yuz ma\'lumotlari</string>
     <string name="data_delete_parent_face">Ota-ona yuzini o\'chirish</string>
     <string name="data_delete_child_face">%1$s yuzini o\'chirish</string>
@@ -219,19 +194,9 @@
     <string name="data_reset_confirm_yes">Ha, o\'chirish</string>
     <string name="data_reset_confirm_no">Bekor qilish</string>
 
-    <string name="home_subtitle">Asosiy bo\'limlardan birini tanlab sozlashni davom ettiring</string>
-    <string name="home_profile_title">Sizning profilingiz</string>
-    <string name="home_profile_name">Ism: %1$s</string>
-    <string name="home_profile_phone">Telefon: %1$s</string>
-    <string name="home_profile_protection">Holat: %1$s</string>
-    <string name="home_main_actions_title">Asosiy bo\'limlar</string>
     <string name="home_menu_protected_apps">Himoyalangan ilovalar</string>
-    <string name="home_setup_progress">Bajarildi: %1$d/%2$d qadam</string>
-    <string name="home_additional_title">Qo\'shimcha bo\'limlar</string>
     <string name="home_section_show">Ko\'rsatish</string>
     <string name="home_section_hide">Yashirish</string>
-    <string name="home_developer_title">Dasturchi bo\'limi</string>
-    <string name="home_developer_hint">Bu bo\'lim sinov va diagnostika uchun. Oddiy foydalanishda kerak emas.</string>
     <string name="protection_title">Himoya holati</string>
     <string name="protection_toggle_label">Himoya</string>
     <string name="protection_toggle_on">Himoya yoqilgan</string>
@@ -257,16 +222,12 @@
     <string name="protection_emergency_hint">Blokni vaqtincha ochish uchun PIN-kodni kiriting.</string>
     <string name="protection_tech_title">Texnik ma\'lumotlar</string>
     <string name="protection_limit_note">Himoya hozircha Qalqon ochiq turganda to\'liq ishlaydi. Qalqon fonda bo\'lganda kamerani ishlatish uchun tizim xizmati keyingi bosqichda qo\'shiladi.</string>
-    <string name="setup_all_done">Barcha qadamlar bajarildi</string>
-    <string name="setup_next_step">Keyingi qadam: %1$s</string>
     <string name="parent_details_title">Ma\'lumotlaringiz</string>
     <string name="parent_details_subtitle">Bu ma\'lumotlar sizni bolalardan ajratish uchun ishlatiladi.</string>
     <string name="parent_phone_label">Telefon raqami: %1$s</string>
     <string name="parent_face_title">Yuzni ro\'yxatga olish</string>
     <string name="parent_face_reenroll">Yuzni qayta kiritish</string>
     <string name="children_empty_hint">Bola qo\'shib, uning yuzini kiriting — shundan so\'ng himoya ishlaydi.</string>
-    <string name="children_level_label">Cheklov darajasi: %1$s</string>
-    <string name="children_face_reenroll">Yuzni qayta kiritish</string>
     <string name="papps_search_hint">Ilova nomini qidirish</string>
     <string name="papps_no_results">Bunday nomdagi ilova topilmadi</string>
     <string name="settings_protection_hint">Himoya yoqilganda Qalqon tanlangan ilovalarni kuzatadi.</string>
@@ -313,11 +274,7 @@
 
     <string name="dashboard_subtitle">Bola himoyasi holati va sozlamalari bir joyda</string>
     <string name="dashboard_schedule_none">Hozir jadval ta\'sir qilmayapti</string>
-    <string name="dashboard_schedule_active">%1$s · %2$s</string>
     <string name="dashboard_schedule_conflict">Jadval ziddiyati: %1$s</string>
-    <string name="dashboard_schedule_manage">Jadvallarni boshqarish</string>
-    <string name="dashboard_eye_safety_actions">Ogohlantirish: %1$s · Xavf: %2$s</string>
-    <string name="dashboard_eye_safety_manage">Ko\'z xavfsizligini sozlash</string>
     <string name="dashboard_error">Ma\'lumotlarni yuklab bo\'lmadi</string>
     <string name="dashboard_error_hint">Iltimos, qayta urinib ko\'ring</string>
     <string name="dashboard_retry">Qayta urinish</string>
@@ -444,16 +401,8 @@
     <string name="app_category_social">Ijtimoiy tarmoqlar</string>
     <string name="app_category_other">Boshqa</string>
     <string name="screentime_summary_today">Bugungi ekran vaqti</string>
-    <string name="screentime_summary_used">Ishlatildi: %1$s</string>
-    <string name="screentime_summary_limit">Kunlik chegara: %1$s</string>
-    <string name="screentime_summary_unlimited">Kunlik chegara: qo\'yilmagan</string>
-    <string name="screentime_summary_limit_invalid">Kunlik chegara: noto\'g\'ri sozlangan</string>
-    <string name="screentime_summary_status_remaining">Qoldi: %1$s</string>
-    <string name="screentime_summary_status_reached">Chegaraga yetdi</string>
-    <string name="screentime_summary_status_unlimited">Chegara yo\'q</string>
     <string name="screentime_summary_no_target">Ekran vaqti uchun bola tanlanmagan</string>
     <string name="screentime_summary_unavailable">Foydalanish ma\'lumoti mavjud emas</string>
-    <string name="screentime_summary_unavailable_hint">Ekran vaqtini hisoblash uchun foydalanish ruxsatini yoqing</string>
     <string name="screentime_summary_error">Ma\'lumotni yuklab bo\'lmadi</string>
     <string name="screentime_duration_minutes">%1$d daqiqa</string>
     <string name="screentime_duration_hours">%1$d soat</string>
@@ -648,4 +597,90 @@
     <string name="qal_action_cancel">Bekor qilish</string>
     <string name="qal_action_confirm">Tasdiqlash</string>
     <string name="qal_badge_content_description">%1$d ta yangi</string>
+
+    <!-- QALQON navigation shell: the four primary top-level destinations. -->
+    <string name="nav_home">Bosh sahifa</string>
+    <string name="nav_children">Bolalar</string>
+    <string name="nav_activity">Faoliyat</string>
+    <string name="nav_settings">Sozlamalar</string>
+
+    <!-- QALQON Home dashboard (UI/UX redesign, Phase 3). -->
+    <string name="home_greeting">Salom, %1$s</string>
+    <string name="home_more_options">Boshqa</string>
+    <string name="home_attention_title">Diqqat talab qiladi</string>
+    <string name="home_attention_children_setup">Ba\'zi bolalar uchun yuz hali sozlanmagan</string>
+    <string name="home_today_title">Bugun</string>
+    <string name="home_quick_actions_title">Tezkor amallar</string>
+    <string name="home_action_manage_children">Bolalarni boshqarish</string>
+    <string name="home_status_off_hint">Himoya hozircha o\'chirilgan</string>
+    <string name="home_status_active_hint">Himoya faol va ishlayapti</string>
+    <string name="home_status_setup_hint">Himoyani yoqish uchun ruxsatlarni to\'ldiring</string>
+    <string name="home_status_blocking">Himoya bloklayapti</string>
+    <string name="home_status_blocking_hint">Himoya hozir amal qilmoqda</string>
+    <string name="home_status_recovering_hint">Himoya tiklanmoqda</string>
+    <string name="home_child_content_description">Farzand: %1$s, %2$s</string>
+
+    <!-- QALQON Children + Child Detail (UI/UX redesign, Phase 4). -->
+    <string name="children_overview">Farzandlaringiz</string>
+    <string name="children_open_details">%1$s ma\'lumotlarini ochish</string>
+    <string name="child_detail_back">Orqaga</string>
+    <string name="child_detail_controls_title">Boshqarish</string>
+    <string name="child_detail_apps">Ilovalar</string>
+    <string name="child_detail_apps_desc">Qaysi ilovalar himoyalanishini tanlang</string>
+    <string name="child_detail_screen_time">Ekran vaqti</string>
+    <string name="child_detail_screen_time_desc">Kunlik limitlar va foydalanish</string>
+    <string name="child_detail_schedule">Jadval</string>
+    <string name="child_detail_schedule_desc">Himoya jadvali</string>
+    <string name="child_detail_eye_safety">Ko\'z xavfsizligi</string>
+    <string name="child_detail_eye_safety_desc">Tanaffuslar va ko\'z xavfsizligi chegaralari</string>
+    <string name="child_detail_face">Yuz</string>
+    <string name="child_detail_face_desc">Tanib olish profili</string>
+    <string name="child_detail_requests">So\'rovlar</string>
+    <string name="child_detail_requests_desc">Kutilayotgan so\'rovlar</string>
+    <string name="child_detail_missing">Farzand topilmadi</string>
+    <string name="child_detail_missing_hint">Bu farzand o\'chirilgan bo\'lishi mumkin</string>
+
+    <!-- QALQON Activity center (UI/UX redesign, Phase 5). -->
+    <string name="activity_overview_title">Bugun</string>
+    <string name="activity_metric_screen_time">Bugungi ekran vaqti</string>
+    <string name="activity_metric_requests">Kutilayotgan so\'rovlar</string>
+    <string name="activity_metric_events">Bugungi hodisalar</string>
+    <string name="activity_screentime_title">Ekran vaqti tarixi</string>
+    <string name="activity_filter_all">Barcha bolalar</string>
+    <string name="activity_day_today">Bugun</string>
+    <string name="activity_day_yesterday">Kecha</string>
+    <string name="activity_usage_unavailable">Foydalanish ma\'lumotlari mavjud emas</string>
+    <string name="activity_no_screentime">Hozircha ekran vaqti qayd etilmagan</string>
+    <string name="activity_clear_confirm">Barcha faoliyat yozuvlarini o\'chirish?</string>
+
+    <!-- QALQON Settings center (UI/UX redesign, Phase 6). -->
+    <string name="settings_category_protection">Himoya</string>
+    <string name="settings_category_protection_desc">Himoya va bloklash qoidalari</string>
+    <string name="settings_category_family">Oila</string>
+    <string name="settings_category_family_desc">Ota-ona profili va farzandlar</string>
+    <string name="settings_category_security">Xavfsizlik</string>
+    <string name="settings_category_security_desc">Qulf va kirish</string>
+    <string name="settings_category_appearance">Ko\'rinish</string>
+    <string name="settings_category_appearance_desc">Til va ko\'rinish</string>
+    <string name="settings_category_notifications">Bildirishnomalar</string>
+    <string name="settings_category_notifications_desc">Bildirishnoma holati</string>
+    <string name="settings_category_privacy">Maxfiylik</string>
+    <string name="settings_category_privacy_desc">Ma\'lumotlar va yuz ma\'lumotlari</string>
+    <string name="settings_category_support">Yordam</string>
+    <string name="settings_category_support_desc">Qo\'llanma va ma\'lumot</string>
+    <string name="settings_category_developer">Ishlab chiquvchi</string>
+    <string name="settings_category_developer_desc">Diagnostika (faqat debug)</string>
+
+    <string name="settings_row_parent_profile">Ota-ona profili</string>
+    <string name="settings_row_parent_profile_desc">Ism va yuz ma\'lumotlarini boshqarish</string>
+    <string name="settings_row_children">Farzandlar</string>
+    <string name="settings_row_children_desc">Farzandlarni boshqarish</string>
+    <string name="settings_row_protected_apps_desc">Himoyalanadigan ilovalarni tanlash</string>
+    <string name="settings_row_help_desc">Qo\'llanma va boshlash</string>
+    <string name="settings_row_recognition_debug_desc">Yuzni tanish diagnostikasi</string>
+    <string name="settings_row_app_lock">Ilova qulfi</string>
+    <string name="settings_row_app_lock_desc">Qalqon PIN va biometrik bilan qulflanadi</string>
+    <string name="settings_notifications_enabled">Yoqilgan</string>
+    <string name="settings_notifications_disabled">O\'chirilgan</string>
+    <string name="settings_notifications_hint">Bildirishnomalar tizim sozlamalarida boshqariladi</string>
 </resources>

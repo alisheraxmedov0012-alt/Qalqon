@@ -1,12 +1,17 @@
 package uz.faceguard.app.navigation
 
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import uz.faceguard.app.core.debug.DebugFlags
 import uz.faceguard.app.core.i18n.StartupDestination
 import uz.faceguard.app.core.notification.NotificationNavigation
@@ -17,6 +22,7 @@ import uz.faceguard.app.feature.auth.RegisterScreen
 import uz.faceguard.app.feature.auth.SplashScreen
 import uz.faceguard.app.feature.auth.WelcomeScreen
 import uz.faceguard.app.feature.language.LanguageScreen
+import uz.faceguard.app.feature.child.ChildDetailScreen
 import uz.faceguard.app.feature.child.ChildProfilesScreen
 import uz.faceguard.app.feature.enrollment.FaceEnrollmentScreen
 import uz.faceguard.app.feature.enrollment.SUBJECT_CHILD
@@ -36,7 +42,16 @@ import uz.faceguard.app.feature.eyesafety.EyeSafetyScreen
 import uz.faceguard.app.feature.requests.RequestsArgs
 import uz.faceguard.app.feature.requests.RequestsScreen
 import uz.faceguard.app.feature.recognition.RecognitionDebugScreen
+import uz.faceguard.app.feature.settings.AppearanceSettingsScreen
+import uz.faceguard.app.feature.settings.DeveloperSettingsScreen
+import uz.faceguard.app.feature.settings.FamilySettingsScreen
+import uz.faceguard.app.feature.settings.NotificationsSettingsScreen
+import uz.faceguard.app.feature.settings.PrivacySettingsScreen
+import uz.faceguard.app.feature.settings.ProtectedAppsScreen
+import uz.faceguard.app.feature.settings.ProtectionSettingsScreen
+import uz.faceguard.app.feature.settings.SecuritySettingsScreen
 import uz.faceguard.app.feature.settings.SettingsScreen
+import uz.faceguard.app.feature.settings.SupportSettingsScreen
 
 object Routes {
     const val SPLASH = "splash"
@@ -53,6 +68,20 @@ object Routes {
     const val CHILD_PROFILES = "child_profiles"
     const val SETTINGS = "settings"
     const val SETTINGS_APPS = "settings_apps"
+
+    /**
+     * UI/UX redesign, Phase 6: one route per Settings category. They are siblings of
+     * `settings_apps` (reusing the existing protected-apps destination) rather than new
+     * bottom-navigation items, and they group the existing settings by function.
+     */
+    const val SETTINGS_PROTECTION = "settings_protection"
+    const val SETTINGS_FAMILY = "settings_family"
+    const val SETTINGS_SECURITY = "settings_security"
+    const val SETTINGS_APPEARANCE = "settings_appearance"
+    const val SETTINGS_NOTIFICATIONS = "settings_notifications"
+    const val SETTINGS_PRIVACY = "settings_privacy"
+    const val SETTINGS_SUPPORT = "settings_support"
+    const val SETTINGS_DEVELOPER = "settings_developer"
     const val RECOGNITION_DEBUG = "recognition_debug"
     const val PROTECTION = "protection"
     const val PRIVACY = "privacy"
@@ -60,13 +89,26 @@ object Routes {
     const val ACTIVITY_LOG = "activity_log"
     const val REQUESTS = "requests"
     const val PARENT_FACE_ENROLLMENT = "parent_face_enrollment"
+    const val CHILD_DETAIL = "child_detail/{childId}"
     const val CHILD_FACE_ENROLLMENT = "child_face_enrollment/{childId}"
     const val CHILD_POLICY = "child_policy/{childId}"
     const val CHILD_SCHEDULES = "child_schedules/{childId}"
     const val CHILD_SCHEDULE_EDITOR = "child_schedule_editor/{childId}?scheduleId={scheduleId}"
     const val CHILD_EYE_SAFETY = "child_eye_safety/{childId}"
+
+    /**
+     * UI/UX redesign, Phase 4: optional section selector on the child policy screen,
+     * so the Child Detail hub can open App rules or Screen time directly on the same
+     * screen (and the same ViewModel) instead of duplicating either destination.
+     */
+    const val CHILD_POLICY_SECTION = "section"
+    const val CHILD_POLICY_SECTION_SCREEN_TIME = "screen_time"
+
+    fun childDetail(childId: Long) = "child_detail/$childId"
     fun childFaceEnrollment(childId: Long) = "child_face_enrollment/$childId"
     fun childPolicy(childId: Long) = "child_policy/$childId"
+    fun childScreenTime(childId: Long) =
+        "child_policy/$childId?$CHILD_POLICY_SECTION=$CHILD_POLICY_SECTION_SCREEN_TIME"
     fun childSchedules(childId: Long) = "child_schedules/$childId"
     fun childScheduleEditor(childId: Long, scheduleId: Long = -1L) =
         "child_schedule_editor/$childId?scheduleId=$scheduleId"
@@ -116,6 +158,16 @@ private val PROTECTED_ROUTE_PREFIXES = listOf(
     Routes.CHILD_PROFILES,
     Routes.SETTINGS,
     Routes.SETTINGS_APPS,
+    // Phase 6: every Settings category page is parental control and must stay behind
+    // the PIN gate alongside the Settings hub itself.
+    Routes.SETTINGS_PROTECTION,
+    Routes.SETTINGS_FAMILY,
+    Routes.SETTINGS_SECURITY,
+    Routes.SETTINGS_APPEARANCE,
+    Routes.SETTINGS_NOTIFICATIONS,
+    Routes.SETTINGS_PRIVACY,
+    Routes.SETTINGS_SUPPORT,
+    Routes.SETTINGS_DEVELOPER,
     Routes.PROTECTION,
     Routes.PRIVACY,
     Routes.HELP,
@@ -123,6 +175,9 @@ private val PROTECTED_ROUTE_PREFIXES = listOf(
     Routes.REQUESTS,
     Routes.RECOGNITION_DEBUG,
     Routes.PARENT_FACE_ENROLLMENT,
+    // Phase 4: the new Child Detail hub is a child-management route and must stay
+    // behind the PIN gate like every other child-scoped destination.
+    "child_detail",
     "child_face_enrollment",
     "child_policy",
     "child_schedules",
@@ -152,6 +207,25 @@ fun isProtectedRoute(route: String?): Boolean {
  */
 fun lockRedirectFor(route: String?, isUnlocked: Boolean): String? =
     if (!isUnlocked && isProtectedRoute(route)) Routes.PIN_UNLOCK else null
+
+/**
+ * Switches to a primary top-level destination (UI/UX redesign, Phase 2).
+ *
+ * Implements the standard Material bottom-navigation behaviour on the one existing
+ * controller: switching tabs never grows the back stack (so
+ * `Home → Children → Activity → Settings → Activity` cannot happen) and each tab's
+ * saved state is restored when it is re-selected. Home is the stable root of the
+ * authenticated UI (every successful auth path lands there with `popUpTo(0)`), so
+ * popping up to it keeps the back behaviour intuitive without a second start
+ * destination.
+ */
+private fun NavHostController.navigateToTopLevel(destination: QalqonTopLevelDestination) {
+    navigate(destination.route) {
+        popUpTo(Routes.HOME) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
+}
 
 /**
  * Launch: Splash resolves the language, the registered account and the process
@@ -211,7 +285,47 @@ fun FaceGuardNavHost(
         }
     }
 
-    NavHost(navController = navController, startDestination = Routes.SPLASH) {
+    // Phase 2: the currently selected primary destination, derived from the single
+    // existing back stack. Null on every non-tab route, which is what keeps the
+    // bottom bar off the onboarding, PIN-gate and child-detail screens.
+    val selectedDestination = QalqonTopLevelDestination.forRoute(
+        navController.currentBackStackEntryAsState().value?.destination?.route,
+    )
+
+    QalqonAppShell(
+        selected = selectedDestination,
+        onSelect = { destination -> navController.navigateToTopLevel(destination) },
+    ) { innerPadding ->
+        QalqonNavHost(
+            navController = navController,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                // The shell already reserves the bar (and the system bars) area;
+                // consuming those insets stops each screen's own Scaffold from
+                // applying them a second time.
+                .consumeWindowInsets(innerPadding),
+        )
+    }
+}
+
+/**
+ * The existing QALQON route graph, hosted inside the shell.
+ *
+ * Extracted verbatim from [FaceGuardNavHost] so the graph is not duplicated: the
+ * shell adds the bottom navigation *around* the routes, the routes themselves —
+ * every existing destination, argument and debug gate — are unchanged.
+ */
+@Composable
+private fun QalqonNavHost(
+    navController: NavHostController,
+    modifier: Modifier = Modifier,
+) {
+    NavHost(
+        navController = navController,
+        startDestination = Routes.SPLASH,
+        modifier = modifier,
+    ) {
         composable(Routes.SPLASH) {
             SplashScreen(
                 onReady = { destination ->
@@ -269,20 +383,21 @@ fun FaceGuardNavHost(
             )
         }
         composable(Routes.HOME) {
+            // Phase 3: the redesigned dashboard. Every callback maps to an existing
+            // route; Parent profile / schedules / eye safety remain reachable through
+            // the Protection and child-policy screens, and Activity is a bottom tab.
             HomeScreen(
-                onOpenParent = { navController.navigate(Routes.PARENT_PROFILE) },
                 onOpenChildren = { navController.navigate(Routes.CHILD_PROFILES) },
                 onOpenProtectedApps = { navController.navigate(Routes.SETTINGS_APPS) },
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
-                onOpenRecognition = { navController.navigate(Routes.RECOGNITION_DEBUG) },
                 onOpenProtection = { navController.navigate(Routes.PROTECTION) },
+                onOpenRequests = { navController.navigate(Routes.requests()) },
+                // Phase 4: Home's child card now opens the Child Detail hub, which is
+                // the single entry point for every child-scoped control.
+                onOpenChildPolicy = { childId -> navController.navigate(Routes.childDetail(childId)) },
                 onOpenPrivacy = { navController.navigate(Routes.PRIVACY) },
                 onOpenHelp = { navController.navigate(Routes.HELP) },
-                onOpenActivity = { navController.navigate(Routes.ACTIVITY_LOG) },
-                onOpenChildPolicy = { childId -> navController.navigate(Routes.childPolicy(childId)) },
-                onOpenRequests = { navController.navigate(Routes.requests()) },
-                onOpenChildSchedules = { childId -> navController.navigate(Routes.childSchedules(childId)) },
-                onOpenChildEyeSafety = { childId -> navController.navigate(Routes.childEyeSafety(childId)) },
+                onOpenRecognition = { navController.navigate(Routes.RECOGNITION_DEBUG) },
             )
         }
         composable(Routes.PARENT_PROFILE) {
@@ -312,23 +427,47 @@ fun FaceGuardNavHost(
         composable(Routes.CHILD_PROFILES) {
             ChildProfilesScreen(
                 onBack = { navController.popBackStack() },
+                onOpenChild = { childId -> navController.navigate(Routes.childDetail(childId)) },
                 onEnrollChild = { childId ->
                     navController.navigate(Routes.childFaceEnrollment(childId))
                 },
-                onOpenPolicy = { childId ->
-                    navController.navigate(Routes.childPolicy(childId))
-                },
+            )
+        }
+        // Phase 4: the Child Detail hub. Every control keeps the child context by
+        // navigating to the existing child-scoped route with the same id.
+        composable(
+            route = Routes.CHILD_DETAIL,
+            arguments = listOf(navArgument("childId") { type = NavType.LongType }),
+        ) {
+            entry ->
+            val childId = entry.arguments?.getLong("childId") ?: -1L
+            ChildDetailScreen(
+                onBack = { navController.popBackStack() },
+                onOpenApps = { id -> navController.navigate(Routes.childPolicy(id)) },
+                onOpenScreenTime = { id -> navController.navigate(Routes.childScreenTime(id)) },
+                onOpenSchedule = { id -> navController.navigate(Routes.childSchedules(id)) },
+                onOpenEyeSafety = { id -> navController.navigate(Routes.childEyeSafety(id)) },
+                onOpenFace = { id -> navController.navigate(Routes.childFaceEnrollment(id)) },
+                onOpenRequests = { navController.navigate(Routes.requests()) },
             )
         }
         composable(
-            route = Routes.CHILD_POLICY,
-            arguments = listOf(navArgument("childId") { type = NavType.LongType }),
-        ) {
+            route = "${Routes.CHILD_POLICY}?${Routes.CHILD_POLICY_SECTION}={${Routes.CHILD_POLICY_SECTION}}",
+            arguments = listOf(
+                navArgument("childId") { type = NavType.LongType },
+                navArgument(Routes.CHILD_POLICY_SECTION) {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+            ),
+        ) { entry ->
             ChildPolicyScreen(
                 onBack = { navController.popBackStack() },
                 onOpenChildren = { navController.navigate(Routes.CHILD_PROFILES) },
                 onOpenSchedules = { childId -> navController.navigate(Routes.childSchedules(childId)) },
                 onOpenEyeSafety = { childId -> navController.navigate(Routes.childEyeSafety(childId)) },
+                focusScreenTime = entry.arguments?.getString(Routes.CHILD_POLICY_SECTION) ==
+                    Routes.CHILD_POLICY_SECTION_SCREEN_TIME,
             )
         }
         composable(
@@ -403,25 +542,71 @@ fun FaceGuardNavHost(
             HelpScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.ACTIVITY_LOG) {
-            ActivityLogScreen(onBack = { navController.popBackStack() })
+            // Phase 5: Activity is a top-level bottom-navigation destination, so it has
+            // no back arrow; its pending requests open the existing requests route.
+            ActivityLogScreen(
+                onOpenRequests = { navController.navigate(Routes.requests()) },
+            )
         }
+        // Phase 6: Settings is a top-level tab whose hub links to one page per
+        // category. Every category route is a sibling of `settings_apps` and stays
+        // behind the same PIN gate; the hub itself has no back arrow.
         composable(Routes.SETTINGS) {
             SettingsScreen(
-                onBack = { navController.popBackStack() },
-                onLoggedOut = {
-                    navController.navigate(Routes.WELCOME) { popUpTo(0) { inclusive = true } }
-                },
-                initialTab = 0,
+                onOpenCategory = { category -> navController.navigate(category.route) },
             )
         }
         composable(Routes.SETTINGS_APPS) {
-            SettingsScreen(
+            ProtectedAppsScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.SETTINGS_PROTECTION) {
+            ProtectionSettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenProtectedApps = { navController.navigate(Routes.SETTINGS_APPS) },
+            )
+        }
+        composable(Routes.SETTINGS_FAMILY) {
+            FamilySettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenParentProfile = { navController.navigate(Routes.PARENT_PROFILE) },
+                onOpenChildren = { navController.navigate(Routes.CHILD_PROFILES) },
+            )
+        }
+        composable(Routes.SETTINGS_SECURITY) {
+            SecuritySettingsScreen(
                 onBack = { navController.popBackStack() },
                 onLoggedOut = {
                     navController.navigate(Routes.WELCOME) { popUpTo(0) { inclusive = true } }
                 },
-                initialTab = 1,
             )
+        }
+        composable(Routes.SETTINGS_APPEARANCE) {
+            AppearanceSettingsScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.SETTINGS_NOTIFICATIONS) {
+            NotificationsSettingsScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.SETTINGS_PRIVACY) {
+            PrivacySettingsScreen(
+                onBack = { navController.popBackStack() },
+                onLoggedOut = {
+                    navController.navigate(Routes.WELCOME) { popUpTo(0) { inclusive = true } }
+                },
+            )
+        }
+        composable(Routes.SETTINGS_SUPPORT) {
+            SupportSettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenHelp = { navController.navigate(Routes.HELP) },
+            )
+        }
+        if (DebugFlags.DEBUG_SCREENS_ENABLED) {
+            composable(Routes.SETTINGS_DEVELOPER) {
+                DeveloperSettingsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenRecognition = { navController.navigate(Routes.RECOGNITION_DEBUG) },
+                )
+            }
         }
     }
 }

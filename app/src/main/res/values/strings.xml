@@ -704,4 +704,38 @@
     <string name="activity_child_usage_content_description">%1$s: %2$s</string>
     <string name="activity_no_screentime">Hozircha ekran vaqti qayd etilmagan</string>
     <string name="activity_clear_confirm">Barcha faoliyat yozuvlarini o\'chirish?</string>
+
+    <!-- QALQON Settings center (UI/UX redesign, Phase 6). -->
+    <string name="settings_category_protection">Himoya</string>
+    <string name="settings_category_protection_desc">Himoya va bloklash qoidalari</string>
+    <string name="settings_category_family">Oila</string>
+    <string name="settings_category_family_desc">Ota-ona profili va farzandlar</string>
+    <string name="settings_category_security">Xavfsizlik</string>
+    <string name="settings_category_security_desc">Qulf va kirish</string>
+    <string name="settings_category_appearance">Ko\'rinish</string>
+    <string name="settings_category_appearance_desc">Til va ko\'rinish</string>
+    <string name="settings_category_notifications">Bildirishnomalar</string>
+    <string name="settings_category_notifications_desc">Bildirishnoma holati</string>
+    <string name="settings_category_privacy">Maxfiylik</string>
+    <string name="settings_category_privacy_desc">Ma\'lumotlar va yuz ma\'lumotlari</string>
+    <string name="settings_category_support">Yordam</string>
+    <string name="settings_category_support_desc">Qo\'llanma va ma\'lumot</string>
+    <string name="settings_category_developer">Ishlab chiquvchi</string>
+    <string name="settings_category_developer_desc">Diagnostika (faqat debug)</string>
+
+    <string name="settings_row_parent_profile">Ota-ona profili</string>
+    <string name="settings_row_parent_profile_desc">Ism va yuz ma\'lumotlarini boshqarish</string>
+    <string name="settings_row_children">Farzandlar</string>
+    <string name="settings_row_children_desc">Farzandlarni boshqarish</string>
+    <string name="settings_row_protected_apps_desc">Himoyalanadigan ilovalarni tanlash</string>
+    <string name="settings_row_language_desc">Ilova tilini o\'zgartirish</string>
+    <string name="settings_row_privacy_info_desc">Qalqon maxfiyligi haqida</string>
+    <string name="settings_row_help_desc">Qo\'llanma va boshlash</string>
+    <string name="settings_row_recognition_debug_desc">Yuzni tanish diagnostikasi</string>
+    <string name="settings_row_health_desc">Tizim holatini tekshirish</string>
+    <string name="settings_row_app_lock">Ilova qulfi</string>
+    <string name="settings_row_app_lock_desc">Qalqon PIN va biometrik bilan qulflanadi</string>
+    <string name="settings_notifications_enabled">Yoqilgan</string>
+    <string name="settings_notifications_disabled">O\'chirilgan</string>
+    <string name="settings_notifications_hint">Bildirishnomalar tizim sozlamalarida boshqariladi</string>
 </resources>

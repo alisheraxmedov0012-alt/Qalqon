@@ -42,7 +42,16 @@ import uz.faceguard.app.feature.eyesafety.EyeSafetyScreen
 import uz.faceguard.app.feature.requests.RequestsArgs
 import uz.faceguard.app.feature.requests.RequestsScreen
 import uz.faceguard.app.feature.recognition.RecognitionDebugScreen
+import uz.faceguard.app.feature.settings.AppearanceSettingsScreen
+import uz.faceguard.app.feature.settings.DeveloperSettingsScreen
+import uz.faceguard.app.feature.settings.FamilySettingsScreen
+import uz.faceguard.app.feature.settings.NotificationsSettingsScreen
+import uz.faceguard.app.feature.settings.PrivacySettingsScreen
+import uz.faceguard.app.feature.settings.ProtectedAppsScreen
+import uz.faceguard.app.feature.settings.ProtectionSettingsScreen
+import uz.faceguard.app.feature.settings.SecuritySettingsScreen
 import uz.faceguard.app.feature.settings.SettingsScreen
+import uz.faceguard.app.feature.settings.SupportSettingsScreen
 
 object Routes {
     const val SPLASH = "splash"
@@ -59,6 +68,20 @@ object Routes {
     const val CHILD_PROFILES = "child_profiles"
     const val SETTINGS = "settings"
     const val SETTINGS_APPS = "settings_apps"
+
+    /**
+     * UI/UX redesign, Phase 6: one route per Settings category. They are siblings of
+     * `settings_apps` (reusing the existing protected-apps destination) rather than new
+     * bottom-navigation items, and they group the existing settings by function.
+     */
+    const val SETTINGS_PROTECTION = "settings_protection"
+    const val SETTINGS_FAMILY = "settings_family"
+    const val SETTINGS_SECURITY = "settings_security"
+    const val SETTINGS_APPEARANCE = "settings_appearance"
+    const val SETTINGS_NOTIFICATIONS = "settings_notifications"
+    const val SETTINGS_PRIVACY = "settings_privacy"
+    const val SETTINGS_SUPPORT = "settings_support"
+    const val SETTINGS_DEVELOPER = "settings_developer"
     const val RECOGNITION_DEBUG = "recognition_debug"
     const val PROTECTION = "protection"
     const val PRIVACY = "privacy"
@@ -135,6 +158,16 @@ private val PROTECTED_ROUTE_PREFIXES = listOf(
     Routes.CHILD_PROFILES,
     Routes.SETTINGS,
     Routes.SETTINGS_APPS,
+    // Phase 6: every Settings category page is parental control and must stay behind
+    // the PIN gate alongside the Settings hub itself.
+    Routes.SETTINGS_PROTECTION,
+    Routes.SETTINGS_FAMILY,
+    Routes.SETTINGS_SECURITY,
+    Routes.SETTINGS_APPEARANCE,
+    Routes.SETTINGS_NOTIFICATIONS,
+    Routes.SETTINGS_PRIVACY,
+    Routes.SETTINGS_SUPPORT,
+    Routes.SETTINGS_DEVELOPER,
     Routes.PROTECTION,
     Routes.PRIVACY,
     Routes.HELP,
@@ -515,23 +548,65 @@ private fun QalqonNavHost(
                 onOpenRequests = { navController.navigate(Routes.requests()) },
             )
         }
+        // Phase 6: Settings is a top-level tab whose hub links to one page per
+        // category. Every category route is a sibling of `settings_apps` and stays
+        // behind the same PIN gate; the hub itself has no back arrow.
         composable(Routes.SETTINGS) {
             SettingsScreen(
-                onBack = { navController.popBackStack() },
-                onLoggedOut = {
-                    navController.navigate(Routes.WELCOME) { popUpTo(0) { inclusive = true } }
-                },
-                initialTab = 0,
+                onOpenCategory = { category -> navController.navigate(category.route) },
             )
         }
         composable(Routes.SETTINGS_APPS) {
-            SettingsScreen(
+            ProtectedAppsScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.SETTINGS_PROTECTION) {
+            ProtectionSettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenProtectedApps = { navController.navigate(Routes.SETTINGS_APPS) },
+            )
+        }
+        composable(Routes.SETTINGS_FAMILY) {
+            FamilySettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenParentProfile = { navController.navigate(Routes.PARENT_PROFILE) },
+                onOpenChildren = { navController.navigate(Routes.CHILD_PROFILES) },
+            )
+        }
+        composable(Routes.SETTINGS_SECURITY) {
+            SecuritySettingsScreen(
                 onBack = { navController.popBackStack() },
                 onLoggedOut = {
                     navController.navigate(Routes.WELCOME) { popUpTo(0) { inclusive = true } }
                 },
-                initialTab = 1,
             )
+        }
+        composable(Routes.SETTINGS_APPEARANCE) {
+            AppearanceSettingsScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.SETTINGS_NOTIFICATIONS) {
+            NotificationsSettingsScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.SETTINGS_PRIVACY) {
+            PrivacySettingsScreen(
+                onBack = { navController.popBackStack() },
+                onLoggedOut = {
+                    navController.navigate(Routes.WELCOME) { popUpTo(0) { inclusive = true } }
+                },
+            )
+        }
+        composable(Routes.SETTINGS_SUPPORT) {
+            SupportSettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenHelp = { navController.navigate(Routes.HELP) },
+            )
+        }
+        if (DebugFlags.DEBUG_SCREENS_ENABLED) {
+            composable(Routes.SETTINGS_DEVELOPER) {
+                DeveloperSettingsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenRecognition = { navController.navigate(Routes.RECOGNITION_DEBUG) },
+                )
+            }
         }
     }
 }

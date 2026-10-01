@@ -703,4 +703,38 @@
     <string name="activity_child_usage_content_description">%1$s: %2$s</string>
     <string name="activity_no_screentime">No screen time recorded yet</string>
     <string name="activity_clear_confirm">Clear all activity events?</string>
+
+    <!-- QALQON Settings center (UI/UX redesign, Phase 6). -->
+    <string name="settings_category_protection">Protection</string>
+    <string name="settings_category_protection_desc">Protection and blocking rules</string>
+    <string name="settings_category_family">Family</string>
+    <string name="settings_category_family_desc">Parent profile and children</string>
+    <string name="settings_category_security">Security</string>
+    <string name="settings_category_security_desc">Lock and access</string>
+    <string name="settings_category_appearance">Appearance</string>
+    <string name="settings_category_appearance_desc">Language and display</string>
+    <string name="settings_category_notifications">Notifications</string>
+    <string name="settings_category_notifications_desc">Notification status</string>
+    <string name="settings_category_privacy">Privacy</string>
+    <string name="settings_category_privacy_desc">Data and face information</string>
+    <string name="settings_category_support">Support</string>
+    <string name="settings_category_support_desc">Help and information</string>
+    <string name="settings_category_developer">Developer</string>
+    <string name="settings_category_developer_desc">Diagnostics (debug only)</string>
+
+    <string name="settings_row_parent_profile">Parent profile</string>
+    <string name="settings_row_parent_profile_desc">Manage name and face data</string>
+    <string name="settings_row_children">Children</string>
+    <string name="settings_row_children_desc">Manage children</string>
+    <string name="settings_row_protected_apps_desc">Choose which apps are protected</string>
+    <string name="settings_row_language_desc">Change the application language</string>
+    <string name="settings_row_privacy_info_desc">About Qalqon privacy</string>
+    <string name="settings_row_help_desc">Guide and getting started</string>
+    <string name="settings_row_recognition_debug_desc">Face recognition diagnostics</string>
+    <string name="settings_row_health_desc">Check system health</string>
+    <string name="settings_row_app_lock">App lock</string>
+    <string name="settings_row_app_lock_desc">Qalqon is locked with a PIN and biometrics</string>
+    <string name="settings_notifications_enabled">Enabled</string>
+    <string name="settings_notifications_disabled">Disabled</string>
+    <string name="settings_notifications_hint">Notifications are managed in system settings</string>
 </resources>

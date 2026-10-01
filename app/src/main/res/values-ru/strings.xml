@@ -703,4 +703,38 @@
     <string name="activity_child_usage_content_description">%1$s: %2$s</string>
     <string name="activity_no_screentime">Экранное время пока не зафиксировано</string>
     <string name="activity_clear_confirm">Очистить все события активности?</string>
+
+    <!-- QALQON Settings center (UI/UX redesign, Phase 6). -->
+    <string name="settings_category_protection">Защита</string>
+    <string name="settings_category_protection_desc">Правила защиты и блокировки</string>
+    <string name="settings_category_family">Семья</string>
+    <string name="settings_category_family_desc">Профиль родителя и дети</string>
+    <string name="settings_category_security">Безопасность</string>
+    <string name="settings_category_security_desc">Блокировка и доступ</string>
+    <string name="settings_category_appearance">Внешний вид</string>
+    <string name="settings_category_appearance_desc">Язык и оформление</string>
+    <string name="settings_category_notifications">Уведомления</string>
+    <string name="settings_category_notifications_desc">Статус уведомлений</string>
+    <string name="settings_category_privacy">Конфиденциальность</string>
+    <string name="settings_category_privacy_desc">Данные и информация о лице</string>
+    <string name="settings_category_support">Поддержка</string>
+    <string name="settings_category_support_desc">Справка и информация</string>
+    <string name="settings_category_developer">Разработчик</string>
+    <string name="settings_category_developer_desc">Диагностика (только debug)</string>
+
+    <string name="settings_row_parent_profile">Профиль родителя</string>
+    <string name="settings_row_parent_profile_desc">Управление именем и данными лица</string>
+    <string name="settings_row_children">Дети</string>
+    <string name="settings_row_children_desc">Управление детьми</string>
+    <string name="settings_row_protected_apps_desc">Выбор защищаемых приложений</string>
+    <string name="settings_row_language_desc">Изменить язык приложения</string>
+    <string name="settings_row_privacy_info_desc">О конфиденциальности Qalqon</string>
+    <string name="settings_row_help_desc">Руководство и начало работы</string>
+    <string name="settings_row_recognition_debug_desc">Диагностика распознавания лица</string>
+    <string name="settings_row_health_desc">Проверка состояния системы</string>
+    <string name="settings_row_app_lock">Блокировка приложения</string>
+    <string name="settings_row_app_lock_desc">Qalqon блокируется PIN и биометрией</string>
+    <string name="settings_notifications_enabled">Включены</string>
+    <string name="settings_notifications_disabled">Отключены</string>
+    <string name="settings_notifications_hint">Уведомления настраиваются в системных настройках</string>
 </resources>

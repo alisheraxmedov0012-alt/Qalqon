@@ -1,6 +1,10 @@
 package uz.faceguard.app.feature.auth
 
 import uz.faceguard.app.core.security.AppLockState
+import uz.faceguard.app.core.security.BiometricAuthResult
+import uz.faceguard.app.core.security.BiometricAvailability
+import uz.faceguard.app.core.security.BiometricAvailabilityProvider
+import uz.faceguard.app.core.security.BiometricPolicy
 import uz.faceguard.app.domain.repository.AccountRepository
 import uz.faceguard.app.domain.security.PinAttemptPolicy
 import uz.faceguard.app.domain.security.PinVerification
@@ -33,6 +37,7 @@ sealed interface PinUnlockResult {
 class PinUnlockController(
     private val accountRepository: AccountRepository,
     private val appLockState: AppLockState,
+    private val biometricAvailability: BiometricAvailabilityProvider,
 ) {
 
     /**
@@ -50,6 +55,36 @@ class PinUnlockController(
 
             is PinVerification.LockedOut ->
                 PinUnlockResult.LockedOut(verification.remainingMillis)
+        }
+
+    /** Whether the Android biometric prompt may be offered on this device. */
+    fun biometricAvailability(): BiometricAvailability = biometricAvailability.availability()
+
+    /** Whether the biometric button should be shown / auto-prompted. */
+    fun shouldOfferBiometric(): Boolean =
+        BiometricPolicy.showBiometricButton(biometricAvailability())
+
+    /**
+     * Applies an **Android system** biometric outcome.
+     *
+     * Only [BiometricAuthResult.Success] unlocks — which can only be produced by
+     * `BiometricPrompt`, so QALQON's own face recognition can never unlock the UI.
+     * Cancellation, failure and errors leave the app locked and the PIN available; a
+     * device without biometrics never reaches this at all.
+     *
+     * Returns the unlock outcome, or `null` when the UI stays locked.
+     */
+    fun onBiometricResult(result: BiometricAuthResult): PinUnlockResult? =
+        when (result) {
+            BiometricAuthResult.Success -> {
+                appLockState.onAuthenticated()
+                PinUnlockResult.Unlocked
+            }
+            // Never unlock on anything else.
+            BiometricAuthResult.Cancelled,
+            BiometricAuthResult.Failed,
+            is BiometricAuthResult.Error,
+            -> null
         }
 
     /** The remaining wait as `M:SS`, for the lockout message. */

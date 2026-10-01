@@ -101,6 +101,33 @@ class LocalizationCompletenessTest {
     }
 
     @Test
+    fun theBiometricUnlockStringsExistEverywhere() {
+        val required = setOf(
+            "lock_biometric_button",
+            "lock_pin_alternative",
+            "lock_biometric_failed",
+            "lock_biometric_prompt_title",
+            "lock_biometric_prompt_subtitle",
+        )
+        locales.forEach { locale ->
+            val missing = required - keys(locale)
+            assertTrue("$locale is missing: ${missing.sorted()}", missing.isEmpty())
+        }
+    }
+
+    @Test
+    fun theBiometricPromptAndPinFallbackAreLocalized() {
+        assertEquals("Biometrik bilan ochish", values("values")["lock_biometric_button"])
+        assertEquals("Unlock with biometrics", values("values-en")["lock_biometric_button"])
+        assertEquals("Открыть с помощью биометрии", values("values-ru")["lock_biometric_button"])
+
+        // The system dialog's negative button must read as the QALQON PIN fallback.
+        assertEquals("PIN orqali kirish", values("values")["lock_pin_alternative"])
+        assertEquals("Use PIN", values("values-en")["lock_pin_alternative"])
+        assertEquals("Использовать PIN", values("values-ru")["lock_pin_alternative"])
+    }
+
+    @Test
     fun thePinGatePromptIsLocalizedInAllThreeLanguages() {
         // The startup PIN prompt must read in the selected language.
         assertEquals("PIN-kodni kiriting", values("values")["lock_title"])

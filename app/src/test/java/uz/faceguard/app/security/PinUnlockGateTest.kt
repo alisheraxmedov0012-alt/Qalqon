@@ -8,6 +8,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import uz.faceguard.app.core.security.AppLockState
+import uz.faceguard.app.core.security.BiometricAvailability
+import uz.faceguard.app.core.security.BiometricAvailabilityProvider
 import uz.faceguard.app.core.security.PinHasher
 import uz.faceguard.app.domain.model.AuthResult
 import uz.faceguard.app.domain.model.UserAccount
@@ -70,10 +72,15 @@ class PinUnlockGateTest {
         override suspend fun logout() = Unit
     }
 
+    /** No device biometrics in this test; the biometric path is covered separately. */
+    private val noBiometric = object : BiometricAvailabilityProvider {
+        override fun availability(): BiometricAvailability = BiometricAvailability.NO_HARDWARE
+    }
+
     private fun gate(pin: String = "1234"): Triple<PinUnlockController, AppLockState, FakeAccountRepository> {
         val repository = FakeAccountRepository(pin)
         val lock = AppLockState()
-        return Triple(PinUnlockController(repository, lock), lock, repository)
+        return Triple(PinUnlockController(repository, lock, noBiometric), lock, repository)
     }
 
     // The UI starts locked on every process start.

@@ -2,10 +2,10 @@ package uz.faceguard.app
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
@@ -19,8 +19,18 @@ import uz.faceguard.app.core.theme.FaceGuardTheme
 import uz.faceguard.app.data.prefs.AppLanguageStore
 import uz.faceguard.app.navigation.FaceGuardNavHost
 
+/**
+ * `FragmentActivity` (a `ComponentActivity`) is required by `BiometricPrompt`, which
+ * needs a `FragmentActivity` host for its system dialog. It keeps every
+ * `ComponentActivity` behaviour QALQON relied on — `setContent`, Hilt injection,
+ * the CameraX lifecycle owner and the Activity context `hiltViewModel()` needs — so
+ * the change is confined to the class declaration.
+ *
+ * The theme stays the platform Material theme: `FragmentActivity` does not require an
+ * AppCompat theme, so no dependency or theme change is involved.
+ */
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     /**
      * Phase 7.1: the runtime needs to know when Qalqon is actually visible. That

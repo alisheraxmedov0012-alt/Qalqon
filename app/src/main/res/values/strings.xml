@@ -635,4 +635,11 @@
     <string name="lock_wrong_pin">PIN-kod noto\'g\'ri</string>
     <string name="lock_locked_out">Juda ko\'p urinish. Qayta urinib ko\'rishdan oldin %1$s kuting.</string>
     <string name="lock_unlock">Ochish</string>
+
+    <!-- Biometric app unlock (Android system prompt) with PIN fallback -->
+    <string name="lock_biometric_button">Biometrik bilan ochish</string>
+    <string name="lock_pin_alternative">PIN orqali kirish</string>
+    <string name="lock_biometric_failed">Biometrik tasdiqlanmadi. PIN-kod bilan urinib ko\'ring.</string>
+    <string name="lock_biometric_prompt_title">Qalqonni ochish</string>
+    <string name="lock_biometric_prompt_subtitle">Yuz yoki barmoq izi bilan ochish</string>
 </resources>

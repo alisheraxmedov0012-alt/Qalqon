@@ -42,7 +42,84 @@ class AppLockProtectionIndependenceTest {
                     "running while the UI is locked",
                 source.contains("AppLockState") || source.contains("appLockState"),
             )
+            // Checked against the unlock *types*, not the bare word: "biometric
+            // data" already appears in prose about face-template encryption.
+            listOf(
+                "BiometricAvailabilityProvider",
+                "BiometricAuthResult",
+                "BiometricPolicy",
+                "AndroidBiometricPrompt",
+                "BiometricPrompt",
+                "BiometricManager",
+            ).forEach { biometricApi ->
+                assertFalse(
+                    "$relative must not depend on the biometric unlock API ($biometricApi)",
+                    source.contains(biometricApi),
+                )
+            }
         }
+    }
+
+    @Test
+    fun neitherTheLockNorTheBiometricPathControlsProtection() {
+        listOf(
+            "core/security/AppLockState.kt",
+            "core/security/BiometricModels.kt",
+            "core/security/BiometricAvailabilityProvider.kt",
+            "core/security/AndroidBiometricPrompt.kt",
+            "feature/auth/PinUnlockController.kt",
+            "feature/auth/PinUnlockScreen.kt",
+        ).forEach { relative ->
+            val source = read(relative)
+            listOf(
+                "ProtectionRuntime",
+                "ProtectionEngine",
+                "ProtectionForegroundService",
+                "ProtectionAccessibilityService",
+                "ProtectionCameraSession",
+                "ProtectionBootRestorer",
+                "serviceLauncher",
+                "stopService",
+                "startForegroundService",
+            ).forEach { forbidden ->
+                assertFalse(
+                    "$relative must not reference $forbidden",
+                    source.contains(forbidden),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun theAppLockNeverUsesQalqonsOwnFaceRecognitionForUnlock() {
+        listOf(
+            "core/security/AppLockState.kt",
+            "core/security/AndroidBiometricPrompt.kt",
+            "feature/auth/PinUnlockController.kt",
+            "feature/auth/PinUnlockScreen.kt",
+        ).forEach { relative ->
+            val source = read(relative)
+            listOf("Recognizer", "FaceCaptureController", "FaceEmbeddable", "MobileFaceNet", "enrollment", "LivenessEvaluator")
+                .forEach { forbidden ->
+                    assertFalse(
+                        "$relative must not use QALQON's own recognition ($forbidden) for app unlock",
+                        source.contains(forbidden),
+                    )
+                }
+        }
+    }
+
+    @Test
+    fun theBiometricPathUsesOnlyTheAndroidSystemPrompt() {
+        val prompt = read("core/security/AndroidBiometricPrompt.kt")
+        assertTrue(
+            "the unlock must be driven by the AndroidX system prompt",
+            prompt.contains("BiometricPrompt") && prompt.contains("BiometricManager.Authenticators.BIOMETRIC_STRONG"),
+        )
+        assertFalse(
+            "the device credential must not be used; the QALQON PIN stays the account fallback",
+            prompt.contains("DEVICE_CREDENTIAL"),
+        )
     }
 
     @Test

@@ -28,11 +28,7 @@
     <string name="error_pin_mismatch">PIN codes do not match</string>
     <string name="error_invalid_pin">Incorrect PIN</string>
     <string name="home_title">Home</string>
-    <string name="home_status_on">Protection enabled</string>
-    <string name="home_status_off">Protection disabled</string>
-    <string name="home_menu_parent">Parent profile</string>
     <string name="home_menu_children">Child profiles</string>
-    <string name="home_menu_settings">Settings</string>
     <string name="parent_title">Parent profile</string>
     <string name="parent_display_name_hint">Display name</string>
     <string name="parent_saved">Saved</string>
@@ -69,8 +65,6 @@
     <string name="children_face_off">Face not enrolled</string>
     <string name="children_delete_title">Delete child</string>
     <string name="children_delete_message">Delete %1$s?</string>
-    <string name="settings_tab_rules">Rules</string>
-    <string name="settings_tab_apps">Apps</string>
     <string name="scan_balanced">Balanced</string>
     <string name="scan_battery_saver">Battery Saver</string>
     <string name="scan_strict">Strict</string>
@@ -88,8 +82,6 @@
     <string name="papps_refreshing">Refreshing...</string>
     <string name="papps_selected_count">Protected count: %1$d</string>
     <string name="papps_marked">Selected</string>
-    <string name="home_scan_mode_label">Scan mode</string>
-    <string name="home_unknown_policy_label">Unknown user policy</string>
 
     <string name="enroll_title">Enroll face</string>
     <string name="enroll_parent_hint">Enroll a face for the parent profile</string>
@@ -116,12 +108,7 @@
     <string name="recognition_permission_title">Camera permission</string>
     <string name="recognition_permission_message">Camera is needed for recognition</string>
 
-    <string name="home_protected_count">Protected apps: %1$d</string>
-    <string name="home_foreground_title">Current app</string>
     <string name="home_foreground_current">Current app: %1$s</string>
-    <string name="home_foreground_unknown">unknown</string>
-    <string name="home_usage_access_hint">Usage stats access is needed</string>
-    <string name="home_usage_access_grant">Grant access</string>
     <string name="papps_refresh">Refresh apps</string>
 
     <string name="protection_debug_title">Protection status</string>
@@ -138,7 +125,6 @@
     <string name="protection_emergency_locked_out">Too many attempts. Try again in %1$s.</string>
     <string name="protection_emergency_unlock">Unlock</string>
 
-    <string name="home_protection_debug">Check protection</string>
 
     <string name="protection_scan_debug_title">Scan status</string>
     <string name="protection_scan_mode">Mode: %1$s</string>
@@ -161,17 +147,8 @@
     <string name="welcome_point_offline">The app works fully offline. All data stays on the phone.</string>
     <string name="welcome_point_on_device">Face recognition runs entirely on the device.</string>
     <string name="welcome_point_battery">The camera only turns on when needed, saving battery.</string>
-    <string name="setup_title">Setup status</string>
     <string name="setup_done_mark">✓</string>
     <string name="setup_todo_mark">○</string>
-    <string name="setup_account">Account created</string>
-    <string name="setup_parent_profile">Parent profile created</string>
-    <string name="setup_parent_face">Parent face enrolled</string>
-    <string name="setup_child_added">At least one child added</string>
-    <string name="setup_child_face">Child face enrolled</string>
-    <string name="setup_protected_apps">Protected apps selected</string>
-    <string name="setup_protection_enabled">Protection enabled</string>
-    <string name="home_menu_activity">Activity log</string>
     <string name="home_menu_privacy">Privacy</string>
     <string name="home_menu_help">Help</string>
     <string name="privacy_title">Privacy</string>
@@ -187,7 +164,6 @@
     <string name="help_steps_body">1. Create an account. 2. Set up the parent profile and enroll your face. 3. Add a child and enroll their face. 4. Choose protected apps. 5. Turn protection on.</string>
     <string name="help_version">%1$s — MVP demo build</string>
     <string name="activity_title">Activity log</string>
-    <string name="activity_empty">No events yet</string>
     <string name="activity_clear">Clear log</string>
     <string name="activity_child_recognized">Child recognized</string>
     <string name="activity_parent_recognized">Parent recognized</string>
@@ -204,7 +180,6 @@
     <string name="protection_service_channel_description">Shows the protection status while Qalqon runs in the background.</string>
     <string name="protection_service_notification_title">Qalqon protection is active</string>
     <string name="protection_service_notification_text">Qalqon is monitoring your selected rules.</string>
-    <string name="settings_tab_data">Data</string>
     <string name="data_section_faces">Face data</string>
     <string name="data_delete_parent_face">Delete parent face</string>
     <string name="data_delete_child_face">Delete face of %1$s</string>
@@ -218,19 +193,9 @@
     <string name="data_reset_confirm_yes">Yes, delete</string>
     <string name="data_reset_confirm_no">Cancel</string>
 
-    <string name="home_subtitle">Choose a main section to continue setup</string>
-    <string name="home_profile_title">Your profile</string>
-    <string name="home_profile_name">Name: %1$s</string>
-    <string name="home_profile_phone">Phone: %1$s</string>
-    <string name="home_profile_protection">Status: %1$s</string>
-    <string name="home_main_actions_title">Main sections</string>
     <string name="home_menu_protected_apps">Protected apps</string>
-    <string name="home_setup_progress">Completed: %1$d/%2$d steps</string>
-    <string name="home_additional_title">Additional sections</string>
     <string name="home_section_show">Show</string>
     <string name="home_section_hide">Hide</string>
-    <string name="home_developer_title">Developer section</string>
-    <string name="home_developer_hint">This area is for testing and diagnostics only.</string>
     <string name="protection_title">Protection status</string>
     <string name="protection_toggle_label">Protection</string>
     <string name="protection_toggle_on">Protection on</string>
@@ -256,16 +221,12 @@
     <string name="protection_emergency_hint">Enter the PIN to temporarily lift the block.</string>
     <string name="protection_tech_title">Technical details</string>
     <string name="protection_limit_note">Protection currently works fully while Qalqon is open. Keeping the camera alive in the background will need a system service in a later phase.</string>
-    <string name="setup_all_done">All steps completed</string>
-    <string name="setup_next_step">Next step: %1$s</string>
     <string name="parent_details_title">Your details</string>
     <string name="parent_details_subtitle">These details are used to tell you apart from your child.</string>
     <string name="parent_phone_label">Phone number: %1$s</string>
     <string name="parent_face_title">Face enrollment</string>
     <string name="parent_face_reenroll">Enroll face again</string>
     <string name="children_empty_hint">Add a child and enroll their face — then protection can work.</string>
-    <string name="children_level_label">Restriction level: %1$s</string>
-    <string name="children_face_reenroll">Enroll face again</string>
     <string name="papps_search_hint">Search apps by name</string>
     <string name="papps_no_results">No app matches that name</string>
     <string name="settings_protection_hint">When protection is on, Qalqon watches your selected apps.</string>
@@ -312,11 +273,7 @@
 
     <string name="dashboard_subtitle">Your child\'s protection status and settings in one place</string>
     <string name="dashboard_schedule_none">No schedule applies right now</string>
-    <string name="dashboard_schedule_active">%1$s · %2$s</string>
     <string name="dashboard_schedule_conflict">Schedule conflict: %1$s</string>
-    <string name="dashboard_schedule_manage">Manage schedules</string>
-    <string name="dashboard_eye_safety_actions">Warning: %1$s · Danger: %2$s</string>
-    <string name="dashboard_eye_safety_manage">Configure eye safety</string>
     <string name="dashboard_error">Could not load dashboard data</string>
     <string name="dashboard_error_hint">Please try again</string>
     <string name="dashboard_retry">Retry</string>
@@ -443,16 +400,8 @@
     <string name="app_category_social">Social</string>
     <string name="app_category_other">Other</string>
     <string name="screentime_summary_today">Today\'s screen time</string>
-    <string name="screentime_summary_used">Used: %1$s</string>
-    <string name="screentime_summary_limit">Daily limit: %1$s</string>
-    <string name="screentime_summary_unlimited">Daily limit: none</string>
-    <string name="screentime_summary_limit_invalid">Daily limit: not configured correctly</string>
-    <string name="screentime_summary_status_remaining">%1$s remaining</string>
-    <string name="screentime_summary_status_reached">Limit reached</string>
-    <string name="screentime_summary_status_unlimited">No limit</string>
     <string name="screentime_summary_no_target">No screen-time child selected</string>
     <string name="screentime_summary_unavailable">Usage data unavailable</string>
-    <string name="screentime_summary_unavailable_hint">Enable Usage Access to collect screen-time data</string>
     <string name="screentime_summary_error">Could not load screen-time data</string>
     <string name="screentime_duration_minutes">%1$d min</string>
     <string name="screentime_duration_hours">%1$d h</string>
@@ -700,7 +649,6 @@
     <string name="activity_day_today">Today</string>
     <string name="activity_day_yesterday">Yesterday</string>
     <string name="activity_usage_unavailable">Usage data unavailable</string>
-    <string name="activity_child_usage_content_description">%1$s: %2$s</string>
     <string name="activity_no_screentime">No screen time recorded yet</string>
     <string name="activity_clear_confirm">Clear all activity events?</string>
 
@@ -727,11 +675,8 @@
     <string name="settings_row_children">Children</string>
     <string name="settings_row_children_desc">Manage children</string>
     <string name="settings_row_protected_apps_desc">Choose which apps are protected</string>
-    <string name="settings_row_language_desc">Change the application language</string>
-    <string name="settings_row_privacy_info_desc">About Qalqon privacy</string>
     <string name="settings_row_help_desc">Guide and getting started</string>
     <string name="settings_row_recognition_debug_desc">Face recognition diagnostics</string>
-    <string name="settings_row_health_desc">Check system health</string>
     <string name="settings_row_app_lock">App lock</string>
     <string name="settings_row_app_lock_desc">Qalqon is locked with a PIN and biometrics</string>
     <string name="settings_notifications_enabled">Enabled</string>

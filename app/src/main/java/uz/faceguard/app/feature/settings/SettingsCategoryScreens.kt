@@ -36,7 +36,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlin.math.roundToInt
@@ -553,7 +552,7 @@ private fun SettingSwitchRow(label: String, checked: Boolean, onChange: (Boolean
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun <T> ChipRow(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.sm)) {
         options.forEach { (value, label) ->
             FilterChip(
                 selected = selected == value,

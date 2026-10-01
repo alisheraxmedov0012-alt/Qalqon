@@ -28,11 +28,7 @@
     <string name="error_pin_mismatch">PIN-коды не совпадают</string>
     <string name="error_invalid_pin">Неверный PIN-код</string>
     <string name="home_title">Главная</string>
-    <string name="home_status_on">Защита включена</string>
-    <string name="home_status_off">Защита выключена</string>
-    <string name="home_menu_parent">Профиль родителя</string>
     <string name="home_menu_children">Профили детей</string>
-    <string name="home_menu_settings">Настройки</string>
     <string name="parent_title">Профиль родителя</string>
     <string name="parent_display_name_hint">Отображаемое имя</string>
     <string name="parent_saved">Сохранено</string>
@@ -69,8 +65,6 @@
     <string name="children_face_off">Лицо не зарегистрировано</string>
     <string name="children_delete_title">Удалить данные ребёнка</string>
     <string name="children_delete_message">Удалить %1$s?</string>
-    <string name="settings_tab_rules">Правила</string>
-    <string name="settings_tab_apps">Приложения</string>
     <string name="scan_balanced">Сбалансированный</string>
     <string name="scan_battery_saver">Экономия заряда</string>
     <string name="scan_strict">Строгий</string>
@@ -88,8 +82,6 @@
     <string name="papps_refreshing">Обновление...</string>
     <string name="papps_selected_count">Защищено: %1$d</string>
     <string name="papps_marked">Выбрано</string>
-    <string name="home_scan_mode_label">Режим сканирования</string>
-    <string name="home_unknown_policy_label">Политика для неизвестного пользователя</string>
 
     <string name="enroll_title">Регистрация лица</string>
     <string name="enroll_parent_hint">Регистрация лица для профиля родителя</string>
@@ -116,12 +108,7 @@
     <string name="recognition_permission_title">Разрешение камеры</string>
     <string name="recognition_permission_message">Для распознавания нужна камера</string>
 
-    <string name="home_protected_count">Защищённых приложений: %1$d</string>
-    <string name="home_foreground_title">Текущее приложение</string>
     <string name="home_foreground_current">Текущее приложение: %1$s</string>
-    <string name="home_foreground_unknown">неизвестно</string>
-    <string name="home_usage_access_hint">Нужен доступ к статистике использования</string>
-    <string name="home_usage_access_grant">Предоставить доступ</string>
     <string name="papps_refresh">Обновить приложения</string>
 
     <string name="protection_debug_title">Состояние защиты</string>
@@ -138,7 +125,6 @@
     <string name="protection_emergency_locked_out">Слишком много попыток. Повторите через %1$s.</string>
     <string name="protection_emergency_unlock">Разблокировать</string>
 
-    <string name="home_protection_debug">Проверка защиты</string>
 
     <string name="protection_scan_debug_title">Состояние сканирования</string>
     <string name="protection_scan_mode">Режим: %1$s</string>
@@ -161,17 +147,8 @@
     <string name="welcome_point_offline">Приложение работает полностью офлайн. Все данные хранятся только на телефоне.</string>
     <string name="welcome_point_on_device">Распознавание лица выполняется на самом устройстве.</string>
     <string name="welcome_point_battery">Камера включается только при необходимости, экономя заряд.</string>
-    <string name="setup_title">Статус настройки</string>
     <string name="setup_done_mark">✓</string>
     <string name="setup_todo_mark">○</string>
-    <string name="setup_account">Аккаунт создан</string>
-    <string name="setup_parent_profile">Профиль родителя создан</string>
-    <string name="setup_parent_face">Лицо родителя добавлено</string>
-    <string name="setup_child_added">Добавлен хотя бы один ребёнок</string>
-    <string name="setup_child_face">Лицо ребёнка добавлено</string>
-    <string name="setup_protected_apps">Выбраны защищаемые приложения</string>
-    <string name="setup_protection_enabled">Защита включена</string>
-    <string name="home_menu_activity">Журнал активности</string>
     <string name="home_menu_privacy">Конфиденциальность</string>
     <string name="home_menu_help">Помощь</string>
     <string name="privacy_title">Конфиденциальность</string>
@@ -187,7 +164,6 @@
     <string name="help_steps_body">1. Создайте аккаунт. 2. Заполните профиль родителя и добавьте своё лицо. 3. Добавьте ребёнка и его лицо. 4. Выберите защищаемые приложения. 5. Включите защиту.</string>
     <string name="help_version">%1$s — демо-версия MVP</string>
     <string name="activity_title">Журнал активности</string>
-    <string name="activity_empty">Пока нет событий</string>
     <string name="activity_clear">Очистить журнал</string>
     <string name="activity_child_recognized">Ребёнок распознан</string>
     <string name="activity_parent_recognized">Родитель распознан</string>
@@ -204,7 +180,6 @@
     <string name="protection_service_channel_description">Показывает статус защиты, пока Qalqon работает в фоне.</string>
     <string name="protection_service_notification_title">Защита Qalqon активна</string>
     <string name="protection_service_notification_text">Qalqon отслеживает выбранные правила.</string>
-    <string name="settings_tab_data">Данные</string>
     <string name="data_section_faces">Данные лиц</string>
     <string name="data_delete_parent_face">Удалить лицо родителя</string>
     <string name="data_delete_child_face">Удалить лицо: %1$s</string>
@@ -218,19 +193,9 @@
     <string name="data_reset_confirm_yes">Да, удалить</string>
     <string name="data_reset_confirm_no">Отмена</string>
 
-    <string name="home_subtitle">Выберите основной раздел, чтобы продолжить настройку</string>
-    <string name="home_profile_title">Ваш профиль</string>
-    <string name="home_profile_name">Имя: %1$s</string>
-    <string name="home_profile_phone">Телефон: %1$s</string>
-    <string name="home_profile_protection">Статус: %1$s</string>
-    <string name="home_main_actions_title">Основные разделы</string>
     <string name="home_menu_protected_apps">Защищённые приложения</string>
-    <string name="home_setup_progress">Выполнено: %1$d/%2$d шагов</string>
-    <string name="home_additional_title">Дополнительные разделы</string>
     <string name="home_section_show">Показать</string>
     <string name="home_section_hide">Скрыть</string>
-    <string name="home_developer_title">Раздел разработчика</string>
-    <string name="home_developer_hint">Этот раздел нужен только для тестирования и диагностики.</string>
     <string name="protection_title">Статус защиты</string>
     <string name="protection_toggle_label">Защита</string>
     <string name="protection_toggle_on">Защита включена</string>
@@ -256,16 +221,12 @@
     <string name="protection_emergency_hint">Введите PIN, чтобы временно снять блокировку.</string>
     <string name="protection_tech_title">Технические данные</string>
     <string name="protection_limit_note">Сейчас защита полностью работает, пока Qalqon открыт. Для работы камеры в фоне на следующем этапе потребуется системная служба.</string>
-    <string name="setup_all_done">Все шаги выполнены</string>
-    <string name="setup_next_step">Следующий шаг: %1$s</string>
     <string name="parent_details_title">Ваши данные</string>
     <string name="parent_details_subtitle">Эти данные используются, чтобы отличать вас от ребёнка.</string>
     <string name="parent_phone_label">Номер телефона: %1$s</string>
     <string name="parent_face_title">Регистрация лица</string>
     <string name="parent_face_reenroll">Зарегистрировать лицо заново</string>
     <string name="children_empty_hint">Добавьте ребёнка и зарегистрируйте его лицо — тогда защита заработает.</string>
-    <string name="children_level_label">Уровень ограничений: %1$s</string>
-    <string name="children_face_reenroll">Зарегистрировать лицо заново</string>
     <string name="papps_search_hint">Поиск приложения по названию</string>
     <string name="papps_no_results">Приложение с таким названием не найдено</string>
     <string name="settings_protection_hint">Когда защита включена, Qalqon следит за выбранными приложениями.</string>
@@ -312,11 +273,7 @@
 
     <string name="dashboard_subtitle">Статус защиты и настройки ребёнка в одном месте</string>
     <string name="dashboard_schedule_none">Сейчас расписание не действует</string>
-    <string name="dashboard_schedule_active">%1$s · %2$s</string>
     <string name="dashboard_schedule_conflict">Конфликт расписаний: %1$s</string>
-    <string name="dashboard_schedule_manage">Управление расписаниями</string>
-    <string name="dashboard_eye_safety_actions">Предупреждение: %1$s · Опасность: %2$s</string>
-    <string name="dashboard_eye_safety_manage">Настроить защиту зрения</string>
     <string name="dashboard_error">Не удалось загрузить данные</string>
     <string name="dashboard_error_hint">Попробуйте ещё раз</string>
     <string name="dashboard_retry">Повторить</string>
@@ -443,16 +400,8 @@
     <string name="app_category_social">Соцсети</string>
     <string name="app_category_other">Другое</string>
     <string name="screentime_summary_today">Экранное время за сегодня</string>
-    <string name="screentime_summary_used">Использовано: %1$s</string>
-    <string name="screentime_summary_limit">Дневной лимит: %1$s</string>
-    <string name="screentime_summary_unlimited">Дневной лимит: не задан</string>
-    <string name="screentime_summary_limit_invalid">Дневной лимит: настроен неверно</string>
-    <string name="screentime_summary_status_remaining">Осталось: %1$s</string>
-    <string name="screentime_summary_status_reached">Лимит достигнут</string>
-    <string name="screentime_summary_status_unlimited">Без лимита</string>
     <string name="screentime_summary_no_target">Ребёнок для экранного времени не выбран</string>
     <string name="screentime_summary_unavailable">Данные об использовании недоступны</string>
-    <string name="screentime_summary_unavailable_hint">Включите доступ к использованию, чтобы собирать экранное время</string>
     <string name="screentime_summary_error">Не удалось загрузить данные экранного времени</string>
     <string name="screentime_duration_minutes">%1$d мин</string>
     <string name="screentime_duration_hours">%1$d ч</string>
@@ -700,7 +649,6 @@
     <string name="activity_day_today">Сегодня</string>
     <string name="activity_day_yesterday">Вчера</string>
     <string name="activity_usage_unavailable">Данные об использовании недоступны</string>
-    <string name="activity_child_usage_content_description">%1$s: %2$s</string>
     <string name="activity_no_screentime">Экранное время пока не зафиксировано</string>
     <string name="activity_clear_confirm">Очистить все события активности?</string>
 
@@ -727,11 +675,8 @@
     <string name="settings_row_children">Дети</string>
     <string name="settings_row_children_desc">Управление детьми</string>
     <string name="settings_row_protected_apps_desc">Выбор защищаемых приложений</string>
-    <string name="settings_row_language_desc">Изменить язык приложения</string>
-    <string name="settings_row_privacy_info_desc">О конфиденциальности Qalqon</string>
     <string name="settings_row_help_desc">Руководство и начало работы</string>
     <string name="settings_row_recognition_debug_desc">Диагностика распознавания лица</string>
-    <string name="settings_row_health_desc">Проверка состояния системы</string>
     <string name="settings_row_app_lock">Блокировка приложения</string>
     <string name="settings_row_app_lock_desc">Qalqon блокируется PIN и биометрией</string>
     <string name="settings_notifications_enabled">Включены</string>

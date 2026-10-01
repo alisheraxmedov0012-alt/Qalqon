@@ -29,7 +29,6 @@ class ActivityLocalizationTest {
         "activity_day_today",
         "activity_day_yesterday",
         "activity_usage_unavailable",
-        "activity_child_usage_content_description",
         "activity_no_screentime",
         "activity_clear_confirm",
     )

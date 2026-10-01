@@ -618,6 +618,9 @@
     <string name="home_status_blocking_hint">Защита применяет ограничение прямо сейчас</string>
     <string name="home_status_recovering_hint">Защита восстанавливается</string>
     <string name="home_child_content_description">Ребёнок: %1$s, %2$s</string>
+    <string name="home_all_children">Все</string>
+    <string name="home_protection_manage">Управление защитой</string>
+    <string name="home_child_screen_time">Сегодня: %1$s</string>
 
     <!-- QALQON Children + Child Detail (UI/UX redesign, Phase 4). -->
     <string name="children_overview">Ваши дети</string>

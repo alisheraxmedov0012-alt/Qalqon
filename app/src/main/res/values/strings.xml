@@ -619,6 +619,9 @@
     <string name="home_status_blocking_hint">Himoya hozir amal qilmoqda</string>
     <string name="home_status_recovering_hint">Himoya tiklanmoqda</string>
     <string name="home_child_content_description">Farzand: %1$s, %2$s</string>
+    <string name="home_all_children">Barchasi</string>
+    <string name="home_protection_manage">Himoyani boshqarish</string>
+    <string name="home_child_screen_time">Bugun: %1$s</string>
 
     <!-- QALQON Children + Child Detail (UI/UX redesign, Phase 4). -->
     <string name="children_overview">Farzandlaringiz</string>

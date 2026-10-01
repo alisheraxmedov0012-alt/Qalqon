@@ -509,7 +509,11 @@ private fun QalqonNavHost(
             HelpScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.ACTIVITY_LOG) {
-            ActivityLogScreen(onBack = { navController.popBackStack() })
+            // Phase 5: Activity is a top-level bottom-navigation destination, so it has
+            // no back arrow; its pending requests open the existing requests route.
+            ActivityLogScreen(
+                onOpenRequests = { navController.navigate(Routes.requests()) },
+            )
         }
         composable(Routes.SETTINGS) {
             SettingsScreen(

@@ -689,4 +689,18 @@
     <string name="child_detail_requests_desc">Pending requests</string>
     <string name="child_detail_missing">Child not found</string>
     <string name="child_detail_missing_hint">This child may have been deleted</string>
+
+    <!-- QALQON Activity center (UI/UX redesign, Phase 5). -->
+    <string name="activity_overview_title">Today</string>
+    <string name="activity_metric_screen_time">Screen time today</string>
+    <string name="activity_metric_requests">Pending requests</string>
+    <string name="activity_metric_events">Events today</string>
+    <string name="activity_screentime_title">Screen time history</string>
+    <string name="activity_filter_all">All children</string>
+    <string name="activity_day_today">Today</string>
+    <string name="activity_day_yesterday">Yesterday</string>
+    <string name="activity_usage_unavailable">Usage data unavailable</string>
+    <string name="activity_child_usage_content_description">%1$s: %2$s</string>
+    <string name="activity_no_screentime">No screen time recorded yet</string>
+    <string name="activity_clear_confirm">Clear all activity events?</string>
 </resources>

@@ -689,4 +689,18 @@
     <string name="child_detail_requests_desc">Ожидающие запросы</string>
     <string name="child_detail_missing">Ребёнок не найден</string>
     <string name="child_detail_missing_hint">Возможно, этот ребёнок удалён</string>
+
+    <!-- QALQON Activity center (UI/UX redesign, Phase 5). -->
+    <string name="activity_overview_title">Сегодня</string>
+    <string name="activity_metric_screen_time">Экранное время сегодня</string>
+    <string name="activity_metric_requests">Ожидающие запросы</string>
+    <string name="activity_metric_events">События сегодня</string>
+    <string name="activity_screentime_title">История экранного времени</string>
+    <string name="activity_filter_all">Все дети</string>
+    <string name="activity_day_today">Сегодня</string>
+    <string name="activity_day_yesterday">Вчера</string>
+    <string name="activity_usage_unavailable">Данные об использовании недоступны</string>
+    <string name="activity_child_usage_content_description">%1$s: %2$s</string>
+    <string name="activity_no_screentime">Экранное время пока не зафиксировано</string>
+    <string name="activity_clear_confirm">Очистить все события активности?</string>
 </resources>

@@ -1,41 +1,36 @@
 package uz.faceguard.app.feature.home
 
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -57,10 +52,17 @@ import kotlinx.coroutines.launch
 import java.time.ZoneId
 import uz.faceguard.app.R
 import uz.faceguard.app.core.debug.DebugFlags
-import uz.faceguard.app.core.monitor.ForegroundAppMonitor
 import uz.faceguard.app.core.protection.ProtectionRuntime
-import uz.faceguard.app.core.protection.ProtectionState
-import uz.faceguard.app.core.ui.SectionCard
+import uz.faceguard.app.core.theme.QalqonDimens
+import uz.faceguard.app.core.ui.qalqon.QalqonAlertRow
+import uz.faceguard.app.core.ui.qalqon.QalqonCard
+import uz.faceguard.app.core.ui.qalqon.QalqonChildCard
+import uz.faceguard.app.core.ui.qalqon.QalqonEmptyState
+import uz.faceguard.app.core.ui.qalqon.QalqonErrorState
+import uz.faceguard.app.core.ui.qalqon.QalqonLoadingState
+import uz.faceguard.app.core.ui.qalqon.QalqonSectionHeader
+import uz.faceguard.app.core.ui.qalqon.QalqonStatusCard
+import uz.faceguard.app.core.ui.qalqon.toneColor
 import uz.faceguard.app.domain.eyesafety.EyeSafetyRepository
 import uz.faceguard.app.domain.model.AppSettings
 import uz.faceguard.app.domain.model.ParentProfile
@@ -72,21 +74,19 @@ import uz.faceguard.app.domain.repository.ChildProfileRepository
 import uz.faceguard.app.domain.repository.ParentProfileRepository
 import uz.faceguard.app.domain.repository.ProtectedAppsRepository
 import uz.faceguard.app.domain.repository.SettingsRepository
-import uz.faceguard.app.domain.screentime.AppCategory
+import uz.faceguard.app.domain.request.ParentRequestRepository
 import uz.faceguard.app.domain.screentime.ScreenTimeActiveChildRepository
 import uz.faceguard.app.domain.screentime.ScreenTimeLimitEvaluator
 import uz.faceguard.app.domain.screentime.ScreenTimeLimitRepository
 import uz.faceguard.app.domain.screentime.ScreenTimeUsageRepository
-import uz.faceguard.app.domain.request.ParentRequestRepository
-import uz.faceguard.app.domain.schedule.ScheduleResolution
 
 /**
- * Phase 10 Parent Dashboard.
+ * Home dashboard state holder.
  *
  * A read-only aggregation over existing application data (profiles, per-child
  * policies, protected apps, activity events, protection runtime). No metric is
- * invented: screen-time usage does not exist yet, so the dashboard says so
- * rather than showing a fabricated figure.
+ * invented: a value that cannot be read is reported as unavailable rather than
+ * shown as a fabricated figure.
  */
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -227,195 +227,111 @@ class HomeViewModel @Inject constructor(
     }
 }
 
+/**
+ * UI/UX redesign, Phase 3: the QALQON Home dashboard.
+ *
+ * A single scrolling dashboard that answers the parent's questions in priority
+ * order — is protection active, does anything need attention, what is happening with
+ * the children, today's key states, and what can I do now. It replaces the previous
+ * configuration dump (child picker, per-child policy/EYE-safety cards, a usage table,
+ * a 7-step checklist, a developer section) with an overview; the configuration
+ * itself continues to live on the screens that own it.
+ *
+ * It only presents state the existing [HomeViewModel]/[DashboardAggregator] already
+ * produced — no Room/DataStore access, no policy/screen-time/schedule/permission
+ * calculation, and no fabricated value.
+ */
 @Composable
 fun HomeScreen(
-    onOpenParent: () -> Unit,
     onOpenChildren: () -> Unit,
     onOpenProtectedApps: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenRecognition: () -> Unit,
     onOpenProtection: () -> Unit,
+    onOpenRequests: () -> Unit,
+    onOpenChildPolicy: (Long) -> Unit,
     onOpenPrivacy: () -> Unit,
     onOpenHelp: () -> Unit,
-    onOpenActivity: () -> Unit,
-    onOpenChildPolicy: (Long) -> Unit,
-    onOpenRequests: () -> Unit,
-    onOpenChildSchedules: (Long) -> Unit,
-    onOpenChildEyeSafety: (Long) -> Unit,
+    onOpenRecognition: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val dashboard by viewModel.dashboard.collectAsStateWithLifecycle()
-    val settings by viewModel.settings.collectAsStateWithLifecycle()
-    val account by viewModel.account.collectAsStateWithLifecycle()
-    val parentProfile by viewModel.parentProfile.collectAsStateWithLifecycle()
-    val screenTimeTarget by viewModel.screenTimeTarget.collectAsStateWithLifecycle()
     val screenTimeSummary by viewModel.screenTimeSummary.collectAsStateWithLifecycle()
+    val parentProfile by viewModel.parentProfile.collectAsStateWithLifecycle()
 
-    var showMore by remember { mutableStateOf(false) }
-    var showDeveloperTools by remember { mutableStateOf(false) }
-
-    Scaffold { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(stringResource(R.string.home_title), style = MaterialTheme.typography.headlineMedium)
-            Text(
-                stringResource(R.string.dashboard_subtitle),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            when (dashboard.status) {
-                DashboardStatus.LOADING -> Text(
-                    stringResource(R.string.state_loading),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-
-                DashboardStatus.ERROR -> ErrorCard(onRetry = viewModel::retry)
-
-                DashboardStatus.NO_ACCOUNT -> SectionCard(
-                    title = stringResource(R.string.dashboard_no_account),
-                    subtitle = stringResource(R.string.dashboard_no_account_hint),
-                ) {}
-
-                DashboardStatus.READY -> {
-                    ChildContextCard(
-                        dashboard = dashboard,
-                        onSelectChild = viewModel::selectChild,
-                        onOpenChildren = onOpenChildren,
-                    )
-                    ProtectionStatusCard(dashboard = dashboard, onOpenProtection = onOpenProtection)
-                    ActiveProtectionCard(dashboard)
-                    ChildPolicySummaryCard(
-                        dashboard = dashboard,
-                        onOpenChildPolicy = onOpenChildPolicy,
-                        onOpenChildren = onOpenChildren,
-                    )
-                    ProtectedAppsSummaryCard(dashboard = dashboard, onOpenProtectedApps = onOpenProtectedApps)
-                    ScheduleSummaryCard(
-                        dashboard = dashboard,
-                        onManage = { dashboard.selectedChildId?.let(onOpenChildSchedules) ?: onOpenChildren() },
-                    )
-                    EyeSafetySummaryCard(
-                        dashboard = dashboard,
-                        onManage = { dashboard.selectedChildId?.let(onOpenChildEyeSafety) ?: onOpenChildren() },
-                    )
-                    RequestsSummaryCard(dashboard = dashboard, onOpenRequests = onOpenRequests)
-                    ChildProfileSummaryCard(dashboard, onOpenChildren = onOpenChildren)
-                    RecentActivityCard(dashboard, onOpenActivity = onOpenActivity)
-                    UsageCard(
-                        target = screenTimeTarget,
-                        summary = screenTimeSummary,
-                        onSelectChild = viewModel::selectScreenTimeChild,
-                        onOpenChildren = onOpenChildren,
-                    )
-                }
-            }
-
-            SetupChecklistCard(
-                account = account,
-                parentProfile = parentProfile,
-                dashboard = dashboard,
-                settings = settings,
-            )
-
-            MainActionsCard(
-                onOpenProtection = onOpenProtection,
-                onOpenParent = onOpenParent,
-                onOpenChildren = onOpenChildren,
-                onOpenProtectedApps = onOpenProtectedApps,
-                onOpenSettings = onOpenSettings,
-                protectedCount = dashboard.protectedAppsCount,
-            )
-
-            AdditionalSection(
-                expanded = showMore,
-                onToggle = { showMore = !showMore },
-                onOpenActivity = onOpenActivity,
+    Scaffold(
+        topBar = {
+            HomeTopBar(
+                parentName = parentProfile?.displayName,
                 onOpenPrivacy = onOpenPrivacy,
                 onOpenHelp = onOpenHelp,
+                onOpenRecognition = onOpenRecognition,
             )
+        },
+    ) { padding ->
+        when (dashboard.status) {
+            DashboardStatus.LOADING -> Box(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentAlignment = Alignment.Center,
+            ) {
+                QalqonLoadingState()
+            }
 
-            if (DebugFlags.DEBUG_SCREENS_ENABLED) {
-                DeveloperSection(
-                    expanded = showDeveloperTools,
-                    onToggle = { showDeveloperTools = !showDeveloperTools },
-                    onOpenRecognition = onOpenRecognition,
+            DashboardStatus.ERROR -> Box(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentAlignment = Alignment.Center,
+            ) {
+                QalqonErrorState(
+                    title = stringResource(R.string.dashboard_error),
+                    message = stringResource(R.string.dashboard_error_hint),
+                    retryLabel = stringResource(R.string.dashboard_retry),
+                    onRetry = viewModel::retry,
                 )
             }
-        }
-    }
-}
 
-@Composable
-private fun ErrorCard(onRetry: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                stringResource(R.string.dashboard_error),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.error,
-            )
-            Text(
-                stringResource(R.string.dashboard_error_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            OutlinedButton(onClick = onRetry, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.dashboard_retry))
-            }
-        }
-    }
-}
-
-/** A. Which child's data is on screen, and how to switch. */
-@Composable
-private fun ChildContextCard(
-    dashboard: DashboardUiState,
-    onSelectChild: (Long?) -> Unit,
-    onOpenChildren: () -> Unit,
-) {
-    SectionCard(
-        title = stringResource(R.string.dashboard_child_title),
-        subtitle = if (dashboard.hasChild) {
-            stringResource(R.string.dashboard_child_selected, dashboard.child?.name.orEmpty())
-        } else {
-            stringResource(R.string.dashboard_child_none)
-        },
-    ) {
-        if (!dashboard.hasChild) {
-            Text(
-                stringResource(R.string.dashboard_child_none_hint),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Button(onClick = onOpenChildren, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.dashboard_child_add))
-            }
-            return@SectionCard
-        }
-
-        if (dashboard.hasMultipleChildren) {
-            Text(
-                stringResource(R.string.dashboard_child_switch),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            DashboardStatus.NO_ACCOUNT -> Box(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentAlignment = Alignment.Center,
             ) {
-                dashboard.children.forEach { child ->
-                    FilterChip(
-                        selected = child.id == dashboard.selectedChildId,
-                        onClick = { onSelectChild(child.id) },
-                        label = { Text(child.childName) },
+                QalqonEmptyState(
+                    title = stringResource(R.string.dashboard_no_account),
+                    description = stringResource(R.string.dashboard_no_account_hint),
+                )
+            }
+
+            DashboardStatus.READY -> LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentPadding = PaddingValues(
+                    start = QalqonDimens.screenPadding,
+                    end = QalqonDimens.screenPadding,
+                    top = QalqonDimens.spacing.lg,
+                    bottom = QalqonDimens.spacing.xxl,
+                ),
+                verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.lg),
+            ) {
+                item { ProtectionStatusSection(dashboard, onOpenProtection) }
+
+                // The attention section is hidden entirely when the dashboard is calm.
+                val attention = homeAttentionItems(dashboard)
+                if (attention.isNotEmpty()) {
+                    item {
+                        AttentionSection(
+                            items = attention,
+                            onOpenRequests = onOpenRequests,
+                            onOpenChildren = onOpenChildren,
+                            onOpenSettings = onOpenSettings,
+                        )
+                    }
+                }
+
+                item { ChildrenSection(dashboard, onOpenChildPolicy, onOpenChildren) }
+                item { TodaySection(dashboard, screenTimeSummary) }
+                item {
+                    QuickActionsSection(
+                        state = dashboard,
+                        onOpenChildren = onOpenChildren,
+                        onOpenProtection = onOpenProtection,
+                        onOpenProtectedApps = onOpenProtectedApps,
+                        onOpenRequests = onOpenRequests,
                     )
                 }
             }
@@ -423,850 +339,264 @@ private fun ChildContextCard(
     }
 }
 
-/** B. Protection enabled/off plus the real capability state. */
+/**
+ * The Home top app bar: a localized greeting (the parent's own name when known, else
+ * the plain title) plus a one-line subtitle. The overflow holds the secondary
+ * destinations that no bottom-navigation tab owns (Privacy, Help), so they stay
+ * reachable; the developer diagnostics entry is present only when [DebugFlags]
+ * enables the debug screens, so it never appears in a production UI.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ProtectionStatusCard(dashboard: DashboardUiState, onOpenProtection: () -> Unit) {
-    SectionCard(title = stringResource(R.string.dashboard_protection_title)) {
-        Text(
-            stringResource(
-                if (dashboard.protectionEnabled) R.string.dashboard_protection_on
-                else R.string.dashboard_protection_off,
-            ),
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        Text(
-            stringResource(
-                if (dashboard.runtimeActive) R.string.dashboard_protection_active
-                else R.string.dashboard_protection_inactive,
-            ),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+private fun HomeTopBar(
+    parentName: String?,
+    onOpenPrivacy: () -> Unit,
+    onOpenHelp: () -> Unit,
+    onOpenRecognition: () -> Unit,
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    val greeting = parentName?.takeIf { it.isNotBlank() }
+        ?.let { stringResource(R.string.home_greeting, it) }
 
-        if (dashboard.protectionEnabled && !dashboard.enforcementReady) {
-            // Protection is on but a prerequisite is missing: never present this
-            // as "everything is protected".
+    TopAppBar(
+        title = {
+            Column {
+                Text(
+                    text = greeting ?: stringResource(R.string.home_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = stringResource(R.string.dashboard_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        },
+        actions = {
+            IconButton(onClick = { menuExpanded = true }) {
+                Icon(
+                    imageVector = Icons.Filled.MoreVert,
+                    contentDescription = stringResource(R.string.home_more_options),
+                )
+            }
+            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.home_menu_privacy)) },
+                    onClick = {
+                        menuExpanded = false
+                        onOpenPrivacy()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.home_menu_help)) },
+                    onClick = {
+                        menuExpanded = false
+                        onOpenHelp()
+                    },
+                )
+                if (DebugFlags.DEBUG_SCREENS_ENABLED) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.home_recognition_debug)) },
+                        onClick = {
+                            menuExpanded = false
+                            onOpenRecognition()
+                        },
+                    )
+                }
+            }
+        },
+    )
+}
+
+/**
+ * The primary element: the current protection state, with a short explanation and,
+ * when the parent can act on it, the existing route to the Protection screen.
+ */
+@Composable
+private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: () -> Unit) {
+    val status = homeProtectionStatus(state)
+    QalqonStatusCard(
+        title = stringResource(homeProtectionLabelRes(status)),
+        statusColor = toneColor(homeProtectionTone(status)),
+        supportingText = stringResource(homeProtectionSupportingRes(status)),
+    ) {
+        state.blockedApp?.let { packageName ->
             Text(
-                stringResource(R.string.dashboard_capability_missing),
+                text = stringResource(R.string.dashboard_active_app, packageName),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
             )
-            CapabilityLine(dashboard.overlayGranted, R.string.protection_req_overlay)
-            CapabilityLine(dashboard.usageAccessGranted, R.string.protection_req_usage)
-            CapabilityLine(dashboard.accessibilityEnabled, R.string.protection_req_accessibility)
-            CapabilityLine(dashboard.parentFaceEnrolled, R.string.protection_req_parent_face)
+        }
+        if (status == HomeProtectionStatus.OFF || status == HomeProtectionStatus.SETUP_REQUIRED) {
             OutlinedButton(onClick = onOpenProtection, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.dashboard_capability_open))
             }
-        } else if (dashboard.enforcementReady) {
-            Text(
-                stringResource(R.string.dashboard_capability_ok),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
         }
     }
 }
 
+/** Compact attention list; only rendered when [items] is not empty. */
 @Composable
-private fun CapabilityLine(satisfied: Boolean, labelRes: Int) {
-    val label = stringResource(labelRes)
-    Text(
-        text = stringResource(
-            if (satisfied) R.string.dashboard_capability_ready else R.string.dashboard_capability_needed,
-            label,
-        ),
-        style = MaterialTheme.typography.bodySmall,
-        color = if (satisfied) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
-    )
-}
-
-/** C. The current runtime cycle (authoritative current state, never from events). */
-@Composable
-private fun ActiveProtectionCard(dashboard: DashboardUiState) {
-    SectionCard(title = stringResource(R.string.dashboard_active_title)) {
-        Text(stringResource(activeStatusLabelRes(dashboard)), style = MaterialTheme.typography.bodyLarge)
-
-        livenessLabelRes(dashboard.liveness)?.let { res ->
-            Text(
-                stringResource(res),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        dashboard.blockedApp?.let { pkg ->
-            Text(
-                stringResource(R.string.dashboard_active_app, pkg),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-
-        if (dashboard.protectionState == ProtectionState.RECOVERING) {
-            Text(
-                stringResource(R.string.dashboard_active_recovering),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+private fun AttentionSection(
+    items: List<HomeAttentionItem>,
+    onOpenRequests: () -> Unit,
+    onOpenChildren: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.sm)) {
+        QalqonSectionHeader(title = stringResource(R.string.home_attention_title))
+        items.forEach { item ->
+            val text = item.count
+                ?.let { count -> stringResource(item.messageRes, count) }
+                ?: stringResource(item.messageRes)
+            QalqonAlertRow(
+                text = text,
+                severity = item.severity,
+                onClick = when (item.kind) {
+                    HomeAttentionKind.PENDING_REQUESTS -> onOpenRequests
+                    HomeAttentionKind.CHILDREN_NEED_SETUP -> onOpenChildren
+                    HomeAttentionKind.NOTIFICATIONS_DISABLED -> onOpenSettings
+                },
             )
         }
     }
 }
 
 /**
- * The current-state line: the live identity when the runtime knows one, else the
- * protection state, else the neutral "nothing active" text. Domain -> resource
- * mapping lives in [DashboardState], not scattered through the UI.
+ * The children overview: one tappable card per child, or the existing empty state
+ * when there is no child yet. It is an overview, not the future Child Detail hub —
+ * tapping a child opens the existing per-child destination.
  */
-private fun activeStatusLabelRes(dashboard: DashboardUiState): Int = when {
-    dashboard.identity != null -> identityLabelRes(dashboard.identity)
-    dashboard.protectionState == ProtectionState.UNPROTECTED -> R.string.dashboard_active_none
-    else -> protectionStateLabelRes(dashboard.protectionState)
-}
-
-/** D. Per-child policy summary + configured limits (no usage). */
 @Composable
-private fun ChildPolicySummaryCard(
-    dashboard: DashboardUiState,
+private fun ChildrenSection(
+    state: DashboardUiState,
     onOpenChildPolicy: (Long) -> Unit,
     onOpenChildren: () -> Unit,
 ) {
-    val child = dashboard.child ?: return
-    SectionCard(title = stringResource(R.string.dashboard_policy_title)) {
-        if (child.policiesLoading) {
-            Text(stringResource(R.string.dashboard_policy_loading), style = MaterialTheme.typography.bodyMedium)
-            return@SectionCard
-        }
+    Column(verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.sm)) {
+        QalqonSectionHeader(title = stringResource(R.string.children_section))
 
-        if (child.policies.total == 0) {
-            Text(
-                stringResource(R.string.dashboard_policy_empty),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+        val children = homeChildSummaries(state)
+        if (children.isEmpty()) {
+            QalqonEmptyState(
+                title = stringResource(R.string.dashboard_child_none),
+                description = stringResource(R.string.dashboard_child_none_hint),
+                actionLabel = stringResource(R.string.dashboard_child_add),
+                onAction = onOpenChildren,
             )
         } else {
-            Text(
-                stringResource(
-                    R.string.dashboard_policy_counts,
-                    child.policies.total,
-                    child.policies.allow,
-                    child.policies.limit,
-                    child.policies.block,
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-
-        if (child.limits.isNotEmpty()) {
-            Text(
-                stringResource(R.string.dashboard_policy_limits_title),
-                style = MaterialTheme.typography.titleSmall,
-            )
-            child.limits.forEach { limit ->
-                Text(
-                    text = if (limit.dailyLimitMinutes != null) {
-                        stringResource(R.string.dashboard_policy_limit_line, limit.packageName, limit.dailyLimitMinutes)
-                    } else {
-                        stringResource(R.string.dashboard_policy_limit_line_unknown, limit.packageName)
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            // Phase 4 (usage accounting) does not exist: say so honestly instead of
-            // showing a fabricated remaining/used figure.
-            Text(
-                stringResource(R.string.dashboard_policy_no_usage),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        OutlinedButton(
-            onClick = { child.childId?.let(onOpenChildPolicy) ?: onOpenChildren() },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.dashboard_policy_open))
-        }
-    }
-}
-
-/** F. Global protected-app catalog summary. */
-@Composable
-private fun ProtectedAppsSummaryCard(dashboard: DashboardUiState, onOpenProtectedApps: () -> Unit) {
-    SectionCard(title = stringResource(R.string.dashboard_apps_title)) {
-        Text(
-            stringResource(R.string.dashboard_apps_count, dashboard.protectedAppsCount),
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        if (dashboard.protectedAppsCount == 0) {
-            Text(
-                stringResource(R.string.dashboard_apps_none_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        OutlinedButton(onClick = onOpenProtectedApps, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.dashboard_apps_open))
-        }
-    }
-}
-
-/**
- * H. Phase 5/10: the schedule summary.
- *
- * Renders the *effective* schedule the engine already resolved for the current
- * protection context — the dashboard never re-resolves one. "No active schedule"
- * is a real state (protection is not schedule-affected right now), not an error.
- */
-@Composable
-private fun ScheduleSummaryCard(dashboard: DashboardUiState, onManage: () -> Unit) {
-    SectionCard(title = stringResource(R.string.schedule_title)) {
-        when (val resolution = dashboard.scheduleResolution) {
-            is ScheduleResolution.NoActiveSchedule -> Text(
-                stringResource(R.string.dashboard_schedule_none),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-
-            is ScheduleResolution.ActiveSchedule -> Text(
-                stringResource(
-                    R.string.dashboard_schedule_active,
-                    resolution.schedule.name,
-                    stringResource(scheduleModeLabelRes(resolution.schedule.mode)),
-                ),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-
-            is ScheduleResolution.ScheduleConflict -> Text(
-                stringResource(
-                    R.string.dashboard_schedule_conflict,
-                    resolution.schedules.joinToString(", ") { it.name },
-                ),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
-        if (dashboard.hasChild) {
-            OutlinedButton(onClick = onManage, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.dashboard_schedule_manage))
-            }
-        }
-    }
-}
-
-/**
- * I. Phase 6/10: the eye-safety summary.
- *
- * Shows the selected child's *configuration* (the parent's own setting) — never a
- * live measurement or a manufactured warning count. "Not configured" and
- * "configured but disabled" are distinct states.
- */
-@Composable
-private fun EyeSafetySummaryCard(dashboard: DashboardUiState, onManage: () -> Unit) {
-    SectionCard(title = stringResource(R.string.eye_safety_title)) {
-        val eyeSafety = dashboard.eyeSafety
-        when {
-            eyeSafety == null -> Text(
-                stringResource(R.string.state_loading),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-
-            !eyeSafety.configured -> Text(
-                stringResource(R.string.eye_safety_status_not_configured),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-
-            !eyeSafety.enabled -> Text(
-                stringResource(R.string.eye_safety_status_disabled),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-
-            else -> {
-                Text(
-                    stringResource(R.string.eye_safety_status_enabled),
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                val warning = eyeSafety.warningAction
-                val danger = eyeSafety.dangerAction
-                if (warning != null && danger != null) {
-                    Text(
-                        stringResource(
-                            R.string.dashboard_eye_safety_actions,
-                            stringResource(eyeSafetyActionLabelRes(warning)),
-                            stringResource(eyeSafetyActionLabelRes(danger)),
+            Column(verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.sm)) {
+                children.forEach { child ->
+                    val faceStatus = stringResource(
+                        if (child.faceEnrolled) R.string.dashboard_child_face_on
+                        else R.string.dashboard_child_face_off,
+                    )
+                    QalqonChildCard(
+                        name = child.name,
+                        initial = child.initial,
+                        protectionConfigured = child.faceEnrolled,
+                        faceEnrolled = child.faceEnrolled,
+                        faceStatus = faceStatus,
+                        onClick = { onOpenChildPolicy(child.childId) },
+                        contentDescription = stringResource(
+                            R.string.home_child_content_description,
+                            child.name,
+                            faceStatus,
                         ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
         }
-        if (dashboard.hasChild) {
-            OutlinedButton(onClick = onManage, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.dashboard_eye_safety_manage))
+    }
+}
+
+/** The compact today-overview metrics, laid out two per row. */
+@Composable
+private fun TodaySection(state: DashboardUiState, screenTime: ScreenTimeSummaryUiState) {
+    val metrics = homeTodayMetrics(state, screenTime)
+    Column(verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.sm)) {
+        QalqonSectionHeader(title = stringResource(R.string.home_today_title))
+        metrics.chunked(2).forEach { rowMetrics ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.md),
+            ) {
+                rowMetrics.forEach { metric ->
+                    HomeMetricTile(metric = metric, modifier = Modifier.weight(1f))
+                }
+                if (rowMetrics.size == 1) Spacer(Modifier.weight(1f))
             }
         }
     }
 }
 
-/** G. Child profile metadata (no biometric data). */
 @Composable
-private fun ChildProfileSummaryCard(dashboard: DashboardUiState, onOpenChildren: () -> Unit) {
-    val child = dashboard.child ?: return
-    SectionCard(title = stringResource(R.string.dashboard_profile_title)) {
+private fun HomeMetricTile(metric: HomeTodayMetric, modifier: Modifier = Modifier) {
+    QalqonCard(modifier = modifier) {
         Text(
-            child.name ?: stringResource(R.string.dashboard_value_unknown),
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        Text(
-            stringResource(
-                if (child.faceEnrolled) R.string.dashboard_child_face_on
-                else R.string.dashboard_child_face_off,
-            ),
-            style = MaterialTheme.typography.bodyMedium,
+            text = stringResource(metric.labelRes),
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
-        Text(
-            stringResource(R.string.children_level_label, stringResource(restrictionLevelLabelRes(child.level))),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        OutlinedButton(onClick = onOpenChildren, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.dashboard_profile_open))
+        val valueText = when (val value = metric.value) {
+            is HomeMetricValue.Duration -> durationLabel(value.ms)
+            is HomeMetricValue.Text ->
+                if (value.arg != null) stringResource(value.res, value.arg) else stringResource(value.res)
         }
-    }
-}
-
-/** E. Historical events only - never used to infer the current runtime state. */
-@Composable
-private fun RecentActivityCard(dashboard: DashboardUiState, onOpenActivity: () -> Unit) {
-    SectionCard(title = stringResource(R.string.dashboard_activity_title)) {
-        if (dashboard.recentEvents.isEmpty()) {
+        val valueColor = metric.tone?.let { toneColor(it) } ?: MaterialTheme.colorScheme.onSurface
+        Text(
+            text = valueText,
+            style = MaterialTheme.typography.titleMedium,
+            color = valueColor,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        metric.caption?.let { caption ->
             Text(
-                stringResource(R.string.dashboard_activity_empty),
-                style = MaterialTheme.typography.bodyMedium,
+                text = caption,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-        } else {
-            dashboard.recentEvents.forEach { event ->
-                val label = stringResource(eventLabelRes(event.type))
-                Text(
-                    text = event.detail?.let { "$label · $it" } ?: label,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-        }
-        TextButton(onClick = onOpenActivity, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.dashboard_activity_open))
         }
     }
 }
 
 /**
- * Phase 4 Step 1B-8: which child this device's screen time is tracked for.
- *
- * Deliberately worded as a *configuration* choice ("screen-time child"), never as
- * recognition: this is not "who is holding the phone", which is what the protection engine
- * decides from faces. No child is pre-selected — until the parent chooses, the background
- * collector attributes nothing.
+ * At most three contextual quick actions, each routed through the existing
+ * navigation callbacks (so the lock gate and protected-route rules are unchanged).
  */
 @Composable
-private fun UsageCard(
-    target: ScreenTimeTargetUiState,
-    summary: ScreenTimeSummaryUiState,
-    onSelectChild: (Long) -> Unit,
+private fun QuickActionsSection(
+    state: DashboardUiState,
     onOpenChildren: () -> Unit,
-) {
-    SectionCard(
-        title = stringResource(R.string.screentime_target_title),
-        subtitle = stringResource(R.string.screentime_target_subtitle),
-    ) {
-        // Phase 4 Step 2: today's facts for the selected child, straight from the evaluator.
-        ScreenTimeSummarySection(summary)
-
-        if (target.status != ScreenTimeTargetStatus.READY || target.children.isEmpty()) {
-            // Nothing to choose from; fall through to the selection states below.
-        } else {
-            Spacer(Modifier.height(12.dp))
-        }
-
-        when {
-            target.status == ScreenTimeTargetStatus.LOADING -> Text(
-                stringResource(R.string.state_loading),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            target.status == ScreenTimeTargetStatus.ERROR -> Text(
-                stringResource(R.string.screentime_target_error_load),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-
-            // No account: nothing to configure on a signed-out device.
-            target.status == ScreenTimeTargetStatus.NO_ACCOUNT -> Text(
-                stringResource(R.string.dashboard_no_account_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            target.noChildren -> {
-                Text(
-                    stringResource(R.string.screentime_target_no_children),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Button(onClick = onOpenChildren, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.dashboard_child_add))
-                }
-            }
-
-            else -> {
-                // The parent must choose: no child is marked until they do.
-                if (target.needsSelection) {
-                    Text(
-                        stringResource(R.string.screentime_target_none_selected),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-                if (target.activeChildMissing) {
-                    Text(
-                        stringResource(R.string.screentime_target_missing),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-
-                target.children.forEach { child ->
-                    val selected = child.id == target.activeChildId
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .selectable(
-                                selected = selected,
-                                enabled = !target.saving,
-                                role = Role.RadioButton,
-                                onClick = { onSelectChild(child.id) },
-                            )
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(
-                            selected = selected,
-                            onClick = null, // the whole row is the target
-                            enabled = !target.saving,
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Text(
-                            text = child.childName,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                }
-
-                Text(
-                    text = if (target.activeChild != null) {
-                        stringResource(R.string.screentime_target_active_hint, target.activeChild!!.childName)
-                    } else {
-                        stringResource(R.string.screentime_target_choose_hint)
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-
-                if (target.errorMessageRes != null) {
-                    Text(
-                        stringResource(target.errorMessageRes),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * Phase 4 Step 2: today's screen time for the selected child.
- *
- * Every value shown comes from the evaluator, so the screen never derives a remaining time or
- * an exceeded flag. Each situation gets its own wording: no usage yet (`0 min`) is deliberately
- * different from usage that could not be read, and "no limit" is never rendered as `0 min`.
- *
- * The total and each category are shown side by side as independent facts — one being reached
- * does not hide the others — and nothing here blocks or warns: this is information only.
- */
-@Composable
-private fun ScreenTimeSummarySection(summary: ScreenTimeSummaryUiState) {
-    when (summary.status) {
-        ScreenTimeSummaryStatus.LOADING -> Unit // the card's own loading line covers this
-
-        ScreenTimeSummaryStatus.NO_ACCOUNT -> Unit
-
-        ScreenTimeSummaryStatus.NO_TARGET -> Text(
-            stringResource(R.string.screentime_summary_no_target),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        ScreenTimeSummaryStatus.USAGE_UNAVAILABLE -> Column {
-            Text(
-                stringResource(R.string.screentime_summary_unavailable),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                stringResource(R.string.screentime_summary_unavailable_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        ScreenTimeSummaryStatus.ERROR -> Text(
-            stringResource(summary.errorMessageRes ?: R.string.screentime_summary_error),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.error,
-        )
-
-        ScreenTimeSummaryStatus.READY -> {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    stringResource(R.string.screentime_summary_today),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                summary.total?.let { total ->
-                    ScreenTimeRow(label = stringResource(R.string.screentime_limits_total_label), row = total)
-                }
-
-                val interesting = summary.usedCategories
-                if (interesting.isNotEmpty()) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        stringResource(R.string.screentime_limits_category_header),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    interesting.forEach { row ->
-                        ScreenTimeRow(label = categoryLabel(row), row = row)
-                    }
-                }
-            }
-        }
-    }
-}
-
-/** One scope's line: used, limit, remaining and whether it has been reached. */
-@Composable
-private fun ScreenTimeRow(label: String, row: ScreenTimeInfoRow) {
-    Column(modifier = Modifier.padding(vertical = 2.dp)) {
-        Text(label, style = MaterialTheme.typography.bodyLarge)
-        Text(
-            text = stringResource(R.string.screentime_summary_used, durationLabel(row.usedMs)),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = when {
-                // A stored limit that is not a valid configuration is stated as such, rather
-                // than being shown as a limit the product would honour.
-                row.invalidLimit -> stringResource(R.string.screentime_summary_limit_invalid)
-                !row.hasLimit -> stringResource(R.string.screentime_summary_unlimited)
-                else -> stringResource(R.string.screentime_summary_limit, durationLabelMinutes(row.limitMinutes!!))
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        // The status is text, not colour alone, so the state is readable without colour.
-        val (statusRes, statusColor) = when {
-            row.invalidLimit -> R.string.screentime_summary_limit_invalid to MaterialTheme.colorScheme.error
-            !row.hasLimit -> R.string.screentime_summary_status_unlimited to MaterialTheme.colorScheme.onSurfaceVariant
-            row.exceeded -> R.string.screentime_summary_status_reached to MaterialTheme.colorScheme.error
-            else -> R.string.screentime_summary_status_remaining to MaterialTheme.colorScheme.primary
-        }
-        Text(
-            text = if (statusRes == R.string.screentime_summary_status_reached) {
-                stringResource(statusRes)
-            } else if (statusRes == R.string.screentime_summary_limit_invalid) {
-                stringResource(statusRes)
-            } else {
-                stringResource(statusRes, durationLabel(row.remainingMs ?: 0L))
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = statusColor,
-        )
-    }
-}
-
-/** Localized name for a summary row. */
-@Composable
-private fun categoryLabel(row: ScreenTimeInfoRow): String = when (val label = row.label) {
-    ScreenTimeInfoLabel.Total -> stringResource(R.string.screentime_limits_total_label)
-    is ScreenTimeInfoLabel.Category -> categoryLabel(label.category)
-    is ScreenTimeInfoLabel.App -> label.packageName
-}
-
-@Composable
-private fun categoryLabel(category: AppCategory): String = stringResource(
-    when (category) {
-        AppCategory.VIDEO -> R.string.app_category_video
-        AppCategory.GAMES -> R.string.app_category_games
-        AppCategory.EDUCATION -> R.string.app_category_education
-        AppCategory.SOCIAL -> R.string.app_category_social
-        AppCategory.OTHER -> R.string.app_category_other
-    },
-)
-
-/** Seven-step readiness checklist with a simple progress indicator. */
-@Composable
-private fun SetupChecklistCard(
-    account: UserAccount?,
-    parentProfile: ParentProfile?,
-    dashboard: DashboardUiState,
-    settings: AppSettings,
-) {
-    val items = listOf(
-        (account != null) to R.string.setup_account,
-        (parentProfile != null) to R.string.setup_parent_profile,
-        (parentProfile?.isFaceEnrolled == true) to R.string.setup_parent_face,
-        dashboard.children.isNotEmpty() to R.string.setup_child_added,
-        dashboard.children.any { it.isFaceEnrolled } to R.string.setup_child_face,
-        (dashboard.protectedAppsCount > 0) to R.string.setup_protected_apps,
-        settings.protectionEnabled to R.string.setup_protection_enabled,
-    )
-    val completed = items.count { it.first }
-    val total = items.size
-    val allDone = completed == total
-    val nextStep = items.firstOrNull { !it.first }?.second
-
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.setup_title), style = MaterialTheme.typography.titleMedium)
-
-            if (allDone) {
-                Text(
-                    stringResource(R.string.setup_all_done),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            } else {
-                Text(
-                    stringResource(R.string.home_setup_progress, completed, total),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                LinearProgressIndicator(
-                    progress = { completed.toFloat() / total.toFloat() },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                nextStep?.let { label ->
-                    Text(
-                        stringResource(R.string.setup_next_step, stringResource(label)),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-                items.forEach { (done, labelRes) ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = stringResource(if (done) R.string.setup_done_mark else R.string.setup_todo_mark),
-                            color = if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        Text(
-                            text = stringResource(labelRes),
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(start = 8.dp),
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun MainActionsCard(
     onOpenProtection: () -> Unit,
-    onOpenParent: () -> Unit,
-    onOpenChildren: () -> Unit,
     onOpenProtectedApps: () -> Unit,
-    onOpenSettings: () -> Unit,
-    protectedCount: Int,
+    onOpenRequests: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(stringResource(R.string.home_main_actions_title), style = MaterialTheme.typography.titleMedium)
-            Button(onClick = onOpenProtection, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.protection_title))
-            }
-            Button(onClick = onOpenParent, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.home_menu_parent))
-            }
-            Button(onClick = onOpenChildren, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.home_menu_children))
-            }
-            Button(onClick = onOpenProtectedApps, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.home_menu_protected_apps))
-            }
-            Text(
-                stringResource(R.string.home_protected_count, protectedCount),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            OutlinedButton(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.home_menu_settings))
-            }
-        }
-    }
-}
+    val actions = homeQuickActions(state)
+    if (actions.isEmpty()) return
 
-@Composable
-private fun AdditionalSection(
-    expanded: Boolean,
-    onToggle: () -> Unit,
-    onOpenActivity: () -> Unit,
-    onOpenPrivacy: () -> Unit,
-    onOpenHelp: () -> Unit,
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(R.string.home_additional_title),
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.weight(1f),
-                )
-                OutlinedButton(onClick = onToggle) {
-                    Text(
-                        stringResource(
-                            if (expanded) R.string.home_section_hide else R.string.home_section_show,
-                        ),
-                    )
-                }
+    Column(verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.sm)) {
+        QalqonSectionHeader(title = stringResource(R.string.home_quick_actions_title))
+        actions.forEach { action ->
+            OutlinedButton(
+                onClick = when (action) {
+                    HomeQuickAction.MANAGE_CHILDREN -> onOpenChildren
+                    HomeQuickAction.PROTECTION_SETTINGS -> onOpenProtection
+                    HomeQuickAction.PROTECTED_APPS -> onOpenProtectedApps
+                    HomeQuickAction.REVIEW_REQUESTS -> onOpenRequests
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(homeQuickActionLabelRes(action)))
             }
-            if (expanded) {
-                OutlinedButton(onClick = onOpenActivity, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.home_menu_activity))
-                }
-                OutlinedButton(onClick = onOpenPrivacy, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.home_menu_privacy))
-                }
-                OutlinedButton(onClick = onOpenHelp, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.home_menu_help))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DeveloperSection(
-    expanded: Boolean,
-    onToggle: () -> Unit,
-    onOpenRecognition: () -> Unit,
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(R.string.home_developer_title),
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.weight(1f),
-                )
-                OutlinedButton(onClick = onToggle) {
-                    Text(
-                        stringResource(
-                            if (expanded) R.string.home_section_hide else R.string.home_section_show,
-                        ),
-                    )
-                }
-            }
-            if (expanded) {
-                Text(
-                    stringResource(R.string.home_developer_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                OutlinedButton(onClick = onOpenRecognition, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.home_recognition_debug))
-                }
-                ForegroundDebugCard()
-            }
-        }
-    }
-}
-
-@Composable
-private fun ForegroundDebugCard() {
-    val context = LocalContext.current
-    val monitor = remember { ForegroundAppMonitor(context) }
-    var hasAccess by remember { mutableStateOf(monitor.hasUsageAccess()) }
-    val foreground by monitor.current.collectAsStateWithLifecycle()
-
-    val scope = rememberCoroutineScope()
-    DisposableEffect(Unit) {
-        monitor.start(scope)
-        onDispose { monitor.stop() }
-    }
-
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(stringResource(R.string.home_foreground_title), style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(4.dp))
-            if (!hasAccess) {
-                Text(stringResource(R.string.home_usage_access_hint), style = MaterialTheme.typography.bodySmall)
-                Spacer(Modifier.height(4.dp))
-                OutlinedButton(
-                    onClick = {
-                        context.startActivity(monitor.usageAccessIntent())
-                        hasAccess = monitor.hasUsageAccess()
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.home_usage_access_grant))
-                }
-            } else {
-                Text(
-                    stringResource(
-                        R.string.home_foreground_current,
-                        foreground ?: stringResource(R.string.home_foreground_unknown),
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-        }
-    }
-}
-
-/**
- * Phase 11: pending parent requests (durable request rows — never a count of
- * protection events) plus the honest notification-capability warning. A denied
- * notification permission never hides or blocks a request, so this is only a
- * warning about *delivery*.
- */
-@Composable
-private fun RequestsSummaryCard(dashboard: DashboardUiState, onOpenRequests: () -> Unit) {
-    SectionCard(title = stringResource(R.string.requests_title)) {
-        if (dashboard.hasPendingRequests) {
-            Text(
-                stringResource(R.string.dashboard_requests_pending, dashboard.pendingRequestCount),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-        } else {
-            Text(
-                stringResource(R.string.dashboard_requests_none),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        if (!dashboard.notificationsEnabled) {
-            Text(
-                stringResource(R.string.dashboard_notifications_disabled),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
-        OutlinedButton(onClick = onOpenRequests, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.dashboard_requests_open))
         }
     }
 }

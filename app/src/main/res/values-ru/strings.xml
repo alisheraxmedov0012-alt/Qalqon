@@ -653,4 +653,20 @@
     <string name="nav_children">Дети</string>
     <string name="nav_activity">Активность</string>
     <string name="nav_settings">Настройки</string>
+
+    <!-- QALQON Home dashboard (UI/UX redesign, Phase 3). -->
+    <string name="home_greeting">Здравствуйте, %1$s</string>
+    <string name="home_more_options">Ещё</string>
+    <string name="home_attention_title">Требует внимания</string>
+    <string name="home_attention_children_setup">У некоторых детей ещё не настроено лицо</string>
+    <string name="home_today_title">Сегодня</string>
+    <string name="home_quick_actions_title">Быстрые действия</string>
+    <string name="home_action_manage_children">Управление детьми</string>
+    <string name="home_status_off_hint">Защита сейчас выключена</string>
+    <string name="home_status_active_hint">Защита активна и работает</string>
+    <string name="home_status_setup_hint">Завершите настройку разрешений для защиты</string>
+    <string name="home_status_blocking">Защита блокирует</string>
+    <string name="home_status_blocking_hint">Защита применяет ограничение прямо сейчас</string>
+    <string name="home_status_recovering_hint">Защита восстанавливается</string>
+    <string name="home_child_content_description">Ребёнок: %1$s, %2$s</string>
 </resources>

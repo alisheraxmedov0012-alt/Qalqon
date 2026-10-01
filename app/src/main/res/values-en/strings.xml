@@ -653,4 +653,20 @@
     <string name="nav_children">Children</string>
     <string name="nav_activity">Activity</string>
     <string name="nav_settings">Settings</string>
+
+    <!-- QALQON Home dashboard (UI/UX redesign, Phase 3). -->
+    <string name="home_greeting">Hi, %1$s</string>
+    <string name="home_more_options">More</string>
+    <string name="home_attention_title">Needs attention</string>
+    <string name="home_attention_children_setup">Some children still need face setup</string>
+    <string name="home_today_title">Today</string>
+    <string name="home_quick_actions_title">Quick actions</string>
+    <string name="home_action_manage_children">Manage children</string>
+    <string name="home_status_off_hint">Protection is currently off</string>
+    <string name="home_status_active_hint">Protection is active and running</string>
+    <string name="home_status_setup_hint">Complete the required permissions to protect</string>
+    <string name="home_status_blocking">Protection is blocking</string>
+    <string name="home_status_blocking_hint">Protection is enforcing a restriction now</string>
+    <string name="home_status_recovering_hint">Protection is recovering</string>
+    <string name="home_child_content_description">Child: %1$s, %2$s</string>
 </resources>

@@ -333,20 +333,19 @@ private fun QalqonNavHost(
             )
         }
         composable(Routes.HOME) {
+            // Phase 3: the redesigned dashboard. Every callback maps to an existing
+            // route; Parent profile / schedules / eye safety remain reachable through
+            // the Protection and child-policy screens, and Activity is a bottom tab.
             HomeScreen(
-                onOpenParent = { navController.navigate(Routes.PARENT_PROFILE) },
                 onOpenChildren = { navController.navigate(Routes.CHILD_PROFILES) },
                 onOpenProtectedApps = { navController.navigate(Routes.SETTINGS_APPS) },
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
-                onOpenRecognition = { navController.navigate(Routes.RECOGNITION_DEBUG) },
                 onOpenProtection = { navController.navigate(Routes.PROTECTION) },
+                onOpenRequests = { navController.navigate(Routes.requests()) },
+                onOpenChildPolicy = { childId -> navController.navigate(Routes.childPolicy(childId)) },
                 onOpenPrivacy = { navController.navigate(Routes.PRIVACY) },
                 onOpenHelp = { navController.navigate(Routes.HELP) },
-                onOpenActivity = { navController.navigate(Routes.ACTIVITY_LOG) },
-                onOpenChildPolicy = { childId -> navController.navigate(Routes.childPolicy(childId)) },
-                onOpenRequests = { navController.navigate(Routes.requests()) },
-                onOpenChildSchedules = { childId -> navController.navigate(Routes.childSchedules(childId)) },
-                onOpenChildEyeSafety = { childId -> navController.navigate(Routes.childEyeSafety(childId)) },
+                onOpenRecognition = { navController.navigate(Routes.RECOGNITION_DEBUG) },
             )
         }
         composable(Routes.PARENT_PROFILE) {

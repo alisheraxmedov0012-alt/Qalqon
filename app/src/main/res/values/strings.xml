@@ -654,4 +654,20 @@
     <string name="nav_children">Bolalar</string>
     <string name="nav_activity">Faoliyat</string>
     <string name="nav_settings">Sozlamalar</string>
+
+    <!-- QALQON Home dashboard (UI/UX redesign, Phase 3). -->
+    <string name="home_greeting">Salom, %1$s</string>
+    <string name="home_more_options">Boshqa</string>
+    <string name="home_attention_title">Diqqat talab qiladi</string>
+    <string name="home_attention_children_setup">Ba\'zi bolalar uchun yuz hali sozlanmagan</string>
+    <string name="home_today_title">Bugun</string>
+    <string name="home_quick_actions_title">Tezkor amallar</string>
+    <string name="home_action_manage_children">Bolalarni boshqarish</string>
+    <string name="home_status_off_hint">Himoya hozircha o\'chirilgan</string>
+    <string name="home_status_active_hint">Himoya faol va ishlayapti</string>
+    <string name="home_status_setup_hint">Himoyani yoqish uchun ruxsatlarni to\'ldiring</string>
+    <string name="home_status_blocking">Himoya bloklayapti</string>
+    <string name="home_status_blocking_hint">Himoya hozir amal qilmoqda</string>
+    <string name="home_status_recovering_hint">Himoya tiklanmoqda</string>
+    <string name="home_child_content_description">Farzand: %1$s, %2$s</string>
 </resources>

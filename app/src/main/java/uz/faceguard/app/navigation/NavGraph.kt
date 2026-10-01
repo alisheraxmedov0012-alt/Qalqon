@@ -1,12 +1,17 @@
 package uz.faceguard.app.navigation
 
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import uz.faceguard.app.core.debug.DebugFlags
 import uz.faceguard.app.core.i18n.StartupDestination
 import uz.faceguard.app.core.notification.NotificationNavigation
@@ -154,6 +159,25 @@ fun lockRedirectFor(route: String?, isUnlocked: Boolean): String? =
     if (!isUnlocked && isProtectedRoute(route)) Routes.PIN_UNLOCK else null
 
 /**
+ * Switches to a primary top-level destination (UI/UX redesign, Phase 2).
+ *
+ * Implements the standard Material bottom-navigation behaviour on the one existing
+ * controller: switching tabs never grows the back stack (so
+ * `Home → Children → Activity → Settings → Activity` cannot happen) and each tab's
+ * saved state is restored when it is re-selected. Home is the stable root of the
+ * authenticated UI (every successful auth path lands there with `popUpTo(0)`), so
+ * popping up to it keeps the back behaviour intuitive without a second start
+ * destination.
+ */
+private fun NavHostController.navigateToTopLevel(destination: QalqonTopLevelDestination) {
+    navigate(destination.route) {
+        popUpTo(Routes.HOME) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
+}
+
+/**
  * Launch: Splash resolves the language, the registered account and the process
  * lock into one destination. A registered account on a later launch is **not**
  * unlocked, so it lands on the PIN screen; Home is only reachable once this
@@ -211,7 +235,47 @@ fun FaceGuardNavHost(
         }
     }
 
-    NavHost(navController = navController, startDestination = Routes.SPLASH) {
+    // Phase 2: the currently selected primary destination, derived from the single
+    // existing back stack. Null on every non-tab route, which is what keeps the
+    // bottom bar off the onboarding, PIN-gate and child-detail screens.
+    val selectedDestination = QalqonTopLevelDestination.forRoute(
+        navController.currentBackStackEntryAsState().value?.destination?.route,
+    )
+
+    QalqonAppShell(
+        selected = selectedDestination,
+        onSelect = { destination -> navController.navigateToTopLevel(destination) },
+    ) { innerPadding ->
+        QalqonNavHost(
+            navController = navController,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                // The shell already reserves the bar (and the system bars) area;
+                // consuming those insets stops each screen's own Scaffold from
+                // applying them a second time.
+                .consumeWindowInsets(innerPadding),
+        )
+    }
+}
+
+/**
+ * The existing QALQON route graph, hosted inside the shell.
+ *
+ * Extracted verbatim from [FaceGuardNavHost] so the graph is not duplicated: the
+ * shell adds the bottom navigation *around* the routes, the routes themselves —
+ * every existing destination, argument and debug gate — are unchanged.
+ */
+@Composable
+private fun QalqonNavHost(
+    navController: NavHostController,
+    modifier: Modifier = Modifier,
+) {
+    NavHost(
+        navController = navController,
+        startDestination = Routes.SPLASH,
+        modifier = modifier,
+    ) {
         composable(Routes.SPLASH) {
             SplashScreen(
                 onReady = { destination ->

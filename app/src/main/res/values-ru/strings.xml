@@ -647,4 +647,10 @@
     <string name="qal_action_cancel">Отмена</string>
     <string name="qal_action_confirm">Подтвердить</string>
     <string name="qal_badge_content_description">%1$d новых</string>
+
+    <!-- QALQON navigation shell: the four primary top-level destinations. -->
+    <string name="nav_home">Главная</string>
+    <string name="nav_children">Дети</string>
+    <string name="nav_activity">Активность</string>
+    <string name="nav_settings">Настройки</string>
 </resources>

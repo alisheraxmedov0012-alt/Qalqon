@@ -648,4 +648,10 @@
     <string name="qal_action_cancel">Bekor qilish</string>
     <string name="qal_action_confirm">Tasdiqlash</string>
     <string name="qal_badge_content_description">%1$d ta yangi</string>
+
+    <!-- QALQON navigation shell: the four primary top-level destinations. -->
+    <string name="nav_home">Bosh sahifa</string>
+    <string name="nav_children">Bolalar</string>
+    <string name="nav_activity">Faoliyat</string>
+    <string name="nav_settings">Sozlamalar</string>
 </resources>

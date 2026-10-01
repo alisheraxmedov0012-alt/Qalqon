@@ -642,4 +642,10 @@
     <string name="lock_biometric_failed">Biometrik tasdiqlanmadi. PIN-kod bilan urinib ko\'ring.</string>
     <string name="lock_biometric_prompt_title">Qalqonni ochish</string>
     <string name="lock_biometric_prompt_subtitle">Yuz yoki barmoq izi bilan ochish</string>
+
+    <!-- QALQON design-system component defaults (generic, reused by any screen) -->
+    <string name="qal_action_retry">Qayta urinish</string>
+    <string name="qal_action_cancel">Bekor qilish</string>
+    <string name="qal_action_confirm">Tasdiqlash</string>
+    <string name="qal_badge_content_description">%1$d ta yangi</string>
 </resources>

@@ -55,6 +55,7 @@ import uz.faceguard.app.R
 import uz.faceguard.app.core.diagnostics.SystemHealthSnapshotSource
 import uz.faceguard.app.core.i18n.AppLanguage
 import uz.faceguard.app.core.i18n.LanguageState
+import uz.faceguard.app.core.theme.QalqonTheme
 import uz.faceguard.app.core.ui.AppLoadingButton
 import uz.faceguard.app.core.ui.SectionCard
 import uz.faceguard.app.core.ui.UiState
@@ -405,18 +406,26 @@ private fun HealthTab(
     }
 }
 
+/**
+ * Health-level colors now come from the design-system semantic tokens
+ * (`QalqonTheme.colors`) instead of inline hex literals, so this screen and the
+ * future redesigned screens agree on what "OK" and "failed" look like in both
+ * light and dark themes. Layout and behaviour are unchanged.
+ */
+@Composable
 private fun healthColor(status: DiagnosticStatus): Color = when (status) {
-    DiagnosticStatus.OK -> Color(0xFF2E7D32)
-    DiagnosticStatus.WARNING -> Color(0xFFF9A825)
-    DiagnosticStatus.FAILED -> Color(0xFFC62828)
-    DiagnosticStatus.UNKNOWN -> Color(0xFF757575)
+    DiagnosticStatus.OK -> QalqonTheme.colors.success
+    DiagnosticStatus.WARNING -> QalqonTheme.colors.warning
+    DiagnosticStatus.FAILED -> MaterialTheme.colorScheme.error
+    DiagnosticStatus.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 
+@Composable
 private fun healthColor(level: SystemHealthLevel): Color = when (level) {
-    SystemHealthLevel.HEALTHY -> Color(0xFF2E7D32)
-    SystemHealthLevel.DEGRADED -> Color(0xFFF9A825)
-    SystemHealthLevel.CRITICAL -> Color(0xFFC62828)
-    SystemHealthLevel.UNKNOWN -> Color(0xFF757575)
+    SystemHealthLevel.HEALTHY -> QalqonTheme.colors.success
+    SystemHealthLevel.DEGRADED -> QalqonTheme.colors.warning
+    SystemHealthLevel.CRITICAL -> MaterialTheme.colorScheme.error
+    SystemHealthLevel.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 
 @Composable

@@ -641,4 +641,10 @@
     <string name="lock_biometric_failed">Биометрическая проверка не пройдена. Попробуйте PIN-код.</string>
     <string name="lock_biometric_prompt_title">Открыть Qalqon</string>
     <string name="lock_biometric_prompt_subtitle">Открыть с помощью лица или отпечатка пальца</string>
+
+    <!-- QALQON design-system component defaults (generic, reused by any screen) -->
+    <string name="qal_action_retry">Повторить</string>
+    <string name="qal_action_cancel">Отмена</string>
+    <string name="qal_action_confirm">Подтвердить</string>
+    <string name="qal_badge_content_description">%1$d новых</string>
 </resources>

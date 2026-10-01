@@ -2,10 +2,10 @@ package uz.faceguard.app
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
@@ -14,12 +14,23 @@ import uz.faceguard.app.core.i18n.LanguageState
 import uz.faceguard.app.core.i18n.LocalizedApp
 import uz.faceguard.app.core.notification.NotificationNavigation
 import uz.faceguard.app.core.protection.ProtectionRuntime
+import uz.faceguard.app.core.security.AppLockState
 import uz.faceguard.app.core.theme.FaceGuardTheme
 import uz.faceguard.app.data.prefs.AppLanguageStore
 import uz.faceguard.app.navigation.FaceGuardNavHost
 
+/**
+ * `FragmentActivity` (a `ComponentActivity`) is required by `BiometricPrompt`, which
+ * needs a `FragmentActivity` host for its system dialog. It keeps every
+ * `ComponentActivity` behaviour QALQON relied on — `setContent`, Hilt injection,
+ * the CameraX lifecycle owner and the Activity context `hiltViewModel()` needs — so
+ * the change is confined to the class declaration.
+ *
+ * The theme stays the platform Material theme: `FragmentActivity` does not require an
+ * AppCompat theme, so no dependency or theme change is involved.
+ */
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     /**
      * Phase 7.1: the runtime needs to know when Qalqon is actually visible. That
@@ -30,6 +41,9 @@ class MainActivity : ComponentActivity() {
 
     /** The app language, applied to the whole Compose tree at the root. */
     @Inject lateinit var languageStore: AppLanguageStore
+
+    /** Whether the parent UI is unlocked for this process (runtime-only, not persisted). */
+    @Inject lateinit var appLockState: AppLockState
 
     /**
      * Phase 11: a notification click asks for exactly one destination. It is kept
@@ -46,6 +60,7 @@ class MainActivity : ComponentActivity() {
             val navController = rememberNavController()
             val languageState by languageStore.state.collectAsStateWithLifecycle()
             val language = (languageState as? LanguageState.Selected)?.language
+            val unlocked by appLockState.unlocked.collectAsStateWithLifecycle()
 
             FaceGuardTheme {
                 // Applying the selected language here makes every string in the
@@ -55,6 +70,10 @@ class MainActivity : ComponentActivity() {
                     FaceGuardNavHost(
                         navController = navController,
                         requestedDestination = requestedDestination.value,
+                        isUnlocked = unlocked,
+                        // Authoritative read for the gate itself, so a navigation in
+                        // the same frame as a successful unlock is never bounced back.
+                        isUnlockedNow = { appLockState.isUnlocked() },
                     )
                 }
             }

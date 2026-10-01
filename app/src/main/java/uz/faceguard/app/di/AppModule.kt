@@ -93,6 +93,8 @@ import uz.faceguard.app.core.security.AndroidKeystoreKeyProvider
 import uz.faceguard.app.core.security.KeystoreBiometricTemplateCipher
 import uz.faceguard.app.core.security.SecureCrypto
 import uz.faceguard.app.core.security.SecureKeyProvider
+import uz.faceguard.app.core.security.AndroidBiometricAvailabilityProvider
+import uz.faceguard.app.core.security.BiometricAvailabilityProvider
 import uz.faceguard.app.core.security.SecurityStateHolder
 import uz.faceguard.app.domain.security.BiometricTemplateCipher
 import uz.faceguard.app.core.notification.AndroidNotificationDispatcher
@@ -311,6 +313,16 @@ object AppModule {
     @Provides
     @Singleton
     fun provideSecurityStateHolder(): SecurityStateHolder = SecurityStateHolder()
+
+    /**
+     * Android system biometric availability (face unlock / fingerprint) for the
+     * parent-UI unlock. PIN always remains as the fallback.
+     */
+    @Provides
+    @Singleton
+    fun provideBiometricAvailabilityProvider(
+        @ApplicationContext context: Context,
+    ): BiometricAvailabilityProvider = AndroidBiometricAvailabilityProvider(context)
 
     @Provides
     @Singleton

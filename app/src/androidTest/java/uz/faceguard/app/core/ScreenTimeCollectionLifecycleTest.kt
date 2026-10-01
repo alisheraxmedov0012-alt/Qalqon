@@ -66,7 +66,15 @@ class ScreenTimeCollectionLifecycleTest {
         runtime.awaitActive(false)
     }
 
-    private suspend fun ProtectionRuntime.awaitActive(expected: Boolean, timeoutMs: Long = 30_000L) {
+    /**
+     * The runtime publishes `state.active` from collectors on `Dispatchers.Main.immediate`,
+     * so the wait must outlast a main-looper stall. The shared CI emulator is
+     * software-rendered and regularly stalls the main looper for tens of seconds
+     * while the activity renders (observed 30s+ `SurfaceComposerClient` sync
+     * stalls), which previously made this assert against the stall rather than the
+     * activation it was waiting for.
+     */
+    private suspend fun ProtectionRuntime.awaitActive(expected: Boolean, timeoutMs: Long = 180_000L) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             if (state.value.active == expected) return
@@ -75,8 +83,18 @@ class ScreenTimeCollectionLifecycleTest {
         assertEquals("runtime active state", expected, state.value.active)
     }
 
+    /**
+     * Launches the real activity (needed so a foreground-service start is legal from
+     * Android 12+) and then blocks until the app's main thread is idle. The first
+     * composition/render of [MainActivity] is what stalls the main looper on the CI
+     * emulator; synchronising here keeps the test body's assertions from racing that
+     * launch render.
+     */
     private fun withForegroundApp(block: suspend () -> Unit) = runBlocking {
-        ActivityScenario.launch(MainActivity::class.java).use { block() }
+        ActivityScenario.launch(MainActivity::class.java).use {
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            block()
+        }
     }
 
     @Test

@@ -627,4 +627,24 @@
     <string name="language_select_subtitle">Qalqon will use this language. You can change it later in Settings.</string>
     <string name="language_section">App language</string>
     <string name="language_section_hint">Chooses the language Qalqon\'s interface is shown in.</string>
+
+    <!-- Startup PIN gate: QALQON's parent UI is locked on every launch -->
+    <string name="lock_title">Enter your PIN</string>
+    <string name="lock_subtitle">Enter your PIN to open Qalqon\'s controls.</string>
+    <string name="lock_wrong_pin">Wrong PIN</string>
+    <string name="lock_locked_out">Too many attempts. Wait %1$s before trying again.</string>
+    <string name="lock_unlock">Unlock</string>
+
+    <!-- Biometric app unlock (Android system prompt) with PIN fallback -->
+    <string name="lock_biometric_button">Unlock with biometrics</string>
+    <string name="lock_pin_alternative">Use PIN</string>
+    <string name="lock_biometric_failed">Biometric check failed. Try the PIN instead.</string>
+    <string name="lock_biometric_prompt_title">Unlock Qalqon</string>
+    <string name="lock_biometric_prompt_subtitle">Unlock with your face or fingerprint</string>
+
+    <!-- QALQON design-system component defaults (generic, reused by any screen) -->
+    <string name="qal_action_retry">Retry</string>
+    <string name="qal_action_cancel">Cancel</string>
+    <string name="qal_action_confirm">Confirm</string>
+    <string name="qal_badge_content_description">%1$d new</string>
 </resources>

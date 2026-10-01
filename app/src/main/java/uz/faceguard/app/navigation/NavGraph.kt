@@ -12,6 +12,7 @@ import uz.faceguard.app.core.i18n.StartupDestination
 import uz.faceguard.app.core.notification.NotificationNavigation
 import uz.faceguard.app.feature.auth.CreatePinScreen
 import uz.faceguard.app.feature.auth.LoginScreen
+import uz.faceguard.app.feature.auth.PinUnlockScreen
 import uz.faceguard.app.feature.auth.RegisterScreen
 import uz.faceguard.app.feature.auth.SplashScreen
 import uz.faceguard.app.feature.auth.WelcomeScreen
@@ -40,6 +41,9 @@ import uz.faceguard.app.feature.settings.SettingsScreen
 object Routes {
     const val SPLASH = "splash"
     const val LANGUAGE = "language"
+
+    /** Startup PIN gate: shown whenever a registered account exists but the UI is locked. */
+    const val PIN_UNLOCK = "pin_unlock"
     const val WELCOME = "welcome"
     const val REGISTER = "register"
     const val LOGIN = "login"
@@ -85,6 +89,9 @@ object Routes {
  * signed out), so it maps to `null` and can never force a signed-out caller past
  * the auth gate.
  *
+ * A resolved destination is additionally only navigated once the parent UI is
+ * unlocked, so a notification click cannot skip the startup PIN gate either.
+ *
  * Pure (no Android/NavController), so the validation is unit-testable.
  */
 fun notificationRouteFor(rawDestination: String?): String? = when (rawDestination) {
@@ -93,8 +100,69 @@ fun notificationRouteFor(rawDestination: String?): String? = when (rawDestinatio
 }
 
 /**
- * Launch: Splash → Home when a persisted session exists, else → Welcome.
- * Logout (from Settings) clears session and returns to Welcome.
+ * Routes that expose parental controls and therefore require an unlocked UI.
+ *
+ * Everything a child must not reach without the parent PIN is listed here —
+ * including the Settings screen, which is where the app language is changed.
+ *
+ * Matching is segment-aware (`route` or `route/...`), so a future route that merely
+ * *starts with* a protected name (e.g. "homework") is not caught by accident.
+ * `settings_apps` is therefore listed explicitly rather than relying on the
+ * `settings` prefix.
+ */
+private val PROTECTED_ROUTE_PREFIXES = listOf(
+    Routes.HOME,
+    Routes.PARENT_PROFILE,
+    Routes.CHILD_PROFILES,
+    Routes.SETTINGS,
+    Routes.SETTINGS_APPS,
+    Routes.PROTECTION,
+    Routes.PRIVACY,
+    Routes.HELP,
+    Routes.ACTIVITY_LOG,
+    Routes.REQUESTS,
+    Routes.RECOGNITION_DEBUG,
+    Routes.PARENT_FACE_ENROLLMENT,
+    "child_face_enrollment",
+    "child_policy",
+    "child_schedules",
+    "child_schedule_editor",
+    "child_eye_safety",
+)
+
+/**
+ * True when [route] is part of the parent control UI and must not be reachable
+ * while the app is locked. Query suffixes are ignored so `requests?requestId=5`
+ * is classified by its path.
+ */
+fun isProtectedRoute(route: String?): Boolean {
+    val path = route?.substringBefore('?')?.takeIf { it.isNotBlank() } ?: return false
+    return PROTECTED_ROUTE_PREFIXES.any { path == it || path.startsWith("$it/") }
+}
+
+/**
+ * The startup lock gate, as a pure rule.
+ *
+ * Returns the route the user must be sent to instead of [route] when the UI is
+ * locked, or `null` when [route] may be shown. Because this is applied to whatever
+ * destination the graph actually reaches, it also covers the routes a locked user
+ * could otherwise slip into — a direct navigation call, a restored navigation
+ * stack after process death, a notification deep link or a back-stack restore —
+ * without any per-screen checks and without touching the notification whitelist.
+ */
+fun lockRedirectFor(route: String?, isUnlocked: Boolean): String? =
+    if (!isUnlocked && isProtectedRoute(route)) Routes.PIN_UNLOCK else null
+
+/**
+ * Launch: Splash resolves the language, the registered account and the process
+ * lock into one destination. A registered account on a later launch is **not**
+ * unlocked, so it lands on the PIN screen; Home is only reachable once this
+ * process has passed the PIN check.
+ *
+ * The lock gate below is applied to every destination the graph reaches, so a
+ * restored navigation stack, a deep link or a notification click cannot expose the
+ * parental controls while locked. Logout (from Settings) clears the session and
+ * returns to Welcome, exactly as before.
  */
 @Composable
 fun FaceGuardNavHost(
@@ -105,15 +173,42 @@ fun FaceGuardNavHost(
      * navigation architecture, and the destination validates ownership itself.
      */
     requestedDestination: String? = null,
+    /** Whether the parent UI is unlocked for this process (see `AppLockState`). */
+    isUnlocked: Boolean = false,
+    /**
+     * The authoritative lock value read *at decision time*.
+     *
+     * [isUnlocked] is what recomposes (and restarts the effects); this provider is
+     * what the gate actually consults, so a navigation that happens in the same
+     * frame as a successful unlock (login/create-PIN mark the UI unlocked just
+     * before signalling success) can never be bounced back to the PIN screen by a
+     * stale captured value.
+     */
+    isUnlockedNow: () -> Boolean = { isUnlocked },
 ) {
     // A notification click opens the app and asks for one destination. The extra is
     // untrusted (MainActivity is exported) so it is validated against the known
     // notification destinations before use; anything else — including a crafted
     // internal route — is ignored. Ownership is still validated by the
-    // destination's own account-scoped queries.
-    LaunchedEffect(requestedDestination) {
+    // destination's own account-scoped queries. A locked UI is never driven
+    // anywhere: the startup PIN gate has to be cleared first.
+    LaunchedEffect(requestedDestination, isUnlocked) {
         val route = notificationRouteFor(requestedDestination) ?: return@LaunchedEffect
+        if (!isUnlockedNow()) return@LaunchedEffect
         runCatching { navController.navigate(route) }
+    }
+
+    // The startup lock gate. Observing the back stack (rather than checking each
+    // screen) is what makes it unbypassable: whatever destination is reached —
+    // including a restored stack after process death or a saved navigation state —
+    // a protected route while locked is replaced by the PIN screen.
+    LaunchedEffect(navController, isUnlocked) {
+        if (isUnlocked) return@LaunchedEffect
+        navController.currentBackStackEntryFlow.collect { entry ->
+            val redirect = lockRedirectFor(entry.destination.route, isUnlockedNow())
+                ?: return@collect
+            navController.navigate(redirect) { popUpTo(0) { inclusive = true } }
+        }
     }
 
     NavHost(navController = navController, startDestination = Routes.SPLASH) {
@@ -122,10 +217,18 @@ fun FaceGuardNavHost(
                 onReady = { destination ->
                     val target = when (destination) {
                         StartupDestination.LANGUAGE_SELECTION -> Routes.LANGUAGE
+                        StartupDestination.PIN_UNLOCK -> Routes.PIN_UNLOCK
                         StartupDestination.HOME -> Routes.HOME
                         StartupDestination.WELCOME -> Routes.WELCOME
                     }
                     navController.navigate(target) { popUpTo(Routes.SPLASH) { inclusive = true } }
+                },
+            )
+        }
+        composable(Routes.PIN_UNLOCK) {
+            PinUnlockScreen(
+                onUnlocked = {
+                    navController.navigate(Routes.HOME) { popUpTo(0) { inclusive = true } }
                 },
             )
         }

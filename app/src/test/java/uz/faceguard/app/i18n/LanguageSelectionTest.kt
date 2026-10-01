@@ -24,12 +24,12 @@ class LanguageSelectionTest {
     fun noLanguageSelectedAlwaysRequiresThePicker() {
         assertEquals(
             StartupDestination.LANGUAGE_SELECTION,
-            startupDestination(language = null, hasSession = false),
+            startupDestination(language = null, hasRegisteredAccount = false, isUnlocked = false),
         )
         // Even a stale session must not skip the picker.
         assertEquals(
             StartupDestination.LANGUAGE_SELECTION,
-            startupDestination(language = null, hasSession = true),
+            startupDestination(language = null, hasRegisteredAccount = true, isUnlocked = false),
         )
     }
 
@@ -40,12 +40,12 @@ class LanguageSelectionTest {
             assertEquals(
                 "signed out after choosing ${language.languageTag}",
                 StartupDestination.WELCOME,
-                startupDestination(language, hasSession = false),
+                startupDestination(language, hasRegisteredAccount = false, isUnlocked = false),
             )
             assertEquals(
-                "signed in after choosing ${language.languageTag}",
+                "unlocked after choosing ${language.languageTag}",
                 StartupDestination.HOME,
-                startupDestination(language, hasSession = true),
+                startupDestination(language, hasRegisteredAccount = true, isUnlocked = true),
             )
         }
     }
@@ -55,7 +55,7 @@ class LanguageSelectionTest {
     fun aselectedLanguageNeverReturnsToThePicker() {
         AppLanguage.entries.forEach { language ->
             assertTrue(
-                startupDestination(language, hasSession = false) != StartupDestination.LANGUAGE_SELECTION,
+                startupDestination(language, hasRegisteredAccount = false, isUnlocked = false) != StartupDestination.LANGUAGE_SELECTION,
             )
         }
     }
@@ -64,9 +64,9 @@ class LanguageSelectionTest {
     @Test
     fun logoutAndLoginDoNotChangeTheLanguageDecision() {
         val chosen = AppLanguage.RUSSIAN
-        assertEquals(StartupDestination.HOME, startupDestination(chosen, hasSession = true))
+        assertEquals(StartupDestination.HOME, startupDestination(chosen, hasRegisteredAccount = true, isUnlocked = true))
         // Log out: still Russian, now at Welcome — never back at the picker.
-        assertEquals(StartupDestination.WELCOME, startupDestination(chosen, hasSession = false))
+        assertEquals(StartupDestination.WELCOME, startupDestination(chosen, hasRegisteredAccount = false, isUnlocked = false))
     }
 
     // J. All three locale identifiers are supported and stable.

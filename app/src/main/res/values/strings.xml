@@ -628,4 +628,24 @@
     <string name="language_select_subtitle">Qalqon shu tilda ishlaydi. Keyin uni sozlamalardan o\'zgartirish mumkin.</string>
     <string name="language_section">Ilova tili</string>
     <string name="language_section_hint">Qalqon interfeysi qaysi tilda ko\'rinishini tanlaydi.</string>
+
+    <!-- Startup PIN gate: QALQON's parent UI is locked on every launch -->
+    <string name="lock_title">PIN-kodni kiriting</string>
+    <string name="lock_subtitle">Qalqon boshqaruvini ochish uchun PIN-kodingizni kiriting.</string>
+    <string name="lock_wrong_pin">PIN-kod noto\'g\'ri</string>
+    <string name="lock_locked_out">Juda ko\'p urinish. Qayta urinib ko\'rishdan oldin %1$s kuting.</string>
+    <string name="lock_unlock">Ochish</string>
+
+    <!-- Biometric app unlock (Android system prompt) with PIN fallback -->
+    <string name="lock_biometric_button">Biometrik bilan ochish</string>
+    <string name="lock_pin_alternative">PIN orqali kirish</string>
+    <string name="lock_biometric_failed">Biometrik tasdiqlanmadi. PIN-kod bilan urinib ko\'ring.</string>
+    <string name="lock_biometric_prompt_title">Qalqonni ochish</string>
+    <string name="lock_biometric_prompt_subtitle">Yuz yoki barmoq izi bilan ochish</string>
+
+    <!-- QALQON design-system component defaults (generic, reused by any screen) -->
+    <string name="qal_action_retry">Qayta urinish</string>
+    <string name="qal_action_cancel">Bekor qilish</string>
+    <string name="qal_action_confirm">Tasdiqlash</string>
+    <string name="qal_badge_content_description">%1$d ta yangi</string>
 </resources>

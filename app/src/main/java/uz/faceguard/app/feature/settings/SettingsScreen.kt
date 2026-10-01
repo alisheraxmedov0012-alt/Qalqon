@@ -55,9 +55,11 @@ import uz.faceguard.app.R
 import uz.faceguard.app.core.diagnostics.SystemHealthSnapshotSource
 import uz.faceguard.app.core.i18n.AppLanguage
 import uz.faceguard.app.core.i18n.LanguageState
+import uz.faceguard.app.core.theme.QalqonTheme
 import uz.faceguard.app.core.ui.AppLoadingButton
 import uz.faceguard.app.core.ui.SectionCard
 import uz.faceguard.app.core.ui.UiState
+import uz.faceguard.app.core.security.AppLockState
 import uz.faceguard.app.data.prefs.AppLanguageStore
 import uz.faceguard.app.feature.language.LanguageOptions
 import uz.faceguard.app.domain.diagnostics.DiagnosticStatus
@@ -91,6 +93,8 @@ class SettingsViewModel @Inject constructor(
     private val healthSource: SystemHealthSnapshotSource,
     /** The single source of truth for the application language. */
     private val languageStore: AppLanguageStore,
+    /** Process-scoped parent UI lock; cleared on logout and full reset. */
+    private val appLockState: AppLockState,
 ) : ViewModel() {
 
     /** The currently selected language (null until one has been chosen). */
@@ -208,6 +212,8 @@ class SettingsViewModel @Inject constructor(
     /** Full local wipe; caller navigates back to the welcome flow. */
     fun resetAll() = viewModelScope.launch {
         resetRepository.resetAll()
+        // A wiped install must not leave the UI unlocked.
+        appLockState.lock()
         _resetDone.value = true
     }
 
@@ -216,6 +222,9 @@ class SettingsViewModel @Inject constructor(
         _logoutState.value = UiState.Loading
         viewModelScope.launch {
             accountRepository.logout()
+            // Logging out ends the unlocked UI session too; the next launch asks for
+            // the PIN (or shows Welcome, matching the existing sign-out flow).
+            appLockState.lock()
             _logoutState.value = UiState.Success
         }
     }
@@ -397,18 +406,26 @@ private fun HealthTab(
     }
 }
 
+/**
+ * Health-level colors now come from the design-system semantic tokens
+ * (`QalqonTheme.colors`) instead of inline hex literals, so this screen and the
+ * future redesigned screens agree on what "OK" and "failed" look like in both
+ * light and dark themes. Layout and behaviour are unchanged.
+ */
+@Composable
 private fun healthColor(status: DiagnosticStatus): Color = when (status) {
-    DiagnosticStatus.OK -> Color(0xFF2E7D32)
-    DiagnosticStatus.WARNING -> Color(0xFFF9A825)
-    DiagnosticStatus.FAILED -> Color(0xFFC62828)
-    DiagnosticStatus.UNKNOWN -> Color(0xFF757575)
+    DiagnosticStatus.OK -> QalqonTheme.colors.success
+    DiagnosticStatus.WARNING -> QalqonTheme.colors.warning
+    DiagnosticStatus.FAILED -> MaterialTheme.colorScheme.error
+    DiagnosticStatus.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 
+@Composable
 private fun healthColor(level: SystemHealthLevel): Color = when (level) {
-    SystemHealthLevel.HEALTHY -> Color(0xFF2E7D32)
-    SystemHealthLevel.DEGRADED -> Color(0xFFF9A825)
-    SystemHealthLevel.CRITICAL -> Color(0xFFC62828)
-    SystemHealthLevel.UNKNOWN -> Color(0xFF757575)
+    SystemHealthLevel.HEALTHY -> QalqonTheme.colors.success
+    SystemHealthLevel.DEGRADED -> QalqonTheme.colors.warning
+    SystemHealthLevel.CRITICAL -> MaterialTheme.colorScheme.error
+    SystemHealthLevel.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 
 @Composable

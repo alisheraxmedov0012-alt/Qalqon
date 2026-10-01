@@ -71,7 +71,12 @@ class ProtectionForegroundServiceTest {
         runtime.awaitActive(false)
     }
 
-    private suspend fun awaitRunning(expected: Boolean, timeoutMs: Long = 30_000L) {
+    // The CI emulator is software-rendered (swiftshader) and regularly stalls the
+    // main looper for tens of seconds when the app renders (observed 30s+ and, in
+    // one suite, 126s). Both the runtime's observers and the service's `running`
+    // flag are published from the main thread, so the waits must be generous enough
+    // to outlast such a stall instead of asserting against it.
+    private suspend fun awaitRunning(expected: Boolean, timeoutMs: Long = 180_000L) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             if (running == expected) return
@@ -80,7 +85,7 @@ class ProtectionForegroundServiceTest {
         assertEquals("foreground service running state", expected, running)
     }
 
-    private suspend fun ProtectionRuntime.awaitActive(expected: Boolean, timeoutMs: Long = 30_000L) {
+    private suspend fun ProtectionRuntime.awaitActive(expected: Boolean, timeoutMs: Long = 180_000L) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             if (state.value.active == expected) return
@@ -92,9 +97,14 @@ class ProtectionForegroundServiceTest {
     /**
      * Launches the real app activity so the process is in the foreground before
      * any foreground-service start (Android 12+ restriction), then runs [block].
+     *
+     * Blocks until the main thread is idle after the launch: the activity's first
+     * composition/render is what stalls the main looper on the CI emulator, and the
+     * runtime/service state asserted by [block] is published from that same looper.
      */
     private fun withForegroundApp(block: suspend () -> Unit) = runBlocking {
         ActivityScenario.launch(MainActivity::class.java).use {
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
             block()
         }
     }
@@ -150,12 +160,22 @@ class ProtectionForegroundServiceTest {
     }
 
     @Test
-    fun enablingProtection_activatesTheRuntimeAndStartsTheService() = withForegroundApp {
+    fun enablingProtection_activatesTheRuntimeAndStartsTheService() = runBlocking {
         session.setCurrentAccountId(1L)
         settingsRepository.setProtectionEnabled(true)
 
+        // Observe activation *before* the app is brought to the foreground. The
+        // runtime's observers run on the main thread, and launching the real
+        // activity can stall that thread on the emulator's first render; asserting
+        // first keeps the activation contract independent of UI responsiveness.
         runtime.awaitActive(true)
-        awaitRunning(true)
+
+        // Foregrounding the app lets the runtime retry the foreground-service start
+        // that the platform refuses from the background (see ProtectionRuntime.onUiForeground).
+        ActivityScenario.launch(MainActivity::class.java).use {
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            awaitRunning(true)
+        }
 
         settingsRepository.setProtectionEnabled(false)
         runtime.awaitActive(false)
@@ -163,11 +183,15 @@ class ProtectionForegroundServiceTest {
     }
 
     @Test
-    fun signingOut_deactivatesProtectionAndStopsTheService() = withForegroundApp {
+    fun signingOut_deactivatesProtectionAndStopsTheService() = runBlocking {
         session.setCurrentAccountId(1L)
         settingsRepository.setProtectionEnabled(true)
         runtime.awaitActive(true)
-        awaitRunning(true)
+
+        ActivityScenario.launch(MainActivity::class.java).use {
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            awaitRunning(true)
+        }
 
         session.clearSession()
         runtime.awaitActive(false)

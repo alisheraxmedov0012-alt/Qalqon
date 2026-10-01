@@ -35,6 +35,8 @@ import uz.faceguard.app.core.theme.QalqonTheme
  * @param faceStatus already-localized face-enrollment state, or null to hide it
  * @param screenTime today's usage summary, or null to hide it
  * @param scheduleStatus active schedule summary, or null to hide it
+ * @param trailing optional secondary control (e.g. an overflow menu); null keeps the
+ *   card identical to its Phase 1 shape, so existing callers are unaffected
  */
 @Composable
 fun QalqonChildCard(
@@ -50,6 +52,7 @@ fun QalqonChildCard(
     onClick: (() -> Unit)? = null,
     onClickLabel: String? = null,
     contentDescription: String? = null,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     val colors = QalqonTheme.colors
 
@@ -130,6 +133,11 @@ fun QalqonChildCard(
                         .size(QalqonDimens.sizes.indicator)
                         .background(color = setupColor, shape = CircleShape),
                 )
+            }
+            // Optional secondary control, outside the clickable content so its own
+            // touch target does not open the card.
+            trailing?.let {
+                Box(modifier = Modifier.padding(start = QalqonDimens.spacing.sm)) { it() }
             }
         }
     }

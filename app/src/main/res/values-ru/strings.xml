@@ -669,4 +669,24 @@
     <string name="home_status_blocking_hint">Защита применяет ограничение прямо сейчас</string>
     <string name="home_status_recovering_hint">Защита восстанавливается</string>
     <string name="home_child_content_description">Ребёнок: %1$s, %2$s</string>
+
+    <!-- QALQON Children + Child Detail (UI/UX redesign, Phase 4). -->
+    <string name="children_overview">Ваши дети</string>
+    <string name="children_open_details">Открыть данные %1$s</string>
+    <string name="child_detail_back">Назад</string>
+    <string name="child_detail_controls_title">Управление</string>
+    <string name="child_detail_apps">Приложения</string>
+    <string name="child_detail_apps_desc">Выберите, какие приложения защищены</string>
+    <string name="child_detail_screen_time">Экранное время</string>
+    <string name="child_detail_screen_time_desc">Дневные лимиты и использование</string>
+    <string name="child_detail_schedule">Расписание</string>
+    <string name="child_detail_schedule_desc">Расписание защиты</string>
+    <string name="child_detail_eye_safety">Защита зрения</string>
+    <string name="child_detail_eye_safety_desc">Перерывы и лимиты защиты зрения</string>
+    <string name="child_detail_face">Лицо</string>
+    <string name="child_detail_face_desc">Профиль распознавания</string>
+    <string name="child_detail_requests">Запросы</string>
+    <string name="child_detail_requests_desc">Ожидающие запросы</string>
+    <string name="child_detail_missing">Ребёнок не найден</string>
+    <string name="child_detail_missing_hint">Возможно, этот ребёнок удалён</string>
 </resources>

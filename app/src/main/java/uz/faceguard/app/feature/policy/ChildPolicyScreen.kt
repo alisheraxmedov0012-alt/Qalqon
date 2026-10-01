@@ -502,6 +502,12 @@ fun ChildPolicyScreen(
     onOpenChildren: () -> Unit,
     onOpenSchedules: (Long) -> Unit = {},
     onOpenEyeSafety: (Long) -> Unit = {},
+    /**
+     * Phase 4: when opened from the Child Detail hub's "Screen time" row, show only
+     * the child's TOTAL/CATEGORY limits section. The default (`false`) keeps the full
+     * App rules screen, so existing entry points are unaffected.
+     */
+    focusScreenTime: Boolean = false,
     viewModel: ChildPolicyViewModel = hiltViewModel(),
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
@@ -515,7 +521,14 @@ fun ChildPolicyScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.child_policy_title)) },
+                title = {
+                    Text(
+                        stringResource(
+                            if (focusScreenTime) R.string.screentime_limits_title
+                            else R.string.child_policy_title,
+                        ),
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
@@ -546,19 +559,32 @@ fun ChildPolicyScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
-                    Text(
-                        stringResource(R.string.child_policy_subtitle),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    val subtitle = if (focusScreenTime) {
+                        ui.selectedChild?.childName?.let {
+                            stringResource(R.string.screentime_limits_subtitle, it)
+                        }
+                    } else {
+                        stringResource(R.string.child_policy_subtitle)
+                    }
+                    if (subtitle != null) {
+                        Text(
+                            subtitle,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
                 if (ui.children.isEmpty()) {
                     item { NoChildrenCard(onOpenChildren) }
                 } else {
-                    item { ChildSelector(ui, viewModel::selectChild) }
-                    ui.selectedChildId?.let { childId ->
-                        item { SchedulesEntryCard(onOpen = { onOpenSchedules(childId) }) }
-                        item { EyeSafetyEntryCard(onOpen = { onOpenEyeSafety(childId) }) }
+                    // The section selector is only offered on the full App rules screen;
+                    // the screen-time view is always scoped to the child it was opened for.
+                    if (!focusScreenTime) {
+                        item { ChildSelector(ui, viewModel::selectChild) }
+                        ui.selectedChildId?.let { childId ->
+                            item { SchedulesEntryCard(onOpen = { onOpenSchedules(childId) }) }
+                            item { EyeSafetyEntryCard(onOpen = { onOpenEyeSafety(childId) }) }
+                        }
                     }
                     item {
                         ScreenTimeLimitsCard(
@@ -570,37 +596,39 @@ fun ChildPolicyScreen(
                             onRemoveCategory = viewModel::removeCategoryLimit,
                         )
                     }
-                    item { AppsHeader(refreshing = ui.refreshing, onRefresh = viewModel::refreshApps) }
+                    if (!focusScreenTime) {
+                        item { AppsHeader(refreshing = ui.refreshing, onRefresh = viewModel::refreshApps) }
 
-                    val visible = if (query.isBlank()) {
-                        ui.apps
-                    } else {
-                        ui.apps.filter { it.appDisplayName.contains(query.trim(), ignoreCase = true) }
-                    }
-                    if (ui.apps.size > SEARCH_THRESHOLD) {
-                        item {
-                            OutlinedTextField(
-                                value = query,
-                                onValueChange = { query = it },
-                                label = { Text(stringResource(R.string.papps_search_hint)) },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
+                        val visible = if (query.isBlank()) {
+                            ui.apps
+                        } else {
+                            ui.apps.filter { it.appDisplayName.contains(query.trim(), ignoreCase = true) }
                         }
-                    }
-                    if (visible.isEmpty()) {
-                        item { EmptyAppsCard(refreshing = ui.refreshing) }
-                    } else {
-                        items(visible, key = { it.packageName }) { app ->
-                            AppPolicyRow(
-                                app = app,
-                                display = ui.displayFor(app.packageName),
-                                policy = ui.policyFor(app.packageName),
-                                screenTime = screenTimeApps.rowFor(app.packageName),
-                                screenTimeAvailable = screenTimeApps.usageAvailable,
-                                screenTimeLoading = screenTimeApps.loading,
-                                onOpen = { dialogApp = app },
-                            )
+                        if (ui.apps.size > SEARCH_THRESHOLD) {
+                            item {
+                                OutlinedTextField(
+                                    value = query,
+                                    onValueChange = { query = it },
+                                    label = { Text(stringResource(R.string.papps_search_hint)) },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        }
+                        if (visible.isEmpty()) {
+                            item { EmptyAppsCard(refreshing = ui.refreshing) }
+                        } else {
+                            items(visible, key = { it.packageName }) { app ->
+                                AppPolicyRow(
+                                    app = app,
+                                    display = ui.displayFor(app.packageName),
+                                    policy = ui.policyFor(app.packageName),
+                                    screenTime = screenTimeApps.rowFor(app.packageName),
+                                    screenTimeAvailable = screenTimeApps.usageAvailable,
+                                    screenTimeLoading = screenTimeApps.loading,
+                                    onOpen = { dialogApp = app },
+                                )
+                            }
                         }
                     }
                 }

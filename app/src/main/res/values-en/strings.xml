@@ -669,4 +669,24 @@
     <string name="home_status_blocking_hint">Protection is enforcing a restriction now</string>
     <string name="home_status_recovering_hint">Protection is recovering</string>
     <string name="home_child_content_description">Child: %1$s, %2$s</string>
+
+    <!-- QALQON Children + Child Detail (UI/UX redesign, Phase 4). -->
+    <string name="children_overview">Your children</string>
+    <string name="children_open_details">Open details for %1$s</string>
+    <string name="child_detail_back">Back</string>
+    <string name="child_detail_controls_title">Manage</string>
+    <string name="child_detail_apps">Apps</string>
+    <string name="child_detail_apps_desc">Choose which apps are protected</string>
+    <string name="child_detail_screen_time">Screen time</string>
+    <string name="child_detail_screen_time_desc">Daily limits and usage</string>
+    <string name="child_detail_schedule">Schedule</string>
+    <string name="child_detail_schedule_desc">Protection schedule</string>
+    <string name="child_detail_eye_safety">Eye safety</string>
+    <string name="child_detail_eye_safety_desc">Breaks and eye-safety limits</string>
+    <string name="child_detail_face">Face</string>
+    <string name="child_detail_face_desc">Recognition profile</string>
+    <string name="child_detail_requests">Requests</string>
+    <string name="child_detail_requests_desc">Pending requests</string>
+    <string name="child_detail_missing">Child not found</string>
+    <string name="child_detail_missing_hint">This child may have been deleted</string>
 </resources>

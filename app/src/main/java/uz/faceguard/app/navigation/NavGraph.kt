@@ -22,6 +22,7 @@ import uz.faceguard.app.feature.auth.RegisterScreen
 import uz.faceguard.app.feature.auth.SplashScreen
 import uz.faceguard.app.feature.auth.WelcomeScreen
 import uz.faceguard.app.feature.language.LanguageScreen
+import uz.faceguard.app.feature.child.ChildDetailScreen
 import uz.faceguard.app.feature.child.ChildProfilesScreen
 import uz.faceguard.app.feature.enrollment.FaceEnrollmentScreen
 import uz.faceguard.app.feature.enrollment.SUBJECT_CHILD
@@ -65,13 +66,26 @@ object Routes {
     const val ACTIVITY_LOG = "activity_log"
     const val REQUESTS = "requests"
     const val PARENT_FACE_ENROLLMENT = "parent_face_enrollment"
+    const val CHILD_DETAIL = "child_detail/{childId}"
     const val CHILD_FACE_ENROLLMENT = "child_face_enrollment/{childId}"
     const val CHILD_POLICY = "child_policy/{childId}"
     const val CHILD_SCHEDULES = "child_schedules/{childId}"
     const val CHILD_SCHEDULE_EDITOR = "child_schedule_editor/{childId}?scheduleId={scheduleId}"
     const val CHILD_EYE_SAFETY = "child_eye_safety/{childId}"
+
+    /**
+     * UI/UX redesign, Phase 4: optional section selector on the child policy screen,
+     * so the Child Detail hub can open App rules or Screen time directly on the same
+     * screen (and the same ViewModel) instead of duplicating either destination.
+     */
+    const val CHILD_POLICY_SECTION = "section"
+    const val CHILD_POLICY_SECTION_SCREEN_TIME = "screen_time"
+
+    fun childDetail(childId: Long) = "child_detail/$childId"
     fun childFaceEnrollment(childId: Long) = "child_face_enrollment/$childId"
     fun childPolicy(childId: Long) = "child_policy/$childId"
+    fun childScreenTime(childId: Long) =
+        "child_policy/$childId?$CHILD_POLICY_SECTION=$CHILD_POLICY_SECTION_SCREEN_TIME"
     fun childSchedules(childId: Long) = "child_schedules/$childId"
     fun childScheduleEditor(childId: Long, scheduleId: Long = -1L) =
         "child_schedule_editor/$childId?scheduleId=$scheduleId"
@@ -128,6 +142,9 @@ private val PROTECTED_ROUTE_PREFIXES = listOf(
     Routes.REQUESTS,
     Routes.RECOGNITION_DEBUG,
     Routes.PARENT_FACE_ENROLLMENT,
+    // Phase 4: the new Child Detail hub is a child-management route and must stay
+    // behind the PIN gate like every other child-scoped destination.
+    "child_detail",
     "child_face_enrollment",
     "child_policy",
     "child_schedules",
@@ -342,7 +359,9 @@ private fun QalqonNavHost(
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                 onOpenProtection = { navController.navigate(Routes.PROTECTION) },
                 onOpenRequests = { navController.navigate(Routes.requests()) },
-                onOpenChildPolicy = { childId -> navController.navigate(Routes.childPolicy(childId)) },
+                // Phase 4: Home's child card now opens the Child Detail hub, which is
+                // the single entry point for every child-scoped control.
+                onOpenChildPolicy = { childId -> navController.navigate(Routes.childDetail(childId)) },
                 onOpenPrivacy = { navController.navigate(Routes.PRIVACY) },
                 onOpenHelp = { navController.navigate(Routes.HELP) },
                 onOpenRecognition = { navController.navigate(Routes.RECOGNITION_DEBUG) },
@@ -375,23 +394,47 @@ private fun QalqonNavHost(
         composable(Routes.CHILD_PROFILES) {
             ChildProfilesScreen(
                 onBack = { navController.popBackStack() },
+                onOpenChild = { childId -> navController.navigate(Routes.childDetail(childId)) },
                 onEnrollChild = { childId ->
                     navController.navigate(Routes.childFaceEnrollment(childId))
                 },
-                onOpenPolicy = { childId ->
-                    navController.navigate(Routes.childPolicy(childId))
-                },
+            )
+        }
+        // Phase 4: the Child Detail hub. Every control keeps the child context by
+        // navigating to the existing child-scoped route with the same id.
+        composable(
+            route = Routes.CHILD_DETAIL,
+            arguments = listOf(navArgument("childId") { type = NavType.LongType }),
+        ) {
+            entry ->
+            val childId = entry.arguments?.getLong("childId") ?: -1L
+            ChildDetailScreen(
+                onBack = { navController.popBackStack() },
+                onOpenApps = { id -> navController.navigate(Routes.childPolicy(id)) },
+                onOpenScreenTime = { id -> navController.navigate(Routes.childScreenTime(id)) },
+                onOpenSchedule = { id -> navController.navigate(Routes.childSchedules(id)) },
+                onOpenEyeSafety = { id -> navController.navigate(Routes.childEyeSafety(id)) },
+                onOpenFace = { id -> navController.navigate(Routes.childFaceEnrollment(id)) },
+                onOpenRequests = { navController.navigate(Routes.requests()) },
             )
         }
         composable(
-            route = Routes.CHILD_POLICY,
-            arguments = listOf(navArgument("childId") { type = NavType.LongType }),
-        ) {
+            route = "${Routes.CHILD_POLICY}?${Routes.CHILD_POLICY_SECTION}={${Routes.CHILD_POLICY_SECTION}}",
+            arguments = listOf(
+                navArgument("childId") { type = NavType.LongType },
+                navArgument(Routes.CHILD_POLICY_SECTION) {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+            ),
+        ) { entry ->
             ChildPolicyScreen(
                 onBack = { navController.popBackStack() },
                 onOpenChildren = { navController.navigate(Routes.CHILD_PROFILES) },
                 onOpenSchedules = { childId -> navController.navigate(Routes.childSchedules(childId)) },
                 onOpenEyeSafety = { childId -> navController.navigate(Routes.childEyeSafety(childId)) },
+                focusScreenTime = entry.arguments?.getString(Routes.CHILD_POLICY_SECTION) ==
+                    Routes.CHILD_POLICY_SECTION_SCREEN_TIME,
             )
         }
         composable(

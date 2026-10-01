@@ -670,4 +670,24 @@
     <string name="home_status_blocking_hint">Himoya hozir amal qilmoqda</string>
     <string name="home_status_recovering_hint">Himoya tiklanmoqda</string>
     <string name="home_child_content_description">Farzand: %1$s, %2$s</string>
+
+    <!-- QALQON Children + Child Detail (UI/UX redesign, Phase 4). -->
+    <string name="children_overview">Farzandlaringiz</string>
+    <string name="children_open_details">%1$s ma\'lumotlarini ochish</string>
+    <string name="child_detail_back">Orqaga</string>
+    <string name="child_detail_controls_title">Boshqarish</string>
+    <string name="child_detail_apps">Ilovalar</string>
+    <string name="child_detail_apps_desc">Qaysi ilovalar himoyalanishini tanlang</string>
+    <string name="child_detail_screen_time">Ekran vaqti</string>
+    <string name="child_detail_screen_time_desc">Kunlik limitlar va foydalanish</string>
+    <string name="child_detail_schedule">Jadval</string>
+    <string name="child_detail_schedule_desc">Himoya jadvali</string>
+    <string name="child_detail_eye_safety">Ko\'z xavfsizligi</string>
+    <string name="child_detail_eye_safety_desc">Tanaffuslar va ko\'z xavfsizligi chegaralari</string>
+    <string name="child_detail_face">Yuz</string>
+    <string name="child_detail_face_desc">Tanib olish profili</string>
+    <string name="child_detail_requests">So\'rovlar</string>
+    <string name="child_detail_requests_desc">Kutilayotgan so\'rovlar</string>
+    <string name="child_detail_missing">Farzand topilmadi</string>
+    <string name="child_detail_missing_hint">Bu farzand o\'chirilgan bo\'lishi mumkin</string>
 </resources>

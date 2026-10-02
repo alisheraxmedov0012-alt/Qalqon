@@ -1,7 +1,6 @@
 package uz.faceguard.app.feature.help
 
 import androidx.annotation.StringRes
-import java.util.Locale
 import uz.faceguard.app.R
 
 /**
@@ -65,6 +64,10 @@ fun interface HelpTextProvider {
 /**
  * The local, deterministic implementation.
  *
+ * Routing is always QUESTION → INTENT → KNOWLEDGE MATCH → OPTIONAL CONTEXT → ANSWER (see
+ * [QalqonAssistantIntents]): the intent is classified first, so a generic word can never
+ * pull a question onto another topic's context answer.
+ *
  * How the three mandatory guarantees are met:
  *  - **domain bound:** an answer is only produced when the question actually matches
  *    the QALQON knowledge base (or a QALQON term); otherwise the localized refusal is
@@ -82,66 +85,109 @@ class LocalQalqonKnowledgeAssistant(
     private val documents: List<Document> by lazy { buildDocuments() }
 
     override suspend fun ask(question: String, context: QalqonAssistantContext?): AssistantReply {
-        val tokens = tokenize(question)
+        // QUESTION → INTENT → KNOWLEDGE MATCH → OPTIONAL CONTEXT → ANSWER.
+        val normalized = QalqonAssistantIntents.normalize(question)
+        val tokens = tokenize(normalized)
         if (tokens.isEmpty()) return AssistantReply.NotFound
 
-        val hasDomainTerm = knowledge.domainTerms.any { term -> question.lowercase(Locale.ROOT).contains(term) }
+        val hasDomainTerm = knowledge.domainTerms.any { it in normalized }
+
+        // 1. Classify the intent first. This is what keeps a generic word such as "ilova"
+        //    from collapsing every question onto the same context answer.
+        val match = QalqonAssistantIntents.classify(normalized, tokens)
+        if (match != null) {
+            // 2. Context is allowed only for the intent it belongs to, and only for an
+            //    explicit "state" question — never merely because a flag is set.
+            contextualReply(match.intent, normalized, context)?.let { return it }
+
+            // 3. Otherwise answer from the knowledge entry that intent maps to.
+            documents.firstOrNull { it.id == match.knowledgeId }?.let { target ->
+                return AssistantReply.Knowledge(target.titleRes, target.bodyRes, target.kind)
+            }
+            // The knowledge source is a test fixture without that entry: fall through to
+            // retrieval so a fixture-backed assistant still answers.
+        }
+
+        // 4. No classified intent: fall back to retrieval over the knowledge base.
         val best = documents.maxByOrNull { it.score(tokens) }
         val bestScore = best?.score(tokens) ?: 0
-
-        if (bestScore == 0) {
-            // No knowledge-base entry matched at all. If it did not even mention a
-            // QALQON concept, it is an unrelated question and must be refused.
+        if (bestScore == 0 || !hasDomainTerm) {
+            // Either nothing matched, or the only overlap was an incidental generic word
+            // ("kod" in "Python kod yoz"). Without a QALQON concept the question is
+            // unrelated and must be refused; with one, say honestly that the guide does
+            // not cover it.
             return if (hasDomainTerm) AssistantReply.NotFound else AssistantReply.OutOfDomain
         }
 
-        contextualReply(question, context, tokens)?.let { return it }
-
         return AssistantReply.Knowledge(
             titleRes = best!!.titleRes,
-            bodyRes = best.bodyRes,
+            bodyRes = best!!.bodyRes,
             kind = best.kind,
         )
     }
 
     /**
-     * A small, explicit set of context-aware answers, offered only for an in-domain
-     * question that is clearly about that topic. Falls back to the knowledge base when
-     * the context does not fit.
+     * A small, explicit set of context-aware answers. Each is offered only for its own
+     * intent *and* only when the question is explicitly about that state (see
+     * [QalqonAssistantIntents]). A flag on its own never produces an answer: for example,
+     * "Bu ilova nima haqida?" is an ABOUT question and is answered from the knowledge base
+     * even when `protectedAppsCount == 0`.
      */
     private fun contextualReply(
-        question: String,
+        intent: AssistantIntent,
+        normalized: String,
         context: QalqonAssistantContext?,
-        tokens: Set<String>,
     ): AssistantReply? {
         if (context == null) return null
-        val q = question.lowercase(Locale.ROOT)
-        fun mentions(vararg needles: String) = needles.any { it in q || it in tokens }
+        fun about(phrases: List<String>) = QalqonAssistantIntents.matchesAny(normalized, phrases)
 
-        return when {
-            mentions("himoya", "protection", "защит") &&
-                (!context.protectionEnabled && mentions("o'chir", "ochir", "off", "islamay", "ishlamay", "не работ", "выключ")) ->
-                AssistantReply.Contextual(
-                    bodyRes = R.string.help_assistant_ctx_protection_off,
-                    followUpRes = R.string.help_assistant_ctx_protection_off_followup,
-                )
+        return when (intent) {
+            AssistantIntent.PROTECTION_STATUS ->
+                if (!context.protectionEnabled &&
+                    about(QalqonAssistantIntents.PROTECTION_OFF_CONTEXT)
+                ) {
+                    AssistantReply.Contextual(
+                        bodyRes = R.string.help_assistant_ctx_protection_off,
+                        followUpRes = R.string.help_assistant_ctx_protection_off_followup,
+                    )
+                } else {
+                    null
+                }
 
-            mentions("ilova", "app", "приложен") && context.protectedAppsCount == 0 ->
-                AssistantReply.Contextual(
-                    bodyRes = R.string.help_assistant_ctx_no_apps,
-                    followUpRes = R.string.help_assistant_ctx_no_apps_followup,
-                )
+            AssistantIntent.PROTECTED_APPS ->
+                if (context.protectedAppsCount == 0 &&
+                    about(QalqonAssistantIntents.NO_APPS_CONTEXT)
+                ) {
+                    AssistantReply.Contextual(
+                        bodyRes = R.string.help_assistant_ctx_no_apps,
+                        followUpRes = R.string.help_assistant_ctx_no_apps_followup,
+                    )
+                } else {
+                    null
+                }
 
-            mentions("bola", "child", "ребен", "ребён") && !context.hasChildren ->
-                AssistantReply.Contextual(
-                    bodyRes = R.string.help_assistant_ctx_no_children,
-                    followUpRes = R.string.help_assistant_ctx_no_children_followup,
-                )
+            AssistantIntent.CHILDREN ->
+                if (!context.hasChildren &&
+                    about(QalqonAssistantIntents.NO_CHILDREN_CONTEXT)
+                ) {
+                    AssistantReply.Contextual(
+                        bodyRes = R.string.help_assistant_ctx_no_children,
+                        followUpRes = R.string.help_assistant_ctx_no_children_followup,
+                    )
+                } else {
+                    null
+                }
 
-            mentions("bildirishnoma", "notification", "уведомл") && !context.notificationsEnabled ->
-                AssistantReply.Contextual(
-                    bodyRes = R.string.help_assistant_ctx_notifications_off,
-                )
+            AssistantIntent.NOTIFICATIONS_REQUESTS ->
+                if (!context.notificationsEnabled &&
+                    about(QalqonAssistantIntents.NOTIFICATIONS_OFF_CONTEXT)
+                ) {
+                    AssistantReply.Contextual(
+                        bodyRes = R.string.help_assistant_ctx_notifications_off,
+                    )
+                } else {
+                    null
+                }
 
             else -> null
         }
@@ -155,7 +201,9 @@ class LocalQalqonKnowledgeAssistant(
                     id = article.id,
                     titleRes = article.titleRes,
                     bodyRes = article.bodyRes,
-                    haystack = (text.text(article.titleRes) + " " + text.text(article.bodyRes)).lowercase(Locale.ROOT),
+                    haystack = QalqonAssistantIntents.normalize(
+                        text.text(article.titleRes) + " " + text.text(article.bodyRes),
+                    ),
                 ),
             )
         }
@@ -166,7 +214,9 @@ class LocalQalqonKnowledgeAssistant(
                     id = faq.id,
                     titleRes = faq.questionRes,
                     bodyRes = faq.answerRes,
-                    haystack = (text.text(faq.questionRes) + " " + text.text(faq.answerRes)).lowercase(Locale.ROOT),
+                    haystack = QalqonAssistantIntents.normalize(
+                        text.text(faq.questionRes) + " " + text.text(faq.answerRes),
+                    ),
                 ),
             )
         }
@@ -177,7 +227,9 @@ class LocalQalqonKnowledgeAssistant(
                     id = item.id,
                     titleRes = item.questionRes,
                     bodyRes = item.bodyRes,
-                    haystack = (text.text(item.questionRes) + " " + text.text(item.bodyRes)).lowercase(Locale.ROOT),
+                    haystack = QalqonAssistantIntents.normalize(
+                        text.text(item.questionRes) + " " + text.text(item.bodyRes),
+                    ),
                 ),
             )
         }
@@ -190,7 +242,7 @@ class LocalQalqonKnowledgeAssistant(
         @StringRes val bodyRes: Int,
         val haystack: String,
     ) {
-        fun score(tokens: Set<String>): Int = tokens.count { it in haystack }
+        fun score(tokens: List<String>): Int = tokens.count { it in haystack }
     }
 
     private companion object {
@@ -202,10 +254,9 @@ class LocalQalqonKnowledgeAssistant(
             "как", "что", "почему", "и", "в", "на", "не", "мне", "это", "ли",
         )
 
-        fun tokenize(question: String): Set<String> =
-            question.lowercase(Locale.ROOT)
+        fun tokenize(normalized: String): List<String> =
+            normalized
                 .split(Regex("[^\\p{L}\\p{N}']+"))
                 .filter { it.length >= 3 && it !in STOPWORDS }
-                .toSet()
     }
 }

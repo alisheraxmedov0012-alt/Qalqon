@@ -705,6 +705,8 @@
     <string name="help_cat_notifications_requests">Bildirishnomalar va so‘rovlar</string>
     <string name="help_cat_privacy">Maxfiylik</string>
     <string name="help_cat_troubleshooting">Muammolarni hal qilish</string>
+    <string name="help_article_about_title">Qalqon nima?</string>
+    <string name="help_article_about_body">Qalqon — oflayn va maxfiylikka asoslangan ota-ona nazorati ilovasi. Ota-ona mahalliy hisob yaratadi, o‘zi va bolalarining yuzini ro‘yxatdan o‘tkazadi hamda himoyalanadigan ilovalarni tanlaydi. Qurilma kim ushlab turganini taniydi: ota-ona hech qanday cheklov ko‘rmaydi, bola bloklanadi, notanish foydalanuvchiga tanlangan qoida qo‘llanadi. Barcha yuz ishlovi qurilmaning o‘zida bajariladi va internet talab qilinmaydi.</string>
     <string name="help_article_first_launch_title">Birinchi ishga tushirish</string>
     <string name="help_article_first_launch_body">1. Tilni tanlang. 2. Ism, telefon raqami va PIN bilan hisob yarating. 3. Ota-ona profilini sozlang. 4. Bola qo‘shing. 5. Himoyalanadigan ilovalarni tanlang. 6. Sozlamalar &gt; Himoya bo‘limida himoyani yoqing.</string>
     <string name="help_article_language_title">Tilni o‘zgartirish</string>

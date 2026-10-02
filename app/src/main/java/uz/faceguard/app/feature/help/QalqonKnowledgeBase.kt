@@ -77,6 +77,12 @@ object QalqonKnowledgeBase : HelpContent {
 
     override val articles: List<HelpArticle> = listOf(
         HelpArticle(
+            "start_about",
+            R.string.help_cat_getting_started,
+            R.string.help_article_about_title,
+            R.string.help_article_about_body,
+        ),
+        HelpArticle(
             "start_first_launch",
             R.string.help_cat_getting_started,
             R.string.help_article_first_launch_title,

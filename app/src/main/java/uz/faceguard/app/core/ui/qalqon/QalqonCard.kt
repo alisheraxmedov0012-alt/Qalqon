@@ -153,9 +153,15 @@ fun QalqonStatusCard(
     leadingIcon: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
+    /**
+     * Surface the card draws on. Defaults to the plain surface, so every existing
+     * caller is unchanged; passing a tone-derived tint lets a screen make one status
+     * card visually dominant without leaving the semantic palette.
+     */
+    containerColor: Color = MaterialTheme.colorScheme.surface,
     content: @Composable ColumnScope.() -> Unit = {},
 ) {
-    QalqonCard(modifier = modifier, onClick = onClick) {
+    QalqonCard(modifier = modifier, containerColor = containerColor, onClick = onClick) {
         Row(verticalAlignment = Alignment.Top) {
             leadingIcon?.let {
                 Box(modifier = Modifier.padding(end = QalqonDimens.spacing.md)) { it() }

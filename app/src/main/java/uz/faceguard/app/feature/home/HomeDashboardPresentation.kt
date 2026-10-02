@@ -61,6 +61,17 @@ fun homeProtectionSupportingRes(status: HomeProtectionStatus): Int = when (statu
     HomeProtectionStatus.SETUP_REQUIRED -> R.string.home_status_setup_hint
 }
 
+/**
+ * The label of the protection card's single primary action. The states the parent
+ * must act on ("off", "setup required") offer the existing setup destination; a
+ * running session instead offers the existing management screen.
+ */
+@StringRes
+fun homeProtectionActionLabelRes(status: HomeProtectionStatus): Int = when (status) {
+    HomeProtectionStatus.OFF, HomeProtectionStatus.SETUP_REQUIRED -> R.string.dashboard_capability_open
+    else -> R.string.home_protection_manage
+}
+
 fun homeProtectionTone(status: HomeProtectionStatus): QalqonStatusTone = when (status) {
     HomeProtectionStatus.ACTIVE -> QalqonStatusTone.ACTIVE
     HomeProtectionStatus.OFF -> QalqonStatusTone.INACTIVE

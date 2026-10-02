@@ -51,6 +51,20 @@ object AssistantAnswerValidator {
         "auto-detect", "autodetects",
     )
 
+    /**
+     * Prompt-injection artefacts (Phase A3 hardening). These phrases are never part of a
+     * legitimate grounded QALQON answer, so their presence means the model echoed an
+     * instruction-override attempt instead of answering from the knowledge entry. Rejecting
+     * them keeps the deterministic fallback in charge.
+     */
+    private val INJECTION_ARTEFACTS = listOf(
+        "ignore previous instructions", "ignore the previous instructions",
+        "ignore all previous", "ignore the knowledge base", "ignore qalqon knowledge",
+        "ignore the above", "disregard previous", "disregard the above",
+        "as a general ai", "as an unrestricted", "unrestricted chatgpt",
+        "jailbreak", "system prompt", "you are now",
+    )
+
     /** Words that carry no evidential value for the overlap check. */
     private val STOPWORDS = setOf(
         "va", "the", "and", "for", "how", "what", "why", "qanday", "nega", "nima",
@@ -81,6 +95,9 @@ object AssistantAnswerValidator {
             return Outcome.Rejected(GenerationFailureReason.INVALID_OUTPUT)
         }
         if (INVENTED_OR_CONTRADICTORY.any { it in lower }) {
+            return Outcome.Rejected(GenerationFailureReason.INVALID_OUTPUT)
+        }
+        if (INJECTION_ARTEFACTS.any { it in lower }) {
             return Outcome.Rejected(GenerationFailureReason.INVALID_OUTPUT)
         }
 

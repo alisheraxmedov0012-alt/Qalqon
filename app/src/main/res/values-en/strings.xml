@@ -592,6 +592,7 @@
     <string name="lock_biometric_failed">Biometric check failed. Try the PIN instead.</string>
     <string name="lock_biometric_prompt_title">Unlock Qalqon</string>
     <string name="lock_biometric_prompt_subtitle">Unlock with your face or fingerprint</string>
+    <string name="lock_auth_subtitle">Confirm your identity to open Qalqon\'s controls</string>
 
     <!-- QALQON design-system component defaults (generic, reused by any screen) -->
     <string name="qal_action_retry">Retry</string>

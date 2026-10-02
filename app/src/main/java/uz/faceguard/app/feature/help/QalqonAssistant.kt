@@ -104,18 +104,22 @@ class LocalQalqonKnowledgeAssistant(
             documents.firstOrNull { it.id == match.knowledgeId }?.let { target ->
                 return AssistantReply.Knowledge(target.titleRes, target.bodyRes, target.kind)
             }
-            // The knowledge source is a test fixture without that entry: fall through to
-            // retrieval so a fixture-backed assistant still answers.
+            // The knowledge source does not contain the mapped entry — this only happens
+            // with a test fixture. Because the intent is already confident, answer with the
+            // best retrieval here without applying the stricter unclassified threshold.
+            documents.maxByOrNull { it.score(tokens) }
+                ?.takeIf { it.score(tokens) > 0 }
+                ?.let { return AssistantReply.Knowledge(it.titleRes, it.bodyRes, it.kind) }
         }
 
         // 4. No classified intent: fall back to retrieval over the knowledge base.
         val best = documents.maxByOrNull { it.score(tokens) }
         val bestScore = best?.score(tokens) ?: 0
-        if (bestScore == 0 || !hasDomainTerm) {
+        if (bestScore < QalqonAssistantIntents.FALLBACK_MIN_OVERLAP || !hasDomainTerm) {
             // Either nothing matched, or the only overlap was an incidental generic word
-            // ("kod" in "Python kod yoz"). Without a QALQON concept the question is
-            // unrelated and must be refused; with one, say honestly that the guide does
-            // not cover it.
+            // ("kod" in "Python kod yoz", "telefon" in an unrelated sentence). Without a
+            // QALQON concept the question is unrelated and must be refused; with one, say
+            // honestly that the guide does not cover it.
             return if (hasDomainTerm) AssistantReply.NotFound else AssistantReply.OutOfDomain
         }
 

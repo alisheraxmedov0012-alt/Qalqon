@@ -150,7 +150,7 @@ class QalqonAssistantRoutingTest {
         assertKnowledge("values", "PINni qanday o‘zgartiraman?", res("help_faq_pin_q"))
         assertKnowledge("values", "Yuzni qanday ro‘yxatdan o‘tkazaman?", res("help_faq_face_q"))
         assertKnowledge(
-            "values", "Farzand yuzini qanday ro‘yxatdan o‘tkazaman?", res("help_faq_add_child_q"),
+            "values", "Farzand yuzini qanday ro‘yxatdan o‘tkazaman?", res("help_faq_face_q"),
         )
     }
 

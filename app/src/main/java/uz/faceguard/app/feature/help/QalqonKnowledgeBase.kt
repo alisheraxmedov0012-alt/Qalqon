@@ -205,7 +205,7 @@ object QalqonKnowledgeBase : HelpContent {
         "qalqon", "himoya", "bola", "farzand", "yuz", "ekran", "vaqt", "jadval",
         "ko'z", "koz", "pin", "biometrik", "bildirishnoma", "so'rov", "sorov",
         "maxfiylik", "ilova", "sozlama", "ro'yxat", "royxat", "parol", "qulf",
-        "blok", "yordam", "dastur", "hisob", "tanaffus", "chegara", "limit",
+        "blok", "dastur", "hisob", "tanaffus", "chegara", "limit",
         // en
         "protection", "protect", "child", "children", "face", "screen", "time",
         "schedule", "eye", "biometric", "notification", "request", "privacy",

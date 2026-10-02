@@ -20,13 +20,13 @@ import uz.faceguard.app.core.theme.QalqonIconSize
 /**
  * QALQON application shell (UI/UX redesign, Phase 2).
  *
- * A thin Material 3 [Scaffold] with a [NavigationBar] holding the four primary
+ * A thin Material 3 [Scaffold] with a [NavigationBar] holding the five primary
  * destinations ([QalqonTopLevelDestination]). It deliberately owns *no* navigation
  * state: the caller supplies the currently selected destination and receives the
  * taps, so the single existing `NavHostController` in [FaceGuardNavHost] stays the
  * one source of truth and no second navigation framework is introduced.
  *
- * The shell is only shown for the four primary destinations. On every other route
+ * The shell is only shown for the primary destinations. On every other route
  * (onboarding, the PIN gate, a child detail screen, a settings sub-route, …) the
  * bottom bar is hidden and [content] receives the plain window insets, so those
  * screens keep the exact full-screen layout they had before.
@@ -57,7 +57,7 @@ fun QalqonAppShell(
 }
 
 /**
- * The QALQON bottom navigation: exactly the four primary destinations, no more.
+ * The QALQON bottom navigation: exactly the primary destinations, no more.
  *
  * Uses the real Material 3 [NavigationBar]/[NavigationBarItem] (not a custom bar),
  * themed with the Phase 1 QALQON tokens: the surface container color, flat tonal

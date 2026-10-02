@@ -596,10 +596,11 @@
     <string name="qal_action_confirm">Подтвердить</string>
     <string name="qal_badge_content_description">%1$d новых</string>
 
-    <!-- QALQON navigation shell: the four primary top-level destinations. -->
+    <!-- QALQON navigation shell: the five primary top-level destinations. -->
     <string name="nav_home">Главная</string>
     <string name="nav_children">Дети</string>
     <string name="nav_activity">Активность</string>
+    <string name="nav_help">Помощь</string>
     <string name="nav_settings">Настройки</string>
 
     <!-- QALQON Home dashboard (UI/UX redesign, Phase 3). -->
@@ -686,8 +687,9 @@
     <string name="settings_notifications_hint">Уведомления настраиваются в системных настройках</string>
 
     <!-- QALQON Help Center + Assistant (local, offline) -->
-    <string name="help_intro">Здесь вы найдёте полезную информацию об использовании Qalqon.</string>
+    <string name="help_intro">Получите помощь по использованию Qalqon, защите, детям, ограничениям времени и настройкам.</string>
     <string name="help_search_hint">Поиск по справке</string>
+    <string name="help_search_clear">Очистить поиск</string>
     <string name="help_search_no_results">Ничего не найдено. Попробуйте другое слово.</string>
     <string name="help_section_faq">Частые вопросы</string>
     <string name="help_section_troubleshooting">Устранение неполадок</string>
@@ -775,7 +777,7 @@
     <string name="help_ts_screen_time_q">Экранное время не показывается</string>
     <string name="help_ts_screen_time_a">Для экранного времени нужен выбранный ребёнок и разрешение на доступ к использованию. Если данные нельзя прочитать, Qalqon сообщает об этом вместо нуля.</string>
     <string name="help_assistant_title">Ассистент Qalqon</string>
-    <string name="help_assistant_subtitle">Задайте вопрос об использовании Qalqon</string>
+    <string name="help_assistant_subtitle">Напишите свой вопрос — помогу с возможностями Qalqon</string>
     <string name="help_assistant_greeting">Здравствуйте! Я ассистент Qalqon. Я могу помочь с функциями, настройками и проблемами Qalqon. Что вы хотите узнать?</string>
     <string name="help_assistant_input_hint">Напишите вопрос</string>
     <string name="help_assistant_send">Отправить</string>

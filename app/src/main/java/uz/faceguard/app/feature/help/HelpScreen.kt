@@ -12,8 +12,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -40,17 +40,20 @@ import uz.faceguard.app.core.ui.qalqon.QalqonCard
 import uz.faceguard.app.core.ui.qalqon.QalqonSectionHeader
 
 /**
- * Settings → Yordam: the QALQON Help Center.
+ * Settings → Yordam / the "Yordam" bottom-navigation tab: the QALQON Help Center.
  *
- * A localized, fully offline help surface: an intro, the Qalqon Assistant entry, a
- * local search over the knowledge base, the guide grouped by category, expandable
- * FAQs and a troubleshooting section. All content comes from [QalqonKnowledgeBase];
- * the screen owns presentation only.
+ * A localized, fully offline help surface: a header and short description, the Qalqon
+ * Assistant entry, a local search over the knowledge base, the guide grouped by
+ * category, expandable FAQs and a troubleshooting section. All content comes from
+ * [QalqonKnowledgeBase]; the screen owns presentation only.
+ *
+ * Help is a top-level destination, so the screen deliberately renders no back arrow —
+ * it matches the other tabs ([uz.faceguard.app.feature.home.HomeScreen],
+ * Activity, Settings). The Assistant remains a separate pushed screen with its own back.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HelpScreen(
-    onBack: () -> Unit,
     onOpenAssistant: () -> Unit,
     viewModel: HelpViewModel = hiltViewModel(),
 ) {
@@ -61,15 +64,6 @@ fun HelpScreen(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.help_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            // Reuses the app's existing localized "Back" action label.
-                            contentDescription = stringResource(R.string.request_back),
-                        )
-                    }
-                },
             )
         },
     ) { padding ->
@@ -100,6 +94,23 @@ fun HelpScreen(
                     },
                     label = { Text(stringResource(R.string.help_search_hint)) },
                     singleLine = true,
+                    trailingIcon = {
+                        // A clear action, exposed to accessibility and only shown when
+                        // there is something to clear.
+                        if (query.isNotEmpty()) {
+                            IconButton(
+                                onClick = {
+                                    query = ""
+                                    viewModel.onQueryChange("")
+                                },
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Close,
+                                    contentDescription = stringResource(R.string.help_search_clear),
+                                )
+                            }
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

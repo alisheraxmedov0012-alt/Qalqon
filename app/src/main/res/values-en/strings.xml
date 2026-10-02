@@ -596,10 +596,11 @@
     <string name="qal_action_confirm">Confirm</string>
     <string name="qal_badge_content_description">%1$d new</string>
 
-    <!-- QALQON navigation shell: the four primary top-level destinations. -->
+    <!-- QALQON navigation shell: the five primary top-level destinations. -->
     <string name="nav_home">Home</string>
     <string name="nav_children">Children</string>
     <string name="nav_activity">Activity</string>
+    <string name="nav_help">Help</string>
     <string name="nav_settings">Settings</string>
 
     <!-- QALQON Home dashboard (UI/UX redesign, Phase 3). -->
@@ -686,8 +687,9 @@
     <string name="settings_notifications_hint">Notifications are managed in system settings</string>
 
     <!-- QALQON Help Center + Assistant (local, offline) -->
-    <string name="help_intro">Find helpful information about using Qalqon here.</string>
+    <string name="help_intro">Get help with using Qalqon, protection, children, time limits and settings.</string>
     <string name="help_search_hint">Search help</string>
+    <string name="help_search_clear">Clear search</string>
     <string name="help_search_no_results">Nothing found. Try another word.</string>
     <string name="help_section_faq">Frequently asked questions</string>
     <string name="help_section_troubleshooting">Troubleshooting</string>
@@ -775,7 +777,7 @@
     <string name="help_ts_screen_time_q">Screen time is not showing</string>
     <string name="help_ts_screen_time_a">Screen time needs a child selected as the screen-time target and the Usage Access permission. If usage cannot be read, Qalqon says so rather than showing zero.</string>
     <string name="help_assistant_title">Qalqon Assistant</string>
-    <string name="help_assistant_subtitle">Ask about using Qalqon</string>
+    <string name="help_assistant_subtitle">Type your question — I can help with Qalqon features</string>
     <string name="help_assistant_greeting">Hello! I am the Qalqon assistant. I can help with Qalqon’s features, settings and troubleshooting. What would you like to know?</string>
     <string name="help_assistant_input_hint">Type your question</string>
     <string name="help_assistant_send">Send</string>

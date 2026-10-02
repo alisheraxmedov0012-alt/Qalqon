@@ -10,7 +10,7 @@ import uz.faceguard.app.navigation.QalqonTopLevelDestination
 /**
  * UI/UX redesign Phase 2: the navigation shell is fully localized.
  *
- * The four bottom-navigation labels must exist as string resources in every
+ * The five bottom-navigation labels must exist as string resources in every
  * supported language (Uzbek default, English, Russian) and must never be hardcoded
  * in Kotlin. This mirrors [LocalizationCompletenessTest], but pins the navigation
  * keys specifically so a shell edit cannot smuggle in an English literal.
@@ -19,7 +19,9 @@ class NavigationLocalizationTest {
 
     private val locales = listOf("values", "values-en", "values-ru")
 
-    private val navKeys = setOf("nav_home", "nav_children", "nav_activity", "nav_settings")
+    private val navKeys = setOf(
+        "nav_home", "nav_children", "nav_activity", "nav_help", "nav_settings",
+    )
 
     private fun keys(locale: String): Set<String> =
         Regex("""name="([^"]+)"""").findAll(stringsFile(locale).readText()).map { it.groupValues[1] }.toSet()
@@ -30,7 +32,7 @@ class NavigationLocalizationTest {
             .associate { it.groupValues[1] to it.groupValues[2] }
 
     @Test
-    fun everyLocaleDeclaresAllFourNavigationLabels() {
+    fun everyLocaleDeclaresAllFiveNavigationLabels() {
         locales.forEach { locale ->
             val declared = keys(locale)
             val missing = navKeys - declared
@@ -73,6 +75,10 @@ class NavigationLocalizationTest {
         assertEquals("Activity", values("values-en")["nav_activity"])
         assertEquals("Активность", values("values-ru")["nav_activity"])
 
+        assertEquals("Yordam", values("values")["nav_help"])
+        assertEquals("Help", values("values-en")["nav_help"])
+        assertEquals("Помощь", values("values-ru")["nav_help"])
+
         assertEquals("Sozlamalar", values("values")["nav_settings"])
         assertEquals("Settings", values("values-en")["nav_settings"])
         assertEquals("Настройки", values("values-ru")["nav_settings"])
@@ -98,7 +104,7 @@ class NavigationLocalizationTest {
         assertTrue(shell.contains("stringResource(destination.labelRes)"))
         assertTrue(shell.contains("stringResource(destination.contentDescriptionRes)"))
         // …and the literal English words must not appear as quoted Kotlin strings.
-        listOf("\"Home\"", "\"Children\"", "\"Activity\"", "\"Settings\"").forEach { literal ->
+        listOf("\"Home\"", "\"Children\"", "\"Activity\"", "\"Help\"", "\"Settings\"").forEach { literal ->
             assertFalse("hardcoded navigation label: $literal", shell.contains(literal))
         }
     }
@@ -107,6 +113,7 @@ class NavigationLocalizationTest {
         "HOME" -> "nav_home"
         "CHILDREN" -> "nav_children"
         "ACTIVITY" -> "nav_activity"
+        "HELP" -> "nav_help"
         "SETTINGS" -> "nav_settings"
         else -> error("unknown destination $destinationName")
     }

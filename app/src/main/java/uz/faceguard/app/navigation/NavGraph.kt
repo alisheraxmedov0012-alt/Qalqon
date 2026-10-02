@@ -544,9 +544,12 @@ private fun QalqonNavHost(
         composable(Routes.PRIVACY) {
             PrivacyScreen(onBack = { navController.popBackStack() })
         }
+        // Help is a first-class bottom-navigation destination (see
+        // QalqonTopLevelDestination.HELP), so it reuses this existing route and renders
+        // without a back arrow, exactly like the other tabs. The Qalqon Assistant stays
+        // its own pushed route behind the same PIN gate.
         composable(Routes.HELP) {
             HelpScreen(
-                onBack = { navController.popBackStack() },
                 onOpenAssistant = { navController.navigate(Routes.HELP_ASSISTANT) },
             )
         }

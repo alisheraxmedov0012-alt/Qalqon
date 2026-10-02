@@ -597,10 +597,11 @@
     <string name="qal_action_confirm">Tasdiqlash</string>
     <string name="qal_badge_content_description">%1$d ta yangi</string>
 
-    <!-- QALQON navigation shell: the four primary top-level destinations. -->
+    <!-- QALQON navigation shell: the five primary top-level destinations. -->
     <string name="nav_home">Bosh sahifa</string>
     <string name="nav_children">Bolalar</string>
     <string name="nav_activity">Faoliyat</string>
+    <string name="nav_help">Yordam</string>
     <string name="nav_settings">Sozlamalar</string>
 
     <!-- QALQON Home dashboard (UI/UX redesign, Phase 3). -->
@@ -687,8 +688,9 @@
     <string name="settings_notifications_hint">Bildirishnomalar tizim sozlamalarida boshqariladi</string>
 
     <!-- QALQON Help Center + Assistant (local, offline) -->
-    <string name="help_intro">Qalqondan foydalanish bo‘yicha kerakli ma’lumotlarni shu yerda toping.</string>
+    <string name="help_intro">Qalqondan foydalanish, himoya, bolalar, vaqt limitlari va sozlamalar bo‘yicha yordam oling.</string>
     <string name="help_search_hint">Yordamdan qidirish</string>
+    <string name="help_search_clear">Qidiruvni tozalash</string>
     <string name="help_search_no_results">Hech narsa topilmadi. Boshqa so‘z bilan urinib ko‘ring.</string>
     <string name="help_section_faq">Ko‘p beriladigan savollar</string>
     <string name="help_section_troubleshooting">Muammolarni hal qilish</string>
@@ -776,7 +778,7 @@
     <string name="help_ts_screen_time_q">Ekran vaqti ko‘rinmayapti</string>
     <string name="help_ts_screen_time_a">Ekran vaqti uchun nishon sifatida bola tanlangan bo‘lishi va foydalanish ma’lumotlariga kirish ruxsati berilishi kerak. Foydalanish o‘qilmasa, Qalqon nol ko‘rsatish o‘rniga buni aytadi.</string>
     <string name="help_assistant_title">Qalqon yordamchisi</string>
-    <string name="help_assistant_subtitle">Qalqondan foydalanish bo‘yicha savolingizni bering</string>
+    <string name="help_assistant_subtitle">Savolingizni yozing — Qalqon funksiyalari bo‘yicha yordam beraman</string>
     <string name="help_assistant_greeting">Salom! Men Qalqon yordamchisiman. Qalqonning funksiyalari, sozlamalari va muammolari bo‘yicha yordam bera olaman. Nimani bilmoqchisiz?</string>
     <string name="help_assistant_input_hint">Savolingizni yozing</string>
     <string name="help_assistant_send">Yuborish</string>

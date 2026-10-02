@@ -81,7 +81,9 @@
     <string name="papps_loading">Loading app list...</string>
     <string name="papps_refreshing">Refreshing...</string>
     <string name="papps_selected_count">Protected count: %1$d</string>
-    <string name="papps_marked">Selected</string>
+    <string name="papps_state_protected">Protected</string>
+    <string name="papps_state_unprotected">Not protected</string>
+    <string name="papps_row_description">%1$s, %2$s</string>
 
     <string name="enroll_title">Enroll face</string>
     <string name="enroll_parent_hint">Enroll a face for the parent profile</string>

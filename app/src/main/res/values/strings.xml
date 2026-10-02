@@ -82,7 +82,9 @@
     <string name="papps_loading">Ilovalar ro\'yxati yuklanmoqda...</string>
     <string name="papps_refreshing">Yangilanmoqda...</string>
     <string name="papps_selected_count">Himoyalanganlar soni: %1$d</string>
-    <string name="papps_marked">Tanlangan</string>
+    <string name="papps_state_protected">Himoyalangan</string>
+    <string name="papps_state_unprotected">Himoyalanmagan</string>
+    <string name="papps_row_description">%1$s, %2$s</string>
 
     <string name="enroll_title">Yuzni ro\'yxatga olish</string>
     <string name="enroll_parent_hint">Ota-ona profili uchun yuzni ro\'yxatga oling</string>

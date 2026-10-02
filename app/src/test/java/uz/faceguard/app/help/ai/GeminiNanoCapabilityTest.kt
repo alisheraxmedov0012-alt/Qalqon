@@ -180,8 +180,8 @@ class GeminiNanoCapabilityTest {
     // ------------------------------------------------------------------ security boundary
 
     @Test
-    fun theAiLayerCannotTouchProtectedDataOrGenerateContent() {
-        val forbidden = listOf(
+    fun theAiLayerCannotTouchProtectedData() {
+        val protectedData = listOf(
             // credentials / secrets
             "PinHasher", "verifyPin", "SecureCrypto", "Keystore", "AndroidBiometricPrompt", "BiometricPrompt",
             // face data
@@ -191,14 +191,32 @@ class GeminiNanoCapabilityTest {
             "phoneNumber", "childName", "accountId",
             // protection authority
             "ProtectionEngine", "ProtectionRuntime", "AppLockState", "startForegroundService",
-            // generation / cloud (Phase A1 is detection only)
-            "generateContent", "GenerateContentRequest", "TextPart", "generateContentStream",
-            "openai", "retrofit", "okhttp", "apiKey", "api_key", "generativelanguage",
         )
         aiSources().forEach { (name, source) ->
             val code = code(source)
-            forbidden.forEach { symbol ->
+            protectedData.forEach { symbol ->
                 assertFalse("$name must not reference $symbol", code.contains(symbol))
+            }
+        }
+    }
+
+    @Test
+    fun onlyTheSingleGatewayFileMayUseGenerationApis() {
+        // Phase A2: generation is allowed, but ONLY inside MlKitGeminiNanoGateway.kt. Every
+        // other ai file — and every cloud marker anywhere — stays forbidden.
+        val generationApis = listOf(
+            "generateContent", "GenerateContentRequest", "TextPart", "generateContentStream",
+        )
+        val cloudOrNetwork = listOf("openai", "retrofit", "okhttp", "apiKey", "api_key", "generativelanguage")
+        aiSources().forEach { (name, source) ->
+            val code = code(source)
+            cloudOrNetwork.forEach { symbol ->
+                assertFalse("$name must not reference $symbol", code.contains(symbol))
+            }
+            if (name != "MlKitGeminiNanoGateway.kt") {
+                generationApis.forEach { symbol ->
+                    assertFalse("$name must not reference $symbol", code.contains(symbol))
+                }
             }
         }
     }

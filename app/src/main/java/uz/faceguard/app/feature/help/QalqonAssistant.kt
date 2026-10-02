@@ -49,6 +49,14 @@ sealed interface AssistantReply {
         @StringRes val followUpRes: Int? = null,
     ) : AssistantReply
 
+    /**
+     * A grounded natural-language rendering of a knowledge entry, produced by the optional
+     * on-device model and passed through deterministic validation (Phase A2). Only ever
+     * emitted when the model is available *and* the output was validated; every other path
+     * returns one of the deterministic replies above.
+     */
+    data class Generated(val text: String) : AssistantReply
+
     /** The question is not about QALQON: the assistant refuses. */
     data object OutOfDomain : AssistantReply
 

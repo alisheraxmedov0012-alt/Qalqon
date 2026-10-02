@@ -8,30 +8,46 @@ import com.google.mlkit.genai.prompt.GenerativeModel
 /**
  * The single place in QALQON that touches the ML Kit GenAI Prompt API.
  *
- * Phase A1 scope: this gateway only *queries* Gemini Nano availability (and can optionally
- * warm up / release the client). It never calls `generateContent`, never builds a prompt and
- * never sends a user question or any QALQON data to the model. It receives no arguments, so
- * no protected data can flow into it by construction.
+ * It implements both A1 capability detection and the A2 text-generation seam, and is the only
+ * file that may import `com.google.mlkit.genai.*`. It receives no QALQON data other than the
+ * already-grounded prompt string, so no protected data can flow in.
  *
- * The client is created lazily, so importing the SDK costs nothing until a caller actually
- * asks for the status; on a device without AICore the first call is caught by
- * [GeminiNanoCapability] and reported as `SDK_ERROR`.
+ * The client is created once, lazily; if creation fails (a device without AICore) the failure
+ * is cached, so detection does not keep retrying and simply reports `SDK_ERROR`. `status()`
+ * and `generate()` never throw — a broken SDK becomes `SDK_ERROR` / empty text, and the caller
+ * falls back to the deterministic assistant.
  */
 class MlKitGeminiNanoGateway(
     private val clientFactory: () -> GenerativeModel = { Generation.getClient() },
-) : GeminiNanoGateway {
+) : GeminiNanoGateway, GeminiNanoGenerator {
 
-    private val client: GenerativeModel by lazy(LazyThreadSafetyMode.SYNCHRONIZED, clientFactory)
+    private val clientResult: Result<GenerativeModel> by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        runCatching { clientFactory() }
+    }
 
     override suspend fun status(): GeminiNanoStatus =
-        featureStatusToGeminiNanoStatus(client.checkStatus())
+        clientResult.getOrNull()?.let { featureStatusToGeminiNanoStatus(it.checkStatus()) }
+            ?: GeminiNanoStatus.SDK_ERROR
 
     override suspend fun warmup() {
-        client.warmup()
+        clientResult.getOrNull()?.warmup()
+    }
+
+    /**
+     * Sends the grounded [prompt] to the on-device model.
+     *
+     * Returns the first candidate's text, or an empty string when the client is unavailable or
+     * the model returned nothing; the caller's validator treats empty output as a fallback.
+     * Only the prompt string is sent — no arguments, no QALQON data.
+     */
+    override suspend fun generate(prompt: String): String {
+        val model = clientResult.getOrNull() ?: return ""
+        val response = model.generateContent(prompt)
+        return response.candidates.firstOrNull()?.text.orEmpty()
     }
 
     override fun close() {
-        runCatching { client.close() }
+        clientResult.getOrNull()?.let { runCatching { it.close() } }
     }
 
     companion object {

@@ -296,6 +296,13 @@ internal object QalqonAssistantIntents {
             }
             .maxByOrNull { it.score }
 
+    /**
+     * The intent label for a knowledge-base entry, reusing the existing rule table (no second
+     * routing system). Returns null when no rule maps to [entryId].
+     */
+    fun intentLabelForEntry(entryId: String): String? =
+        rules.firstOrNull { it.knowledgeId == entryId }?.intent?.name
+
     fun matchesAny(normalized: String, phrases: List<String>): Boolean = phrases.any { it in normalized }
 
     /** Lowercase, canonicalize the various Uzbek apostrophes, collapse whitespace. */

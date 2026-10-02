@@ -50,6 +50,10 @@ import uz.faceguard.app.core.protection.ProtectionRuntime
 import uz.faceguard.app.core.theme.QalqonDimens
 import uz.faceguard.app.core.ui.qalqon.QalqonCard
 import uz.faceguard.app.data.prefs.AppLanguageStore
+import uz.faceguard.app.feature.help.ai.GeminiNanoCapability
+import uz.faceguard.app.feature.help.ai.GroundedGeminiNanoGenerator
+import uz.faceguard.app.feature.help.ai.GroundedQalqonAssistant
+import uz.faceguard.app.feature.help.ai.MlKitGeminiNanoGateway
 
 /** One line in the assistant conversation. Session-only; never persisted. */
 data class AssistantMessage(val text: String, val fromUser: Boolean)
@@ -79,7 +83,19 @@ class AssistantViewModel @Inject constructor(
             .getString(res)
     }
 
-    private val assistant: QalqonAssistant = LocalQalqonKnowledgeAssistant(HelpTextProvider(strings))
+    // Phase A2: the single SDK gateway instance, shared by capability detection and the
+    // grounded generator. Its client is created lazily, so nothing is loaded until a question
+    // actually needs it (and never on an unsupported device).
+    private val gateway = MlKitGeminiNanoGateway()
+
+    private val assistant: QalqonAssistant = GroundedQalqonAssistant(
+        deterministic = LocalQalqonKnowledgeAssistant(HelpTextProvider(strings)),
+        generator = GroundedGeminiNanoGenerator(
+            capability = GeminiNanoCapability(gateway),
+            generator = gateway,
+        ),
+        text = HelpTextProvider(strings),
+    )
 
     private val _messages = MutableStateFlow(
         listOf(AssistantMessage(strings(R.string.help_assistant_greeting), fromUser = false)),
@@ -109,6 +125,8 @@ class AssistantViewModel @Inject constructor(
                 null -> strings(R.string.help_assistant_unavailable)
                 AssistantReply.OutOfDomain -> strings(R.string.help_assistant_ood)
                 AssistantReply.NotFound -> strings(R.string.help_assistant_not_found)
+                // Phase A2: a validated, grounded generation; already in the user's language.
+                is AssistantReply.Generated -> reply.text
                 is AssistantReply.Contextual -> buildString {
                     append(strings(reply.bodyRes))
                     reply.followUpRes?.let { append("\n\n").append(strings(it)) }

@@ -308,6 +308,12 @@ class AssistantRealWorldQaTest {
                 resultType = "NotFound"
                 returnedId = null
             }
+            // The deterministic assistant under test never emits Generated (only the grounded
+            // wrapper can); recorded honestly so the matrix stays exhaustive.
+            is AssistantReply.Generated -> {
+                resultType = "Generated"
+                returnedId = null
+            }
         }
         val actualIntent = when {
             returnedId != null -> INTENT_OF_ENTRY[returnedId] ?: "-"

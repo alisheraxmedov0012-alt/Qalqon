@@ -226,10 +226,19 @@ fun lockRedirectFor(route: String?, isUnlocked: Boolean): String? =
  * destination.
  */
 private fun NavHostController.navigateToTopLevel(destination: QalqonTopLevelDestination) {
-    navigate(destination.route) {
-        popUpTo(Routes.HOME) { saveState = true }
-        launchSingleTop = true
-        restoreState = true
+    // Post-UI correction: decide explicitly instead of relying on launchSingleTop, which
+    // collapsed a re-tap of the active tab (or a restored tab that resolved to the current
+    // destination) to a silent no-op and made the screen appear not to switch.
+    when (val decision = BottomNavigationPolicy.resolve(currentDestination?.route, destination)) {
+        is BottomNavigationPolicy.Decision.ResetToRoot ->
+            popBackStack(decision.route, inclusive = false)
+
+        is BottomNavigationPolicy.Decision.Switch ->
+            navigate(decision.route) {
+                popUpTo(Routes.HOME) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
     }
 }
 

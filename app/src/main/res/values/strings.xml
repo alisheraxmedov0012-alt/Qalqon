@@ -674,6 +674,15 @@
     <string name="settings_category_developer">Ishlab chiquvchi</string>
     <string name="settings_category_developer_desc">Diagnostika (faqat debug)</string>
 
+    <!-- Settings hub grouping (post-UI correction) -->
+    <string name="settings_group_rules">Qoidalar va himoya</string>
+    <string name="settings_group_family">Bolalar</string>
+    <string name="settings_group_notifications">Bildirishnomalar</string>
+    <string name="settings_group_privacy_security">Maxfiylik va xavfsizlik</string>
+    <string name="settings_group_appearance">Ko‘rinish va til</string>
+    <string name="settings_group_support">Yordam</string>
+    <string name="settings_group_developer">Dasturchi</string>
+
     <string name="settings_row_parent_profile">Ota-ona profili</string>
     <string name="settings_row_parent_profile_desc">Ism va yuz ma\'lumotlarini boshqarish</string>
     <string name="settings_row_children">Farzandlar</string>

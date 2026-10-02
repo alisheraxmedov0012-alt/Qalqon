@@ -673,6 +673,15 @@
     <string name="settings_category_developer">Developer</string>
     <string name="settings_category_developer_desc">Diagnostics (debug only)</string>
 
+    <!-- Settings hub grouping (post-UI correction) -->
+    <string name="settings_group_rules">Rules &amp; protection</string>
+    <string name="settings_group_family">Children</string>
+    <string name="settings_group_notifications">Notifications</string>
+    <string name="settings_group_privacy_security">Privacy &amp; security</string>
+    <string name="settings_group_appearance">Appearance &amp; language</string>
+    <string name="settings_group_support">Help</string>
+    <string name="settings_group_developer">Developer</string>
+
     <string name="settings_row_parent_profile">Parent profile</string>
     <string name="settings_row_parent_profile_desc">Manage name and face data</string>
     <string name="settings_row_children">Children</string>

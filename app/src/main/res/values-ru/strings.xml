@@ -673,6 +673,15 @@
     <string name="settings_category_developer">Разработчик</string>
     <string name="settings_category_developer_desc">Диагностика (только debug)</string>
 
+    <!-- Settings hub grouping (post-UI correction) -->
+    <string name="settings_group_rules">Правила и защита</string>
+    <string name="settings_group_family">Дети</string>
+    <string name="settings_group_notifications">Уведомления</string>
+    <string name="settings_group_privacy_security">Конфиденциальность и безопасность</string>
+    <string name="settings_group_appearance">Внешний вид и язык</string>
+    <string name="settings_group_support">Помощь</string>
+    <string name="settings_group_developer">Разработчик</string>
+
     <string name="settings_row_parent_profile">Профиль родителя</string>
     <string name="settings_row_parent_profile_desc">Управление именем и данными лица</string>
     <string name="settings_row_children">Дети</string>

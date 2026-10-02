@@ -4,11 +4,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -625,11 +628,18 @@ private fun TodaySection(state: DashboardUiState, screenTime: ScreenTimeSummaryU
         QalqonSectionHeader(title = stringResource(R.string.home_today_title))
         metrics.chunked(2).forEach { rowMetrics ->
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    // Equal-height tiles: the row takes the intrinsic height of its
+                    // tallest tile and every tile fills it, so paired cards line up.
+                    .height(IntrinsicSize.Min),
                 horizontalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.md),
             ) {
                 rowMetrics.forEach { metric ->
-                    HomeMetricTile(metric = metric, modifier = Modifier.weight(1f))
+                    HomeMetricTile(
+                        metric = metric,
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    )
                 }
                 if (rowMetrics.size == 1) Spacer(Modifier.weight(1f))
             }
@@ -686,7 +696,9 @@ private fun HomeMetricTile(metric: HomeTodayMetric, modifier: Modifier = Modifie
                 text = caption,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+                // The caption carries real explanatory text (e.g. why a metric has no
+                // value); it must wrap rather than truncate to an ellipsis.
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }

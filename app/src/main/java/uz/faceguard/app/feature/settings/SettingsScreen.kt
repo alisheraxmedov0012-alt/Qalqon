@@ -243,16 +243,22 @@ fun SettingsScreen(
         ) {
             if (parentName != null) {
                 item { SettingsIdentityBlock(parentName!!) }
-                item { QalqonSectionHeader(title = stringResource(R.string.settings_title)) }
             }
-            items(
-                items = settingsCategories(DebugFlags.DEBUG_SCREENS_ENABLED),
-                key = { it.name },
-            ) { category ->
-                SettingsCategoryRow(
-                    category = category,
-                    onClick = { onOpenCategory(category) },
-                )
+            // Post-UI correction: the hub is grouped into titled sections so it reads as a
+            // short, scannable set of categories instead of one flat list.
+            settingsGroups(DebugFlags.DEBUG_SCREENS_ENABLED).forEach { (group, categories) ->
+                item(key = "group_${group.name}") {
+                    QalqonSectionHeader(title = stringResource(group.labelRes))
+                }
+                items(
+                    items = categories,
+                    key = { it.name },
+                ) { category ->
+                    SettingsCategoryRow(
+                        category = category,
+                        onClick = { onOpenCategory(category) },
+                    )
+                }
             }
         }
     }

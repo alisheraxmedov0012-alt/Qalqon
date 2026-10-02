@@ -28,6 +28,7 @@ import uz.faceguard.app.feature.enrollment.FaceEnrollmentScreen
 import uz.faceguard.app.feature.enrollment.SUBJECT_CHILD
 import uz.faceguard.app.feature.enrollment.SUBJECT_PARENT
 import uz.faceguard.app.feature.activity.ActivityLogScreen
+import uz.faceguard.app.feature.help.HelpAssistantScreen
 import uz.faceguard.app.feature.help.HelpScreen
 import uz.faceguard.app.feature.home.HomeScreen
 import uz.faceguard.app.feature.privacy.PrivacyScreen
@@ -86,6 +87,9 @@ object Routes {
     const val PROTECTION = "protection"
     const val PRIVACY = "privacy"
     const val HELP = "help"
+
+    /** Settings → Yordam → the Qalqon Assistant (local, offline). */
+    const val HELP_ASSISTANT = "help_assistant"
     const val ACTIVITY_LOG = "activity_log"
     const val REQUESTS = "requests"
     const val PARENT_FACE_ENROLLMENT = "parent_face_enrollment"
@@ -171,6 +175,8 @@ private val PROTECTED_ROUTE_PREFIXES = listOf(
     Routes.PROTECTION,
     Routes.PRIVACY,
     Routes.HELP,
+    // The Qalqon Assistant is part of the parent Help area and stays behind the PIN gate.
+    Routes.HELP_ASSISTANT,
     Routes.ACTIVITY_LOG,
     Routes.REQUESTS,
     Routes.RECOGNITION_DEBUG,
@@ -539,7 +545,13 @@ private fun QalqonNavHost(
             PrivacyScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.HELP) {
-            HelpScreen(onBack = { navController.popBackStack() })
+            HelpScreen(
+                onBack = { navController.popBackStack() },
+                onOpenAssistant = { navController.navigate(Routes.HELP_ASSISTANT) },
+            )
+        }
+        composable(Routes.HELP_ASSISTANT) {
+            HelpAssistantScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.ACTIVITY_LOG) {
             // Phase 5: Activity is a top-level bottom-navigation destination, so it has

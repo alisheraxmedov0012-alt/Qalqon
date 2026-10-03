@@ -42,12 +42,29 @@ class HomeCompositionTest {
     }
 
     @Test
-    fun theHeroIsATintedCardWithADominantTitle() {
+    fun theHeroIsASignaturePremiumSurface() {
         val hero = home.substringAfter("private fun ProtectionStatusSection(").substringBefore("/** Compact attention")
-        assertTrue("the hero must be a card", hero.contains("QalqonCard("))
-        assertTrue("the hero must carry a tinted container", hero.contains("containerColor ="))
+        assertTrue("the hero must be a soft-blue premium surface", hero.contains("Surface("))
+        assertTrue("the hero must use the QALQON blue surface", hero.contains("primaryContainer"))
+        assertTrue("the hero must carry the QALQON wordmark", hero.contains("R.string.app_name"))
         assertTrue("the hero title must be dominant", hero.contains("typography.headlineSmall"))
         assertTrue("the hero must keep a full-width CTA", hero.contains("Modifier.fillMaxWidth()"))
+    }
+
+    @Test
+    fun theDashboardSectionsCarryAnIconMarker() {
+        // The Today / Children / Quick actions headers use the shared section-icon marker,
+        // giving the page a single designed identity.
+        assertTrue(home.contains("HomeSectionIcon(Icons.Filled.DateRange"))
+        assertTrue(home.contains("HomeSectionIcon(Icons.Filled.Person"))
+        assertTrue(home.contains("HomeSectionIcon(Icons.AutoMirrored.Filled.List"))
+    }
+
+    @Test
+    fun theTodayTilesAreBorderlessTonalSurfaces() {
+        val tile = home.substringAfter("private fun HomeMetricTile(").substringBefore("/**")
+        assertTrue("the tile must drop the repeated border", tile.contains("bordered = false"))
+        assertTrue("the tile must use a distinct tonal surface", tile.contains("surfaceVariant"))
     }
 
     @Test

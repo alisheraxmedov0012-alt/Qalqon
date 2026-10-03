@@ -40,6 +40,21 @@ private val LightColors = lightColorScheme(
     onError = Color.White,
     errorContainer = Color(0xFFF9DEDC),
     onErrorContainer = Color(0xFF410E0B),
+    // M3 surface-container hierarchy (premium tonal layering). `surfaceContainerLowest`
+    // is the brightest card surface; the rest step down towards the screen background so
+    // screens can layer cards, sheets and the anchored bottom bar without raw colors.
+    surfaceDim = Color(0xFFDDE2E9),
+    surfaceBright = Color(0xFFFFFFFF),
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFF7F9FC),
+    surfaceContainer = Color(0xFFF1F4F9),
+    surfaceContainerHigh = Color(0xFFEBEFF5),
+    surfaceContainerHighest = Color(0xFFE5EAF1),
+    surfaceTint = Color(0xFF1E5B9E),
+    scrim = Color(0xFF000000),
+    inverseSurface = Color(0xFF2E3238),
+    inverseOnSurface = Color(0xFFF1F3F6),
+    inversePrimary = Color(0xFF9EC5F5),
 )
 
 private val DarkColors = darkColorScheme(
@@ -63,6 +78,19 @@ private val DarkColors = darkColorScheme(
     onError = Color(0xFF601410),
     errorContainer = Color(0xFF8C1D18),
     onErrorContainer = Color(0xFFF9DEDC),
+    // Dark equivalents, so the same components layer correctly in dark theme.
+    surfaceDim = Color(0xFF121417),
+    surfaceBright = Color(0xFF383C42),
+    surfaceContainerLowest = Color(0xFF0D0F12),
+    surfaceContainerLow = Color(0xFF1B1E22),
+    surfaceContainer = Color(0xFF1F2328),
+    surfaceContainerHigh = Color(0xFF2A2F35),
+    surfaceContainerHighest = Color(0xFF33383F),
+    surfaceTint = Color(0xFF9EC5F5),
+    scrim = Color(0xFF000000),
+    inverseSurface = Color(0xFFE2E2E5),
+    inverseOnSurface = Color(0xFF2E3238),
+    inversePrimary = Color(0xFF1E5B9E),
 )
 
 /** Shape scale wired into Material so all components share the radius hierarchy. */

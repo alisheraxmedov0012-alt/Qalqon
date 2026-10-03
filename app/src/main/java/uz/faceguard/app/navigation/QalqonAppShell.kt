@@ -1,8 +1,10 @@
 package uz.faceguard.app.navigation
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -14,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
+import uz.faceguard.app.core.theme.QalqonDimens
 import uz.faceguard.app.core.theme.QalqonElevation
 import uz.faceguard.app.core.theme.QalqonIconSize
 
@@ -49,7 +52,16 @@ fun QalqonAppShell(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             if (showBottomBar) {
-                QalqonNavigationBar(selected = selected, onSelect = onSelect)
+                // A premium anchored bar: a hairline separates it from scrolling content and
+                // the bar itself sits on the tonal `surfaceContainer` role, so the bottom
+                // navigation reads as a deliberate surface rather than a floating strip.
+                Column {
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        thickness = QalqonDimens.cardBorder,
+                    )
+                    QalqonNavigationBar(selected = selected, onSelect = onSelect)
+                }
             }
         },
         content = content,
@@ -75,7 +87,9 @@ fun QalqonNavigationBar(
 ) {
     NavigationBar(
         modifier = modifier.fillMaxWidth(),
-        containerColor = MaterialTheme.colorScheme.surface,
+        // Tonal container role (not plain `surface`) so the anchored bar layers above the
+        // screen background in both light and dark themes.
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         tonalElevation = QalqonElevation.flat,
     ) {
         QalqonTopLevelDestination.entries.forEach { destination ->

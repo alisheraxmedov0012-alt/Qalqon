@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,6 +40,7 @@ import uz.faceguard.app.core.security.AppLockState
 import uz.faceguard.app.core.theme.QalqonDimens
 import uz.faceguard.app.core.ui.UiState
 import uz.faceguard.app.core.ui.qalqon.QalqonCard
+import uz.faceguard.app.core.ui.qalqon.QalqonDivider
 import uz.faceguard.app.core.ui.qalqon.QalqonSectionHeader
 import uz.faceguard.app.core.ui.qalqon.QalqonSettingRow
 import uz.faceguard.app.core.ui.qalqon.toneColor
@@ -244,20 +244,28 @@ fun SettingsScreen(
             if (parentName != null) {
                 item { SettingsIdentityBlock(parentName!!) }
             }
-            // Post-UI correction: the hub is grouped into titled sections so it reads as a
-            // short, scannable set of categories instead of one flat list.
+            // Post-UI correction + deep redesign: each logical group renders as ONE card of
+            // divided rows (the standard Android settings pattern), so the hub reads as a
+            // short, scannable settings centre instead of one card per row.
             settingsGroups(DebugFlags.DEBUG_SCREENS_ENABLED).forEach { (group, categories) ->
                 item(key = "group_${group.name}") {
                     QalqonSectionHeader(title = stringResource(group.labelRes))
                 }
-                items(
-                    items = categories,
-                    key = { it.name },
-                ) { category ->
-                    SettingsCategoryRow(
-                        category = category,
-                        onClick = { onOpenCategory(category) },
-                    )
+                item(key = "group_card_${group.name}") {
+                    QalqonCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = QalqonDimens.spacing.none,
+                    ) {
+                        categories.forEachIndexed { index, category ->
+                            SettingsCategoryRowItem(
+                                category = category,
+                                onClick = { onOpenCategory(category) },
+                            )
+                            if (index != categories.lastIndex) {
+                                QalqonDivider(modifier = Modifier.padding(start = QalqonDimens.spacing.xl))
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -278,26 +286,27 @@ private fun SettingsIdentityBlock(parentName: String) {
 }
 
 @Composable
-private fun SettingsCategoryRow(category: SettingsCategory, onClick: () -> Unit) {
-    QalqonCard(modifier = Modifier.fillMaxWidth(), contentPadding = QalqonDimens.spacing.xs) {
-        QalqonSettingRow(
-            title = stringResource(category.labelRes),
-            description = stringResource(category.descriptionRes),
-            leading = {
-                Icon(
-                    imageVector = category.icon,
-                    contentDescription = null,
-                    tint = toneColor(QalqonStatusTone.INACTIVE),
-                )
-            },
-            trailing = {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            },
-            onClick = onClick,
-        )
-    }
+private fun SettingsCategoryRowItem(category: SettingsCategory, onClick: () -> Unit) {
+    // A plain row: the grouped card provides the surface and the dividers, so this is not
+    // its own card. The whole row is the touch target.
+    QalqonSettingRow(
+        title = stringResource(category.labelRes),
+        description = stringResource(category.descriptionRes),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = QalqonDimens.cardPadding),
+        leading = {
+            Icon(
+                imageVector = category.icon,
+                contentDescription = null,
+                tint = toneColor(QalqonStatusTone.INACTIVE),
+            )
+        },
+        trailing = {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        onClick = onClick,
+    )
 }

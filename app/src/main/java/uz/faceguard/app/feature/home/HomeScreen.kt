@@ -489,6 +489,18 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
+        // Real, non-fabricated context: the actual protected-app count, shown only while
+        // protection is actually running. No invented figures.
+        if (
+            (status == HomeProtectionStatus.ACTIVE || status == HomeProtectionStatus.BLOCKING) &&
+            state.protectedAppsCount > 0
+        ) {
+            Text(
+                text = stringResource(R.string.home_protection_apps_count, state.protectedAppsCount),
+                style = MaterialTheme.typography.labelLarge,
+                color = toneColor(tone),
+            )
+        }
         Button(onClick = onOpenProtection, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(actionLabel))
         }
@@ -679,14 +691,14 @@ private fun HomeMetricTile(metric: HomeTodayMetric, modifier: Modifier = Modifie
         }
         Text(
             text = valueText,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleLarge,
             color = metric.tone?.let { toneColor(it) } ?: MaterialTheme.colorScheme.onSurface,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         Text(
             text = stringResource(metric.labelRes),
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,

@@ -621,6 +621,7 @@
     <string name="home_child_content_description">Farzand: %1$s, %2$s</string>
     <string name="home_all_children">Barchasi</string>
     <string name="home_protection_manage">Himoyani boshqarish</string>
+    <string name="home_protection_apps_count">%1$d ta ilova himoyalangan</string>
     <string name="home_child_screen_time">Bugun: %1$s</string>
 
     <!-- QALQON Children + Child Detail (UI/UX redesign, Phase 4). -->

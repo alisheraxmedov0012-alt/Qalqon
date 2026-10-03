@@ -16,8 +16,11 @@ import androidx.compose.ui.unit.dp
  * Nothing here changes behaviour; screens opt in over time.
  */
 
-/** Spacing rhythm: 4 / 8 / 12 / 16 / 24 / 32. */
+/** Spacing rhythm: 0 / 4 / 8 / 12 / 16 / 24 / 32. */
 object QalqonSpacing {
+    /** 0 dp — no padding (e.g. a grouped card whose rows carry their own inset). */
+    val none: Dp = 0.dp
+
     /** 4 dp — hairline separation (icon ↔ label). */
     val xs: Dp = 4.dp
 

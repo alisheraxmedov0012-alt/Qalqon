@@ -620,6 +620,7 @@
     <string name="home_child_content_description">Ребёнок: %1$s, %2$s</string>
     <string name="home_all_children">Все</string>
     <string name="home_protection_manage">Управление защитой</string>
+    <string name="home_protection_apps_count">%1$d защищённых приложений</string>
     <string name="home_child_screen_time">Сегодня: %1$s</string>
 
     <!-- QALQON Children + Child Detail (UI/UX redesign, Phase 4). -->

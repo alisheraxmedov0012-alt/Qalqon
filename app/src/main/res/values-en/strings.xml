@@ -620,6 +620,7 @@
     <string name="home_child_content_description">Child: %1$s, %2$s</string>
     <string name="home_all_children">All</string>
     <string name="home_protection_manage">Manage protection</string>
+    <string name="home_protection_apps_count">%1$d protected apps</string>
     <string name="home_child_screen_time">Today: %1$s</string>
 
     <!-- QALQON Children + Child Detail (UI/UX redesign, Phase 4). -->

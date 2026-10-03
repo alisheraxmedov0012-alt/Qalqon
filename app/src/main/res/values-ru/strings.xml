@@ -617,7 +617,7 @@
     <string name="home_action_manage_children">Управление детьми</string>
     <string name="home_action_manage_children_desc">Просмотр и управление профилями детей</string>
     <string name="home_action_protection_desc">Статус защиты и разрешения</string>
-    <string name="home_action_protected_apps_desc">Выбор защищаемых приложений</string>
+    <string name="home_action_protected_apps_desc">Настройки защищаемых приложений</string>
     <string name="home_action_requests_desc">Просмотр запросов от ребёнка</string>
     <string name="home_status_off_hint">Устройство вашего ребёнка сейчас не защищено</string>
     <string name="home_status_active_hint">Защита активна и работает</string>

@@ -617,7 +617,7 @@
     <string name="home_action_manage_children">Manage children</string>
     <string name="home_action_manage_children_desc">View and manage child profiles</string>
     <string name="home_action_protection_desc">Protection status and permissions</string>
-    <string name="home_action_protected_apps_desc">Choose which apps to protect</string>
+    <string name="home_action_protected_apps_desc">Protected apps settings</string>
     <string name="home_action_requests_desc">Review requests from your child</string>
     <string name="home_status_off_hint">Your child\'s device is currently unprotected</string>
     <string name="home_status_active_hint">Protection is active and running</string>

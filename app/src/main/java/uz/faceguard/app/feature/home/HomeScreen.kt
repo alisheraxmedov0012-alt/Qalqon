@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Info
@@ -51,6 +50,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -838,10 +838,100 @@ private fun TodaySection(
 
 /** The glyph for each metric; decorative, so the localized label carries the meaning. */
 private fun homeMetricIcon(kind: HomeTodayMetricKind): ImageVector = when (kind) {
-    HomeTodayMetricKind.SCREEN_TIME -> Icons.Filled.DateRange
+    // Reference mockup: a clock for screen time and a shield for protection.
+    HomeTodayMetricKind.SCREEN_TIME -> HomeClockIcon
     HomeTodayMetricKind.SCHEDULE -> Icons.Filled.Info
     HomeTodayMetricKind.EYE_SAFETY -> Icons.Filled.Warning
-    HomeTodayMetricKind.PROTECTION -> Icons.Filled.Lock
+    HomeTodayMetricKind.PROTECTION -> HomeShieldIcon
+}
+
+/**
+ * The Home dashboard's own glyphs.
+ *
+ * The bundled Material icon set (`material-icons-core`) ships only ~50 glyphs and has
+ * no clock, shield or group icon (the extended set is thousands of assets and is not a
+ * dependency). These small hand-built vectors give the mockup's exact semantics without
+ * pulling in that weight. Each is a single 24×24 path; `Icon`'s tint overrides the fill,
+ * so one vector serves every theme and colour role.
+ */
+private fun homeIcon(name: String, build: ImageVector.Builder.() -> Unit): ImageVector =
+    ImageVector.Builder(
+        name = name,
+        defaultWidth = QalqonDimens.icon.lg,
+        defaultHeight = QalqonDimens.icon.lg,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).apply(build).build()
+
+/** An outlined clock (screen time / schedule). */
+private val HomeClockIcon: ImageVector by lazy {
+    homeIcon("HomeClock") {
+        // Outer ring + inner cut-out = the outline.
+        path(fill = SolidColor(Color.Black), pathFillType = PathFillType.EvenOdd) {
+            moveTo(12f, 2f)
+            arcTo(10f, 10f, 0f, isMoreThanHalf = true, isPositiveArc = true, x1 = 12f, y1 = 22f)
+            arcTo(10f, 10f, 0f, isMoreThanHalf = true, isPositiveArc = true, x1 = 12f, y1 = 2f)
+            close()
+            moveTo(12f, 4.4f)
+            arcTo(7.6f, 7.6f, 0f, isMoreThanHalf = true, isPositiveArc = false, x1 = 12f, y1 = 19.6f)
+            arcTo(7.6f, 7.6f, 0f, isMoreThanHalf = true, isPositiveArc = false, x1 = 12f, y1 = 4.4f)
+            close()
+        }
+        // Twelve-o'clock hand and three-o'clock hand.
+        path(fill = SolidColor(Color.Black)) {
+            moveTo(11.1f, 6.8f)
+            lineTo(12.9f, 6.8f)
+            lineTo(12.9f, 12.6f)
+            lineTo(11.1f, 12.6f)
+            close()
+            moveTo(12.4f, 11.1f)
+            lineTo(17.2f, 11.1f)
+            lineTo(17.2f, 12.9f)
+            lineTo(12.4f, 12.9f)
+            close()
+        }
+    }
+}
+
+/** A solid shield (protection / protected apps). */
+private val HomeShieldIcon: ImageVector by lazy {
+    homeIcon("HomeShield") {
+        path(fill = SolidColor(Color.Black)) {
+            moveTo(12f, 2f)
+            lineTo(20f, 5f)
+            lineTo(20f, 11f)
+            curveTo(20f, 16.2f, 16.6f, 20.2f, 12f, 22f)
+            curveTo(7.4f, 20.2f, 4f, 16.2f, 4f, 11f)
+            lineTo(4f, 5f)
+            close()
+        }
+    }
+}
+
+/** A group of people (manage children). */
+private val HomeGroupIcon: ImageVector by lazy {
+    homeIcon("HomeGroup") {
+        path(fill = SolidColor(Color.Black)) {
+            // Two heads.
+            moveTo(9f, 5.2f)
+            arcTo(3.1f, 3.1f, 0f, isMoreThanHalf = true, isPositiveArc = true, x1 = 9f, y1 = 11.4f)
+            arcTo(3.1f, 3.1f, 0f, isMoreThanHalf = true, isPositiveArc = true, x1 = 9f, y1 = 5.2f)
+            close()
+            moveTo(16.7f, 6.1f)
+            arcTo(2.6f, 2.6f, 0f, isMoreThanHalf = true, isPositiveArc = true, x1 = 16.7f, y1 = 11.3f)
+            arcTo(2.6f, 2.6f, 0f, isMoreThanHalf = true, isPositiveArc = true, x1 = 16.7f, y1 = 6.1f)
+            close()
+            // Two shoulders.
+            moveTo(3.4f, 19f)
+            curveTo(3.4f, 14.6f, 5.9f, 12.6f, 9f, 12.6f)
+            curveTo(12.1f, 12.6f, 14.6f, 14.6f, 14.6f, 19f)
+            close()
+            moveTo(15.2f, 18.9f)
+            curveTo(15.2f, 15.8f, 16.7f, 14.3f, 18.6f, 14.3f)
+            curveTo(20.5f, 14.3f, 22.1f, 15.9f, 22.1f, 18.9f)
+            close()
+        }
+    }
 }
 
 /**
@@ -852,13 +942,7 @@ private fun homeMetricIcon(kind: HomeTodayMetricKind): ImageVector = when (kind)
  * bitmap. `Icon`'s tint overrides the fill, so a single vector serves every theme.
  */
 private val HomeQuickActionBolt: ImageVector by lazy {
-    ImageVector.Builder(
-        name = "HomeQuickActionBolt",
-        defaultWidth = QalqonDimens.icon.lg,
-        defaultHeight = QalqonDimens.icon.lg,
-        viewportWidth = 24f,
-        viewportHeight = 24f,
-    ).apply {
+    homeIcon("HomeQuickActionBolt") {
         path(fill = SolidColor(Color.Black)) {
             moveTo(13f, 2f)
             lineTo(4f, 14f)
@@ -868,7 +952,7 @@ private val HomeQuickActionBolt: ImageVector by lazy {
             lineTo(13f, 10f)
             close()
         }
-    }.build()
+    }
 }
 
 /**
@@ -885,27 +969,35 @@ private val HomeQuickActionBolt: ImageVector by lazy {
  */
 @Composable
 private fun QalqonProtectionMotif(modifier: Modifier = Modifier) {
-    // Reference mockup palette: a soft pastel-blue shield, a vivid blue stroke and a
-    // clean white/blue smartphone — no dark grey outlines.
+    // Reference mockup palette: a solid soft-blue shield with a lighter inner face for
+    // 2.5D depth, a vivid blue stroke and a clean white/blue smartphone.
     val shieldFill = QalqonTheme.colors.illustrationShield
+    val shieldHighlight = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.55f)
     val stroke = QalqonTheme.colors.illustrationStroke
     val phoneFill = MaterialTheme.colorScheme.surfaceContainerLowest
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
-            // The soft pastel-blue shield layer.
-            val shield = Path().apply {
-                moveTo(w * 0.5f, h * 0.02f)
-                lineTo(w * 0.94f, h * 0.20f)
-                lineTo(w * 0.94f, h * 0.52f)
-                quadraticBezierTo(w * 0.94f, h * 0.86f, w * 0.5f, h * 0.99f)
-                quadraticBezierTo(w * 0.06f, h * 0.86f, w * 0.06f, h * 0.52f)
-                lineTo(w * 0.06f, h * 0.20f)
-                close()
+            // The shield outline, optionally scaled about its centre (the inner face).
+            fun shieldAt(scale: Float): Path {
+                fun x(f: Float) = w * 0.5f + (w * f - w * 0.5f) * scale
+                fun y(f: Float) = h * 0.5f + (h * f - h * 0.5f) * scale
+                return Path().apply {
+                    moveTo(x(0.5f), y(0.02f))
+                    lineTo(x(0.94f), y(0.20f))
+                    lineTo(x(0.94f), y(0.52f))
+                    quadraticBezierTo(x(0.94f), y(0.86f), x(0.5f), y(0.99f))
+                    quadraticBezierTo(x(0.06f), y(0.86f), x(0.06f), y(0.52f))
+                    lineTo(x(0.06f), y(0.20f))
+                    close()
+                }
             }
-            drawPath(shield, color = shieldFill)
-            drawPath(shield, color = stroke, style = Stroke(width = h * 0.035f))
+            // Solid soft-blue shield, then a lighter inner face for depth, so the emblem
+            // reads as a filled 2.5D badge rather than transparent line-art.
+            drawPath(shieldAt(1f), color = shieldFill)
+            drawPath(shieldAt(0.80f), color = shieldHighlight)
+            drawPath(shieldAt(1f), color = stroke, style = Stroke(width = h * 0.035f))
 
             // The stylized smartphone sitting on the shield.
             val phoneW = w * 0.48f
@@ -1175,8 +1267,9 @@ private fun quickActionIconColors(action: HomeQuickAction): Pair<Color, Color> =
 
 /** The glyph for each quick action; decorative, the label carries the meaning. */
 private fun homeQuickActionIcon(action: HomeQuickAction): ImageVector = when (action) {
-    HomeQuickAction.MANAGE_CHILDREN -> Icons.Filled.Person
+    // Reference mockup: a group for children, a shield for protected apps.
+    HomeQuickAction.MANAGE_CHILDREN -> HomeGroupIcon
     HomeQuickAction.PROTECTION_SETTINGS -> Icons.Filled.Lock
-    HomeQuickAction.PROTECTED_APPS -> Icons.AutoMirrored.Filled.List
+    HomeQuickAction.PROTECTED_APPS -> HomeShieldIcon
     HomeQuickAction.REVIEW_REQUESTS -> Icons.Filled.Notifications
 }

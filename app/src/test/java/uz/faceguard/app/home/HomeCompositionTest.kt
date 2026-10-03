@@ -68,6 +68,32 @@ class HomeCompositionTest {
     }
 
     @Test
+    fun theHeroCarriesTheQalqonShieldAndDeviceMotif() {
+        // The signature hero includes a Compose-native shield+device motif (no bitmap,
+        // no remote asset), drawn from the semantic accent color.
+        val hero = home.substringAfter("private fun ProtectionStatusSection(").substringBefore("/** Compact attention")
+        assertTrue("the hero must render the motif", hero.contains("QalqonProtectionMotif("))
+        val motif = home.substringAfter("private fun QalqonProtectionMotif(").substringBefore("/**")
+        assertTrue("the motif must be Compose-drawn", motif.contains("Canvas("))
+        assertTrue("the motif must not use a bitmap asset", !motif.contains("painterResource"))
+    }
+
+    @Test
+    fun theHeroCtaMeetsTheAccessibilityTouchTarget() {
+        val hero = home.substringAfter("private fun ProtectionStatusSection(").substringBefore("/** Compact attention")
+        assertTrue(
+            "the hero CTA must be at least the 48dp touch target",
+            hero.contains("height(QalqonDimens.sizes.buttonDefault)"),
+        )
+    }
+
+    @Test
+    fun theTodaySectionIsATwoColumnMetricGrid() {
+        val today = home.substringAfter("private fun TodaySection(").substringBefore("/** The glyph for each metric")
+        assertTrue("today must lay its metrics out two per row", today.contains("chunked(2)"))
+    }
+
+    @Test
     fun todayAndQuickActionsHaveSectionSubtitles() {
         assertTrue(home.contains("R.string.home_today_subtitle"))
         assertTrue(home.contains("R.string.home_quick_actions_subtitle"))

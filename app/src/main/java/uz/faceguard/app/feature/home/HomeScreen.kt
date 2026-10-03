@@ -1,5 +1,6 @@
 package uz.faceguard.app.feature.home
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -46,7 +47,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -483,8 +489,9 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
         state.protectedAppsCount > 0
 
     // Signature hero: a large, borderless soft-blue surface (distinct from the white
-    // bordered cards elsewhere) with the QALQON wordmark, a big rounded status glyph,
-    // a dominant title and an action-first CTA. STATE -> EXPLANATION -> ACTION.
+    // bordered cards elsewhere) with a big rounded status glyph, the QALQON wordmark, a
+    // Compose-native shield+device motif, a dominant title, supporting line, an optional
+    // real count chip and an action-first full-width CTA. STATE -> EXPLANATION -> ACTION.
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = QalqonShapes.largeShape,
@@ -492,10 +499,11 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
         tonalElevation = QalqonDimens.elevation.flat,
     ) {
         Column(
-            modifier = Modifier.padding(QalqonDimens.spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.sm),
+            modifier = Modifier.padding(QalqonDimens.cardPadding),
+            verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.md),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // Left: the status glyph and the wordmark + the state copy.
                 Box(
                     modifier = Modifier
                         .size(QalqonDimens.sizes.buttonLarge)
@@ -510,18 +518,30 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
                     )
                 }
                 Spacer(Modifier.size(QalqonDimens.spacing.md))
-                Text(
-                    text = stringResource(R.string.app_name).uppercase(),
-                    style = MaterialTheme.typography.titleSmall,
-                    letterSpacing = 2.sp,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f),
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.xs),
+                ) {
+                    Text(
+                        text = stringResource(R.string.app_name).uppercase(),
+                        style = MaterialTheme.typography.titleSmall,
+                        letterSpacing = 2.sp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f),
+                    )
+                    Text(
+                        text = stringResource(homeProtectionLabelRes(status)),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+                Spacer(Modifier.size(QalqonDimens.spacing.sm))
+                // Right: a restrained, Compose-drawn shield+device motif — product meaning,
+                // secondary to the state, and drawn entirely from the semantic accent color.
+                QalqonProtectionMotif(
+                    accent = accent,
+                    modifier = Modifier.size(QalqonDimens.icon.lg * 2),
                 )
             }
-            Text(
-                text = stringResource(homeProtectionLabelRes(status)),
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
             Text(
                 text = stringResource(homeProtectionSupportingRes(status)),
                 style = MaterialTheme.typography.bodyMedium,
@@ -545,7 +565,7 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
                 onClick = onOpenProtection,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = QalqonDimens.spacing.xs),
+                    .height(QalqonDimens.sizes.buttonDefault),
             ) {
                 Text(stringResource(actionLabel))
             }
@@ -737,6 +757,44 @@ private fun homeMetricIcon(kind: HomeTodayMetricKind): ImageVector = when (kind)
     HomeTodayMetricKind.SCHEDULE -> Icons.Filled.Info
     HomeTodayMetricKind.EYE_SAFETY -> Icons.Filled.Warning
     HomeTodayMetricKind.PROTECTION -> Icons.Filled.Lock
+}
+
+/**
+ * A small, restrained Compose-drawn "shield + device" motif for the protection hero.
+ *
+ * Purely decorative and drawn from the semantic accent color (no bitmap, no remote asset,
+ * no extra dependency), so it reinforces QALQON's protection/shield meaning without
+ * competing with the protection state text. `contentDescription` is intentionally absent:
+ * the hero's title already carries the meaning, so the motif must not be announced.
+ */
+@Composable
+private fun QalqonProtectionMotif(accent: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        // Shield outline.
+        val shield = Path().apply {
+            moveTo(w * 0.5f, h * 0.04f)
+            lineTo(w * 0.90f, h * 0.22f)
+            lineTo(w * 0.90f, h * 0.54f)
+            quadraticBezierTo(w * 0.90f, h * 0.86f, w * 0.5f, h * 0.98f)
+            quadraticBezierTo(w * 0.10f, h * 0.86f, w * 0.10f, h * 0.54f)
+            lineTo(w * 0.10f, h * 0.22f)
+            close()
+        }
+        drawPath(shield, color = accent.copy(alpha = 0.12f))
+        drawPath(shield, color = accent.copy(alpha = 0.38f), style = Stroke(width = h * 0.03f))
+        // Device (phone) inside the shield.
+        val phoneW = w * 0.26f
+        val phoneH = h * 0.34f
+        drawRoundRect(
+            color = accent.copy(alpha = 0.45f),
+            topLeft = Offset((w - phoneW) / 2f, h * 0.30f),
+            size = Size(phoneW, phoneH),
+            cornerRadius = CornerRadius(phoneW * 0.22f),
+            style = Stroke(width = h * 0.03f),
+        )
+    }
 }
 
 /**

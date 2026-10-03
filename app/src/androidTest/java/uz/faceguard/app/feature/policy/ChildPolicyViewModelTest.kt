@@ -4,10 +4,9 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import kotlinx.coroutines.flow.first
 import java.time.ZoneOffset
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -61,6 +60,15 @@ class ChildPolicyViewModelTest {
     private val youtube = "com.example.youtube"
     private val chrome = "com.example.chrome"
 
+    private companion object {
+        /**
+         * Generous enough for the documented CI API-35 emulator main-looper stalls
+         * (observed 30s+), mirroring the 180_000 ms budgets already used by
+         * ScreenTimeCollectionLifecycleTest and ProtectionForegroundServiceTest.
+         */
+        const val AWAIT_TIMEOUT_MS = 180_000L
+    }
+
     @Before
     fun setUp() = runBlocking {
         sessionManager = SessionManager(context)
@@ -107,10 +115,40 @@ class ChildPolicyViewModelTest {
         savedStateHandle = SavedStateHandle(mapOf(ChildPolicyArgs.CHILD_ID to childId)),
     )
 
+    /**
+     * Waits for the ViewModel's UI state to satisfy [predicate].
+     *
+     * `selectChild` starts the policy observer on `viewModelScope`
+     * (`Dispatchers.Main.immediate`) and the Room emission is delivered back to the main
+     * thread, so the transition is observable only once the main looper has processed that
+     * work. The CI API-35 software-rendered emulator intermittently stalls the main looper
+     * (documented as 30s+ in this repo's service/lifecycle tests), which is why the previous
+     * fixed `withTimeout(5_000)` raced the stall and timed out.
+     *
+     * This uses the repository's established synchronization pattern: first let pending
+     * main-thread work run via the instrumentation's own idle sync, then poll against a
+     * generous deadline (`delay` here is the proven 50 ms poll step, not a fixed sleep used
+     * to mask the race) and fail with the last observed state. The caller's predicate is
+     * unchanged, so the full contract is still asserted.
+     */
     private suspend fun awaitUi(
         viewModel: ChildPolicyViewModel,
         predicate: (ChildPolicyUiState) -> Boolean,
-    ): ChildPolicyUiState = withTimeout(5_000) { viewModel.ui.first(predicate) }
+    ): ChildPolicyUiState {
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        val deadline = System.currentTimeMillis() + AWAIT_TIMEOUT_MS
+        while (System.currentTimeMillis() < deadline) {
+            val ui = viewModel.ui.value
+            if (predicate(ui)) return ui
+            delay(50)
+        }
+        val last = viewModel.ui.value
+        throw AssertionError(
+            "ChildPolicyUiState did not reach the expected state within ${AWAIT_TIMEOUT_MS}ms. " +
+                "Last observed: state=${last.state}, selectedChildId=${last.selectedChildId}, " +
+                "children=${last.children.map { it.id }}, policies=${last.policies.keys}",
+        )
+    }
 
     @Test
     fun initialState_loadsChildrenAndSelectsTheNavChild() = runBlocking {

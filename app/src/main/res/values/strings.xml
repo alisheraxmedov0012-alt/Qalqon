@@ -597,10 +597,11 @@
     <string name="qal_action_confirm">Tasdiqlash</string>
     <string name="qal_badge_content_description">%1$d ta yangi</string>
 
-    <!-- QALQON navigation shell: the four primary top-level destinations. -->
+    <!-- QALQON navigation shell: the five primary top-level destinations. -->
     <string name="nav_home">Bosh sahifa</string>
     <string name="nav_children">Bolalar</string>
     <string name="nav_activity">Faoliyat</string>
+    <string name="nav_help">Yordam</string>
     <string name="nav_settings">Sozlamalar</string>
 
     <!-- QALQON Home dashboard (UI/UX redesign, Phase 3). -->
@@ -609,8 +610,14 @@
     <string name="home_attention_title">Diqqat talab qiladi</string>
     <string name="home_attention_children_setup">Ba\'zi bolalar uchun yuz hali sozlanmagan</string>
     <string name="home_today_title">Bugun</string>
+    <string name="home_today_subtitle">Bolangiz faoliyati haqida qisqacha</string>
     <string name="home_quick_actions_title">Tezkor amallar</string>
+    <string name="home_quick_actions_subtitle">Muhim boshqaruvlar</string>
     <string name="home_action_manage_children">Bolalarni boshqarish</string>
+    <string name="home_action_manage_children_desc">Farzand profillarini ko‘rish va boshqarish</string>
+    <string name="home_action_protection_desc">Himoya holati va ruxsatlarni sozlash</string>
+    <string name="home_action_protected_apps_desc">Himoyalanadigan ilovalarni tanlash</string>
+    <string name="home_action_requests_desc">Boladan kelgan so‘rovlarni ko‘rish</string>
     <string name="home_status_off_hint">Himoya hozircha o\'chirilgan</string>
     <string name="home_status_active_hint">Himoya faol va ishlayapti</string>
     <string name="home_status_setup_hint">Himoyani yoqish uchun ruxsatlarni to\'ldiring</string>
@@ -620,6 +627,7 @@
     <string name="home_child_content_description">Farzand: %1$s, %2$s</string>
     <string name="home_all_children">Barchasi</string>
     <string name="home_protection_manage">Himoyani boshqarish</string>
+    <string name="home_protection_apps_count">%1$d ta ilova himoyalangan</string>
     <string name="home_child_screen_time">Bugun: %1$s</string>
 
     <!-- QALQON Children + Child Detail (UI/UX redesign, Phase 4). -->
@@ -673,6 +681,15 @@
     <string name="settings_category_developer">Ishlab chiquvchi</string>
     <string name="settings_category_developer_desc">Diagnostika (faqat debug)</string>
 
+    <!-- Settings hub grouping (post-UI correction) -->
+    <string name="settings_group_rules">Qoidalar va himoya</string>
+    <string name="settings_group_family">Bolalar</string>
+    <string name="settings_group_notifications">Bildirishnomalar</string>
+    <string name="settings_group_privacy_security">Maxfiylik va xavfsizlik</string>
+    <string name="settings_group_appearance">Ko‘rinish va til</string>
+    <string name="settings_group_support">Yordam</string>
+    <string name="settings_group_developer">Dasturchi</string>
+
     <string name="settings_row_parent_profile">Ota-ona profili</string>
     <string name="settings_row_parent_profile_desc">Ism va yuz ma\'lumotlarini boshqarish</string>
     <string name="settings_row_children">Farzandlar</string>
@@ -687,8 +704,9 @@
     <string name="settings_notifications_hint">Bildirishnomalar tizim sozlamalarida boshqariladi</string>
 
     <!-- QALQON Help Center + Assistant (local, offline) -->
-    <string name="help_intro">Qalqondan foydalanish bo‘yicha kerakli ma’lumotlarni shu yerda toping.</string>
+    <string name="help_intro">Qalqondan foydalanish, himoya, bolalar, vaqt limitlari va sozlamalar bo‘yicha yordam oling.</string>
     <string name="help_search_hint">Yordamdan qidirish</string>
+    <string name="help_search_clear">Qidiruvni tozalash</string>
     <string name="help_search_no_results">Hech narsa topilmadi. Boshqa so‘z bilan urinib ko‘ring.</string>
     <string name="help_section_faq">Ko‘p beriladigan savollar</string>
     <string name="help_section_troubleshooting">Muammolarni hal qilish</string>
@@ -705,6 +723,8 @@
     <string name="help_cat_notifications_requests">Bildirishnomalar va so‘rovlar</string>
     <string name="help_cat_privacy">Maxfiylik</string>
     <string name="help_cat_troubleshooting">Muammolarni hal qilish</string>
+    <string name="help_article_about_title">Qalqon nima?</string>
+    <string name="help_article_about_body">Qalqon — oflayn va maxfiylikka asoslangan ota-ona nazorati ilovasi. Ota-ona mahalliy hisob yaratadi, o‘zi va bolalarining yuzini ro‘yxatdan o‘tkazadi hamda himoyalanadigan ilovalarni tanlaydi. Qurilma kim ushlab turganini taniydi: ota-ona hech qanday cheklov ko‘rmaydi, bola bloklanadi, notanish foydalanuvchiga tanlangan qoida qo‘llanadi. Barcha yuz ishlovi qurilmaning o‘zida bajariladi va internet talab qilinmaydi.</string>
     <string name="help_article_first_launch_title">Birinchi ishga tushirish</string>
     <string name="help_article_first_launch_body">1. Tilni tanlang. 2. Ism, telefon raqami va PIN bilan hisob yarating. 3. Ota-ona profilini sozlang. 4. Bola qo‘shing. 5. Himoyalanadigan ilovalarni tanlang. 6. Sozlamalar &gt; Himoya bo‘limida himoyani yoqing.</string>
     <string name="help_article_language_title">Tilni o‘zgartirish</string>
@@ -774,7 +794,7 @@
     <string name="help_ts_screen_time_q">Ekran vaqti ko‘rinmayapti</string>
     <string name="help_ts_screen_time_a">Ekran vaqti uchun nishon sifatida bola tanlangan bo‘lishi va foydalanish ma’lumotlariga kirish ruxsati berilishi kerak. Foydalanish o‘qilmasa, Qalqon nol ko‘rsatish o‘rniga buni aytadi.</string>
     <string name="help_assistant_title">Qalqon yordamchisi</string>
-    <string name="help_assistant_subtitle">Qalqondan foydalanish bo‘yicha savolingizni bering</string>
+    <string name="help_assistant_subtitle">Savolingizni yozing — Qalqon funksiyalari bo‘yicha yordam beraman</string>
     <string name="help_assistant_greeting">Salom! Men Qalqon yordamchisiman. Qalqonning funksiyalari, sozlamalari va muammolari bo‘yicha yordam bera olaman. Nimani bilmoqchisiz?</string>
     <string name="help_assistant_input_hint">Savolingizni yozing</string>
     <string name="help_assistant_send">Yuborish</string>

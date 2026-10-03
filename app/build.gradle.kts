@@ -140,6 +140,9 @@ dependencies {
     implementation(libs.camera.lifecycle)
     implementation(libs.camera.view)
     implementation(libs.mlkit.face.detection)
+    // Phase A1: Gemini Nano capability detection only (no generation wired in). On-device;
+    // no INTERNET permission and no cloud client are introduced by this dependency.
+    implementation(libs.mlkit.genai.prompt)
     implementation(libs.tensorflow.lite)
     implementation(libs.accompanist.permissions)
     implementation(libs.hilt.android)

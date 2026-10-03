@@ -10,16 +10,16 @@ import uz.faceguard.app.R
 /**
  * UI/UX redesign Phase 2: the top-level destination model.
  *
- * Pins the *shape* of the app shell — exactly four primary destinations, in order,
- * with unique routes and localized labels/icons — and the route mapping onto the
- * existing screens. Pure JVM: the model holds no Android/runtime state.
+ * Pins the *shape* of the app shell — the five primary destinations, in product
+ * order, with unique routes and localized labels/icons — and the route mapping onto
+ * the existing screens. Pure JVM: the model holds no Android/runtime state.
  */
 class QalqonTopLevelDestinationTest {
 
     @Test
-    fun thereAreExactlyFourPrimaryDestinationsInProductOrder() {
+    fun thereAreExactlyFivePrimaryDestinationsInProductOrder() {
         assertEquals(
-            listOf("HOME", "CHILDREN", "ACTIVITY", "SETTINGS"),
+            listOf("HOME", "CHILDREN", "ACTIVITY", "HELP", "SETTINGS"),
             QalqonTopLevelDestination.entries.map { it.name },
         )
     }
@@ -29,6 +29,7 @@ class QalqonTopLevelDestinationTest {
         assertNotNull(QalqonTopLevelDestination.valueOf("HOME"))
         assertNotNull(QalqonTopLevelDestination.valueOf("CHILDREN"))
         assertNotNull(QalqonTopLevelDestination.valueOf("ACTIVITY"))
+        assertNotNull(QalqonTopLevelDestination.valueOf("HELP"))
         assertNotNull(QalqonTopLevelDestination.valueOf("SETTINGS"))
     }
 
@@ -37,7 +38,13 @@ class QalqonTopLevelDestinationTest {
         val routes = QalqonTopLevelDestination.entries.map { it.route }
         assertEquals("routes must be unique", routes.size, routes.toSet().size)
         assertEquals(
-            listOf(Routes.HOME, Routes.CHILD_PROFILES, Routes.ACTIVITY_LOG, Routes.SETTINGS),
+            listOf(
+                Routes.HOME,
+                Routes.CHILD_PROFILES,
+                Routes.ACTIVITY_LOG,
+                Routes.HELP,
+                Routes.SETTINGS,
+            ),
             routes,
         )
     }
@@ -47,6 +54,7 @@ class QalqonTopLevelDestinationTest {
         assertEquals(R.string.nav_home, QalqonTopLevelDestination.HOME.labelRes)
         assertEquals(R.string.nav_children, QalqonTopLevelDestination.CHILDREN.labelRes)
         assertEquals(R.string.nav_activity, QalqonTopLevelDestination.ACTIVITY.labelRes)
+        assertEquals(R.string.nav_help, QalqonTopLevelDestination.HELP.labelRes)
         assertEquals(R.string.nav_settings, QalqonTopLevelDestination.SETTINGS.labelRes)
     }
 
@@ -87,6 +95,14 @@ class QalqonTopLevelDestinationTest {
     }
 
     @Test
+    fun helpMapsToTheExistingHelpCenterDestination() {
+        // Help was promoted to a first-class tab but reuses the existing route; no
+        // duplicate help destination exists.
+        assertEquals(Routes.HELP, QalqonTopLevelDestination.HELP.route)
+        assertEquals(QalqonTopLevelDestination.HELP, QalqonTopLevelDestination.forRoute(Routes.HELP))
+    }
+
+    @Test
     fun settingsMapsToTheExistingSettingsDestination() {
         assertEquals(Routes.SETTINGS, QalqonTopLevelDestination.SETTINGS.route)
     }
@@ -114,7 +130,8 @@ class QalqonTopLevelDestinationTest {
             Routes.CHILD_EYE_SAFETY,
             Routes.PROTECTION,
             Routes.PRIVACY,
-            Routes.HELP,
+            // The Assistant is a pushed screen, not a tab.
+            Routes.HELP_ASSISTANT,
             Routes.RECOGNITION_DEBUG,
         ).forEach { route ->
             assertNull("'$route' must not select a tab", QalqonTopLevelDestination.forRoute(route))
@@ -130,8 +147,16 @@ class QalqonTopLevelDestinationTest {
     }
 
     @Test
-    fun theFourTabRoutesAreStillTheProtectedParentalControlRoutes() {
+    fun theFiveTabRoutesAreStillTheProtectedParentalControlRoutes() {
         // The shell must live behind the existing lock: every tab is protected.
         assertTrue(QalqonTopLevelDestination.entries.all { isProtectedRoute(it.route) })
+    }
+
+    @Test
+    fun theHelpTabIsSelectedOnTheHelpRouteAndNowhereElse() {
+        // "Selected state works": exactly the Help route resolves to the Help tab.
+        assertEquals(QalqonTopLevelDestination.HELP, QalqonTopLevelDestination.forRoute(Routes.HELP))
+        assertNull(QalqonTopLevelDestination.forRoute(Routes.HELP_ASSISTANT))
+        assertNull(QalqonTopLevelDestination.forRoute("${Routes.HELP}/anything"))
     }
 }

@@ -4,14 +4,15 @@ import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 import uz.faceguard.app.R
 
 /**
- * The four primary top-level destinations of the authenticated parent UI
- * (UI/UX redesign, Phase 2 — navigation shell).
+ * The five primary top-level destinations of the authenticated parent UI
+ * (UI/UX redesign, Phase 2 — navigation shell; Help added as a first-class tab).
  *
  * This is the single, centralized description of the app shell. Each entry carries
  * a *stable route identity*, the localized label resource and the Material icon the
@@ -33,6 +34,14 @@ enum class QalqonTopLevelDestination(
     HOME(Routes.HOME, R.string.nav_home, Icons.Filled.Home),
     CHILDREN(Routes.CHILD_PROFILES, R.string.nav_children, Icons.Filled.Person),
     ACTIVITY(Routes.ACTIVITY_LOG, R.string.nav_activity, Icons.AutoMirrored.Filled.List),
+
+    /**
+     * Help is a top-level destination that reuses the existing Help Center route
+     * ([Routes.HELP]); no duplicate help destination exists. The Help glyph is not part
+     * of the bundled `material-icons-core` set, so the closest core icon (`Info`) is
+     * used rather than adding the heavy extended-icons dependency.
+     */
+    HELP(Routes.HELP, R.string.nav_help, Icons.Filled.Info),
     SETTINGS(Routes.SETTINGS, R.string.nav_settings, Icons.Filled.Settings),
     ;
 
@@ -52,7 +61,7 @@ enum class QalqonTopLevelDestination(
     companion object {
         /**
          * The destination a concrete back-stack route belongs to, or `null` when the
-         * route is not one of the four primary destinations (onboarding, a child
+         * route is not one of the primary destinations (onboarding, a child
          * detail screen, a settings sub-route, …). Matching is exact: the tab routes
          * are plain strings, so a nested route such as `child_policy/{childId}` can
          * never be mistaken for a tab.

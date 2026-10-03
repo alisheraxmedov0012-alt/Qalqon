@@ -62,8 +62,8 @@ class ActivityNavigationTest {
     }
 
     @Test
-    fun theShellStillProvidesTheFourTopLevelDestinations() {
-        assertEquals(4, QalqonTopLevelDestination.entries.size)
+    fun theShellStillProvidesTheTopLevelDestinationsIncludingActivity() {
+        assertEquals(5, QalqonTopLevelDestination.entries.size)
         assertTrue(QalqonTopLevelDestination.entries.map { it.route }.contains(Routes.ACTIVITY_LOG))
     }
 

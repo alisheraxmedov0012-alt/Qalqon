@@ -92,3 +92,39 @@ enum class SettingsCategory(
  */
 fun settingsCategories(debugScreensEnabled: Boolean): List<SettingsCategory> =
     SettingsCategory.entries.filter { debugScreensEnabled || !it.debugOnly }
+
+/**
+ * Post-UI correction: the logical groups the Settings hub renders, so the centre reads
+ * as a short, scannable set of sections instead of one flat list. Every category keeps
+ * its own route and page — this is presentation grouping only, no new setting.
+ */
+enum class SettingsGroup(@StringRes val labelRes: Int) {
+    RULES(R.string.settings_group_rules),
+    FAMILY(R.string.settings_group_family),
+    NOTIFICATIONS(R.string.settings_group_notifications),
+    PRIVACY_SECURITY(R.string.settings_group_privacy_security),
+    APPEARANCE(R.string.settings_group_appearance),
+    SUPPORT(R.string.settings_group_support),
+    DEVELOPER(R.string.settings_group_developer),
+}
+
+/**
+ * The visible categories grouped for display, in reading order. The developer group is
+ * present only when [debugScreensEnabled] is true (an empty group is dropped), so a
+ * release build never renders it.
+ */
+fun settingsGroups(debugScreensEnabled: Boolean): List<Pair<SettingsGroup, List<SettingsCategory>>> {
+    val groups = linkedMapOf(
+        SettingsGroup.RULES to listOf(SettingsCategory.PROTECTION),
+        SettingsGroup.FAMILY to listOf(SettingsCategory.FAMILY),
+        SettingsGroup.NOTIFICATIONS to listOf(SettingsCategory.NOTIFICATIONS),
+        SettingsGroup.PRIVACY_SECURITY to listOf(SettingsCategory.PRIVACY, SettingsCategory.SECURITY),
+        SettingsGroup.APPEARANCE to listOf(SettingsCategory.APPEARANCE),
+        SettingsGroup.SUPPORT to listOf(SettingsCategory.SUPPORT),
+        SettingsGroup.DEVELOPER to listOf(SettingsCategory.DEVELOPER),
+    )
+    return groups.mapNotNull { (group, categories) ->
+        val visible = categories.filter { debugScreensEnabled || !it.debugOnly }
+        if (visible.isEmpty()) null else group to visible
+    }
+}

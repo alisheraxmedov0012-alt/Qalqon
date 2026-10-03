@@ -159,12 +159,18 @@ class QalqonAssistantTest {
     }
 
     @Test
-    fun theNoAppsContextAnswerIsUsedOnlyWhenNothingIsProtected() {
+    fun theNoAppsContextAnswerIsUsedOnlyForAnExplicitNothingProtectedQuestion() {
+        // The no-apps context belongs to the PROTECTED_APPS intent, and only to a question
+        // that explicitly asks about the (currently empty) state — never to every question
+        // that merely mentions an app.
         val none = QalqonAssistantContext(false, 0, true, true)
-        assertTrue(ask("which app can I protect", none) is AssistantReply.Contextual)
+        assertTrue(ask("why are no apps protected", none) is AssistantReply.Contextual)
 
         val some = none.copy(protectedAppsCount = 5)
-        assertFalse(ask("which app can I protect", some) is AssistantReply.Contextual)
+        assertFalse(ask("why are no apps protected", some) is AssistantReply.Contextual)
+
+        // A how-to question is answered from the knowledge base even when nothing is protected.
+        assertFalse(ask("which app can I protect", none) is AssistantReply.Contextual)
     }
 
     @Test

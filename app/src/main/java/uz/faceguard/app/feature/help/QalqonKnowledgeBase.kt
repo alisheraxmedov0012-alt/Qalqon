@@ -77,6 +77,12 @@ object QalqonKnowledgeBase : HelpContent {
 
     override val articles: List<HelpArticle> = listOf(
         HelpArticle(
+            "start_about",
+            R.string.help_cat_getting_started,
+            R.string.help_article_about_title,
+            R.string.help_article_about_body,
+        ),
+        HelpArticle(
             "start_first_launch",
             R.string.help_cat_getting_started,
             R.string.help_article_first_launch_title,
@@ -199,7 +205,7 @@ object QalqonKnowledgeBase : HelpContent {
         "qalqon", "himoya", "bola", "farzand", "yuz", "ekran", "vaqt", "jadval",
         "ko'z", "koz", "pin", "biometrik", "bildirishnoma", "so'rov", "sorov",
         "maxfiylik", "ilova", "sozlama", "ro'yxat", "royxat", "parol", "qulf",
-        "blok", "yordam", "dastur", "hisob", "tanaffus", "chegara", "limit",
+        "blok", "dastur", "hisob", "tanaffus", "chegara", "limit",
         // en
         "protection", "protect", "child", "children", "face", "screen", "time",
         "schedule", "eye", "biometric", "notification", "request", "privacy",

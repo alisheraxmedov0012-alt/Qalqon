@@ -226,10 +226,19 @@ fun lockRedirectFor(route: String?, isUnlocked: Boolean): String? =
  * destination.
  */
 private fun NavHostController.navigateToTopLevel(destination: QalqonTopLevelDestination) {
-    navigate(destination.route) {
-        popUpTo(Routes.HOME) { saveState = true }
-        launchSingleTop = true
-        restoreState = true
+    // Post-UI correction: decide explicitly instead of relying on launchSingleTop, which
+    // collapsed a re-tap of the active tab (or a restored tab that resolved to the current
+    // destination) to a silent no-op and made the screen appear not to switch.
+    when (val decision = BottomNavigationPolicy.resolve(currentDestination?.route, destination)) {
+        is BottomNavigationPolicy.Decision.ResetToRoot ->
+            popBackStack(decision.route, inclusive = false)
+
+        is BottomNavigationPolicy.Decision.Switch ->
+            navigate(decision.route) {
+                popUpTo(Routes.HOME) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
     }
 }
 
@@ -544,9 +553,12 @@ private fun QalqonNavHost(
         composable(Routes.PRIVACY) {
             PrivacyScreen(onBack = { navController.popBackStack() })
         }
+        // Help is a first-class bottom-navigation destination (see
+        // QalqonTopLevelDestination.HELP), so it reuses this existing route and renders
+        // without a back arrow, exactly like the other tabs. The Qalqon Assistant stays
+        // its own pushed route behind the same PIN gate.
         composable(Routes.HELP) {
             HelpScreen(
-                onBack = { navController.popBackStack() },
                 onOpenAssistant = { navController.navigate(Routes.HELP_ASSISTANT) },
             )
         }

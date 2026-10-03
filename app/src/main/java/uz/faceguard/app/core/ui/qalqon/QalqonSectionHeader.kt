@@ -1,6 +1,7 @@
 package uz.faceguard.app.core.ui.qalqon
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -29,6 +30,7 @@ fun QalqonSectionHeader(
     title: String,
     modifier: Modifier = Modifier.fillMaxWidth(),
     supportingText: String? = null,
+    leading: (@Composable () -> Unit)? = null,
     action: (@Composable () -> Unit)? = null,
 ) {
     Row(
@@ -38,6 +40,9 @@ fun QalqonSectionHeader(
         ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        leading?.let {
+            Box(modifier = Modifier.padding(end = QalqonDimens.spacing.sm)) { it() }
+        }
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.xs / 2),

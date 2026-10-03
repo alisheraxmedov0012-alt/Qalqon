@@ -619,7 +619,7 @@
     <string name="home_action_protection_desc">Protection status and permissions</string>
     <string name="home_action_protected_apps_desc">Choose which apps to protect</string>
     <string name="home_action_requests_desc">Review requests from your child</string>
-    <string name="home_status_off_hint">Protection is currently off</string>
+    <string name="home_status_off_hint">Your child\'s device is currently unprotected</string>
     <string name="home_status_active_hint">Protection is active and running</string>
     <string name="home_status_setup_hint">Complete the required permissions to protect</string>
     <string name="home_status_blocking">Protection is blocking</string>

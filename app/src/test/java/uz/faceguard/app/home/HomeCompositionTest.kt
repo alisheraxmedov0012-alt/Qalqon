@@ -44,8 +44,8 @@ class HomeCompositionTest {
     @Test
     fun theHeroIsASignaturePremiumSurface() {
         val hero = home.substringAfter("private fun ProtectionStatusSection(").substringBefore("/** Compact attention")
-        assertTrue("the hero must be a soft-blue premium surface", hero.contains("Surface("))
-        assertTrue("the hero must use the QALQON blue surface", hero.contains("primaryContainer"))
+        assertTrue("the hero must be an icy premium surface", hero.contains("Surface("))
+        assertTrue("the hero must use the light icy-blue surface", hero.contains("surfaceContainerLow"))
         assertTrue("the hero must carry the QALQON wordmark", hero.contains("R.string.app_name"))
         assertTrue("the hero title must be dominant", hero.contains("typography.headlineSmall"))
         assertTrue("the hero must keep a full-width CTA", hero.contains("Modifier.fillMaxWidth()"))
@@ -118,7 +118,7 @@ class HomeCompositionTest {
     @Test
     fun theHeroIsAChipBackedPremiumSurface() {
         val hero = home.substringAfter("private fun ProtectionStatusSection(").substringBefore("/** Compact attention")
-        assertTrue("the hero must use the soft-blue premium surface", hero.contains("primaryContainer"))
+        assertTrue("the hero must use the light icy-blue premium surface", hero.contains("surfaceContainerLow"))
         assertTrue("the hero must show the real count as a badge", hero.contains("QalqonStatusBadge("))
     }
 

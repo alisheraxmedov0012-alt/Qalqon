@@ -1,6 +1,5 @@
 package uz.faceguard.app.feature.home
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -30,6 +29,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -509,7 +509,6 @@ private fun HomeHeader(
 private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: () -> Unit) {
     val status = homeProtectionStatus(state)
     val tone = homeProtectionTone(status)
-    val accent = toneColor(tone)
     val actionLabel = homeProtectionActionLabelRes(status)
     val statusLabel = stringResource(homeProtectionLabelRes(status))
     val runCount = (status == HomeProtectionStatus.ACTIVE || status == HomeProtectionStatus.BLOCKING) &&
@@ -518,11 +517,8 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = QalqonShapes.xLargeShape,
-        color = MaterialTheme.colorScheme.primaryContainer,
-        border = BorderStroke(
-            QalqonDimens.cardBorder,
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
-        ),
+        // Reference mockup: a light icy-blue card surface, with no hard grey outline.
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         tonalElevation = QalqonDimens.elevation.flat,
     ) {
         Column(
@@ -539,24 +535,23 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
                         text = stringResource(R.string.app_name).uppercase(),
                         style = MaterialTheme.typography.labelMedium,
                         letterSpacing = 2.sp,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f),
+                        color = MaterialTheme.colorScheme.primary,
                     )
                     Text(
                         text = statusLabel,
                         style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         text = stringResource(homeProtectionSupportingRes(status)),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 Spacer(Modifier.size(QalqonDimens.spacing.md))
                 // Right: the prominent shield + smartphone illustration (>= 100 dp), the
                 // hero's visual anchor — not a small status icon.
                 QalqonProtectionMotif(
-                    accent = accent,
                     modifier = Modifier.size(QalqonDimens.sizes.illustration),
                 )
             }
@@ -564,7 +559,7 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
                 Text(
                     text = stringResource(R.string.dashboard_active_app, packageName),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             // Real metadata chip: the actual protected-app count, only while protection runs.
@@ -574,13 +569,26 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
                     tone = tone,
                 )
             }
-            // The hero's primary, full-width action.
+            // The hero's primary, full-width pill action in the mockup's deep blue, with
+            // a shield glyph (the mockup's "🛡️"), the label and a forward chevron. The
+            // shield is a real icon rather than an emoji glyph, per the product's icon rules.
             Button(
                 onClick = onOpenProtection,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(QalqonDimens.sizes.buttonDefault),
+                shape = QalqonShapes.pillShape,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = QalqonTheme.colors.cta,
+                    contentColor = QalqonTheme.colors.onCta,
+                ),
             ) {
+                Icon(
+                    imageVector = Icons.Filled.Lock,
+                    contentDescription = null,
+                    modifier = Modifier.size(QalqonDimens.icon.sm),
+                )
+                Spacer(Modifier.size(QalqonDimens.spacing.sm))
                 Text(stringResource(actionLabel))
                 Spacer(Modifier.size(QalqonDimens.spacing.sm))
                 Icon(
@@ -876,14 +884,17 @@ private val HomeQuickActionBolt: ImageVector by lazy {
  * announced twice.
  */
 @Composable
-private fun QalqonProtectionMotif(accent: Color, modifier: Modifier = Modifier) {
+private fun QalqonProtectionMotif(modifier: Modifier = Modifier) {
+    // Reference mockup palette: a soft pastel-blue shield, a vivid blue stroke and a
+    // clean white/blue smartphone — no dark grey outlines.
+    val shieldFill = QalqonTheme.colors.illustrationShield
+    val stroke = QalqonTheme.colors.illustrationStroke
     val phoneFill = MaterialTheme.colorScheme.surfaceContainerLowest
-    val phoneBorder = MaterialTheme.colorScheme.primary
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
-            // The soft blue shield layer.
+            // The soft pastel-blue shield layer.
             val shield = Path().apply {
                 moveTo(w * 0.5f, h * 0.02f)
                 lineTo(w * 0.94f, h * 0.20f)
@@ -893,8 +904,8 @@ private fun QalqonProtectionMotif(accent: Color, modifier: Modifier = Modifier) 
                 lineTo(w * 0.06f, h * 0.20f)
                 close()
             }
-            drawPath(shield, color = accent.copy(alpha = 0.20f))
-            drawPath(shield, color = accent.copy(alpha = 0.55f), style = Stroke(width = h * 0.035f))
+            drawPath(shield, color = shieldFill)
+            drawPath(shield, color = stroke, style = Stroke(width = h * 0.035f))
 
             // The stylized smartphone sitting on the shield.
             val phoneW = w * 0.48f
@@ -909,7 +920,7 @@ private fun QalqonProtectionMotif(accent: Color, modifier: Modifier = Modifier) 
                 cornerRadius = phoneRadius,
             )
             drawRoundRect(
-                color = phoneBorder,
+                color = stroke,
                 topLeft = Offset(phoneLeft, phoneTop),
                 size = Size(phoneW, phoneH),
                 cornerRadius = phoneRadius,
@@ -917,17 +928,17 @@ private fun QalqonProtectionMotif(accent: Color, modifier: Modifier = Modifier) 
             )
             // A speaker slot, so the rounded rectangle reads as a phone.
             drawRoundRect(
-                color = phoneBorder.copy(alpha = 0.7f),
+                color = stroke.copy(alpha = 0.7f),
                 topLeft = Offset(w * 0.5f - phoneW * 0.18f, phoneTop + h * 0.05f),
                 size = Size(phoneW * 0.36f, h * 0.022f),
                 cornerRadius = CornerRadius(h * 0.011f),
             )
         }
-        // The lock on the phone screen.
+        // The lock centred on the phone screen.
         Icon(
             imageVector = Icons.Filled.Lock,
             contentDescription = null,
-            tint = phoneBorder,
+            tint = stroke,
             modifier = Modifier.size(QalqonDimens.icon.lg),
         )
     }
@@ -1043,20 +1054,23 @@ private fun HomeMetricTile(
         )
         // Real, state-derived nudge shown only while protection is inactive.
         if (metric.kind == HomeTodayMetricKind.PROTECTION && metric.tone == QalqonStatusTone.INACTIVE) {
-            MetricActionBadge(label = stringResource(R.string.home_metric_activate), accent = accent)
+            MetricActionBadge(label = stringResource(R.string.home_metric_activate))
         }
     }
 }
 
-/** A small inline status badge nudging the parent toward the tile's real action. */
+/**
+ * The inactive-metric nudge. Reference mockup: a soft red/pink container with crimson
+ * text on the 8 dp (small) rounded shape.
+ */
 @Composable
-private fun MetricActionBadge(label: String, accent: Color, modifier: Modifier = Modifier) {
+private fun MetricActionBadge(label: String, modifier: Modifier = Modifier) {
     Text(
         text = label,
         style = MaterialTheme.typography.labelSmall,
-        color = accent,
+        color = QalqonTheme.colors.onDangerContainer,
         modifier = modifier
-            .background(color = accent.copy(alpha = 0.14f), shape = QalqonShapes.pillShape)
+            .background(color = QalqonTheme.colors.dangerContainer, shape = QalqonShapes.smallShape)
             .padding(
                 horizontal = QalqonDimens.spacing.sm,
                 vertical = QalqonDimens.spacing.xs,
@@ -1100,7 +1114,7 @@ private fun QuickActionsSection(
                 bordered = true,
                 containerColor = MaterialTheme.colorScheme.surface,
                 elevation = QalqonDimens.elevation.raised,
-                shape = QalqonShapes.xLargeShape,
+                shape = QalqonShapes.largeShape,
                 onClick = onClick,
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

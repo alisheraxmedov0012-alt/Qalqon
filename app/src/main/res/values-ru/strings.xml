@@ -619,7 +619,7 @@
     <string name="home_action_protection_desc">Статус защиты и разрешения</string>
     <string name="home_action_protected_apps_desc">Выбор защищаемых приложений</string>
     <string name="home_action_requests_desc">Просмотр запросов от ребёнка</string>
-    <string name="home_status_off_hint">Защита сейчас выключена</string>
+    <string name="home_status_off_hint">Устройство вашего ребёнка сейчас не защищено</string>
     <string name="home_status_active_hint">Защита активна и работает</string>
     <string name="home_status_setup_hint">Завершите настройку разрешений для защиты</string>
     <string name="home_status_blocking">Защита блокирует</string>

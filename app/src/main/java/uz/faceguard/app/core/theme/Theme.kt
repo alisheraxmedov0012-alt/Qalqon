@@ -28,6 +28,12 @@ private val LightColors = lightColorScheme(
     onSecondary = Color.White,
     secondaryContainer = Color(0xFFE3EDF7),
     onSecondaryContainer = Color(0xFF152A40),
+    // Soft-purple tertiary accent: the third, restrained accent the Home quick actions
+    // use to colour-code their icon containers (no raw colour in the screen itself).
+    tertiary = Color(0xFF6750A4),
+    onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFEDE7F6),
+    onTertiaryContainer = Color(0xFF311B92),
     // A very light blue canvas (not pure white, not grey) so the white cards read as
     // distinct premium surfaces floating on it.
     background = Color(0xFFEEF3FB),
@@ -68,6 +74,11 @@ private val DarkColors = darkColorScheme(
     onSecondary = Color(0xFF0B1E33),
     secondaryContainer = Color(0xFF2A3B4D),
     onSecondaryContainer = Color(0xFFE3EDF7),
+    // Dark soft-purple tertiary, lighter/less saturated for a dark surface.
+    tertiary = Color(0xFFD0BCFF),
+    onTertiary = Color(0xFF381E72),
+    tertiaryContainer = Color(0xFF332D41),
+    onTertiaryContainer = Color(0xFFE8DEF8),
     background = Color(0xFF121417),
     onBackground = Color(0xFFE2E2E5),
     surface = Color(0xFF1B1E22),

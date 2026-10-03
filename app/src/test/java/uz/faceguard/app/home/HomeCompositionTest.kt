@@ -54,10 +54,11 @@ class HomeCompositionTest {
     @Test
     fun theDashboardSectionsCarryAnIconMarker() {
         // The Today / Children / Quick actions headers use the shared section-icon marker,
-        // giving the page a single designed identity.
+        // giving the page a single designed identity. The Quick actions marker is the
+        // lightning bolt added by the reference refinement.
         assertTrue(home.contains("HomeSectionIcon(Icons.Filled.DateRange"))
         assertTrue(home.contains("HomeSectionIcon(Icons.Filled.Person"))
-        assertTrue(home.contains("HomeSectionIcon(Icons.AutoMirrored.Filled.List"))
+        assertTrue(home.contains("HomeSectionIcon(HomeQuickActionBolt"))
     }
 
     @Test

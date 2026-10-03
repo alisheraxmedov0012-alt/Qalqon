@@ -51,8 +51,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
@@ -80,6 +82,7 @@ import uz.faceguard.app.core.debug.DebugFlags
 import uz.faceguard.app.core.protection.ProtectionRuntime
 import uz.faceguard.app.core.theme.QalqonDimens
 import uz.faceguard.app.core.theme.QalqonShapes
+import uz.faceguard.app.core.theme.QalqonTheme
 import uz.faceguard.app.core.ui.qalqon.QalqonAlertRow
 import uz.faceguard.app.core.ui.qalqon.QalqonAlertSeverity
 import uz.faceguard.app.core.ui.qalqon.QalqonCard
@@ -90,6 +93,7 @@ import uz.faceguard.app.core.ui.qalqon.QalqonErrorState
 import uz.faceguard.app.core.ui.qalqon.QalqonLoadingState
 import uz.faceguard.app.core.ui.qalqon.QalqonSectionHeader
 import uz.faceguard.app.core.ui.qalqon.QalqonStatusBadge
+import uz.faceguard.app.core.ui.qalqon.QalqonStatusTone
 import uz.faceguard.app.core.ui.qalqon.severityColor
 import uz.faceguard.app.core.ui.qalqon.toneColor
 import uz.faceguard.app.domain.eyesafety.EyeSafetyRepository
@@ -359,7 +363,7 @@ fun HomeScreen(
                     }
                 }
 
-                item { TodaySection(dashboard, screenTimeSummary) }
+                item { TodaySection(dashboard, screenTimeSummary, onOpenProtection, onOpenChildPolicy) }
                 item { ChildrenSection(dashboard, screenTimeSummary, onOpenChildPolicy, onOpenChildren) }
                 item {
                     QuickActionsSection(
@@ -602,13 +606,13 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
                     .fillMaxWidth()
                     .height(QalqonDimens.sizes.buttonDefault),
             ) {
+                Text(stringResource(actionLabel))
+                Spacer(Modifier.size(QalqonDimens.spacing.sm))
                 Icon(
-                    imageVector = Icons.Filled.Lock,
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
                     modifier = Modifier.size(QalqonDimens.icon.sm),
                 )
-                Spacer(Modifier.size(QalqonDimens.spacing.sm))
-                Text(stringResource(actionLabel))
             }
         }
     }
@@ -803,8 +807,17 @@ private fun ChildrenSection(
 
 /** The compact today-overview metrics, laid out two per row. */
 @Composable
-private fun TodaySection(state: DashboardUiState, screenTime: ScreenTimeSummaryUiState) {
+private fun TodaySection(
+    state: DashboardUiState,
+    screenTime: ScreenTimeSummaryUiState,
+    onOpenProtection: () -> Unit,
+    onOpenChildPolicy: (Long) -> Unit,
+) {
     val metrics = homeTodayMetrics(state, screenTime)
+    // The screen-time tile opens the selected child's detail hub (which owns screen
+    // time); with no child selected it has no destination and stays static.
+    val screenTimeTarget: (() -> Unit)? =
+        screenTime.childId?.let { childId -> { onOpenChildPolicy(childId) } }
     Column(verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.sm)) {
         QalqonSectionHeader(
             title = stringResource(R.string.home_today_title),
@@ -824,6 +837,13 @@ private fun TodaySection(state: DashboardUiState, screenTime: ScreenTimeSummaryU
                     HomeMetricTile(
                         metric = metric,
                         modifier = Modifier.weight(1f).fillMaxHeight(),
+                        onClick = when (metric.kind) {
+                            HomeTodayMetricKind.PROTECTION -> onOpenProtection
+                            HomeTodayMetricKind.SCREEN_TIME -> screenTimeTarget
+                            HomeTodayMetricKind.SCHEDULE,
+                            HomeTodayMetricKind.EYE_SAFETY,
+                            -> null
+                        },
                     )
                 }
                 if (rowMetrics.size == 1) Spacer(Modifier.weight(1f))
@@ -838,6 +858,33 @@ private fun homeMetricIcon(kind: HomeTodayMetricKind): ImageVector = when (kind)
     HomeTodayMetricKind.SCHEDULE -> Icons.Filled.Info
     HomeTodayMetricKind.EYE_SAFETY -> Icons.Filled.Warning
     HomeTodayMetricKind.PROTECTION -> Icons.Filled.Lock
+}
+
+/**
+ * A Compose-drawn lightning bolt marking the Quick actions section.
+ *
+ * The bundled Material icon set has no bolt glyph (and the extended icon set is not a
+ * dependency), so the bolt is a small hand-built vector rather than an emoji or a
+ * bitmap. `Icon`'s tint overrides the fill, so a single vector serves every theme.
+ */
+private val HomeQuickActionBolt: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "HomeQuickActionBolt",
+        defaultWidth = QalqonDimens.icon.lg,
+        defaultHeight = QalqonDimens.icon.lg,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).apply {
+        path(fill = SolidColor(Color.Black)) {
+            moveTo(13f, 2f)
+            lineTo(4f, 14f)
+            lineTo(11f, 14f)
+            lineTo(10f, 22f)
+            lineTo(20f, 10f)
+            lineTo(13f, 10f)
+            close()
+        }
+    }.build()
 }
 
 /**
@@ -903,14 +950,19 @@ private fun HomeSectionIcon(icon: ImageVector, tint: Color) {
  * A compact metric card for the Today grid.
  *
  * Reference treatment: a white surface with a hairline border and a soft lift, a
- * semantic icon on a soft circular container, the metric title as a secondary label,
- * an optional supporting caption and the real value as the prominent line in its
- * semantic tone. The card is deliberately NOT clickable (the metric has no dedicated
- * destination), so no chevron is drawn — a chevron would advertise an action that does
- * not exist. Nothing here truncates: the supporting sentence wraps.
+ * semantic icon inside a tonal circular container (light blue for screen time, soft
+ * green for protection), the metric title as a secondary label, an optional supporting
+ * caption and the real value as the prominent line in its semantic tone. When the tile
+ * has a real destination it is clickable and shows a trailing chevron; with no
+ * destination it stays static and draws no chevron (never a fake affordance). Nothing
+ * truncates: the supporting sentence wraps.
  */
 @Composable
-private fun HomeMetricTile(metric: HomeTodayMetric, modifier: Modifier = Modifier) {
+private fun HomeMetricTile(
+    metric: HomeTodayMetric,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+) {
     val accent = metric.tone?.let { toneColor(it) } ?: MaterialTheme.colorScheme.onSurfaceVariant
     val (valueText, valueStyle) = when (val value = metric.value) {
         is HomeMetricValue.Duration ->
@@ -919,25 +971,46 @@ private fun HomeMetricTile(metric: HomeTodayMetric, modifier: Modifier = Modifie
             (if (value.arg != null) stringResource(value.res, value.arg) else stringResource(value.res)) to
                 MaterialTheme.typography.bodyLarge
     }
+    // Colour-coded circular icon container, so the Today grid reads at a glance.
+    val (iconContainer, iconTint) = when (metric.kind) {
+        HomeTodayMetricKind.SCREEN_TIME ->
+            MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.primary
+        HomeTodayMetricKind.PROTECTION ->
+            QalqonTheme.colors.successContainer to QalqonTheme.colors.success
+        else ->
+            accent.copy(alpha = 0.14f) to accent
+    }
     QalqonCard(
         modifier = modifier,
         bordered = true,
         containerColor = MaterialTheme.colorScheme.surface,
         elevation = QalqonDimens.elevation.raised,
+        onClick = onClick,
     ) {
-        // A soft circular icon container is the metric's semantic anchor.
-        Box(
-            modifier = Modifier
-                .size(QalqonDimens.sizes.buttonDefault)
-                .background(color = accent.copy(alpha = 0.14f), shape = CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = homeMetricIcon(metric.kind),
-                contentDescription = null,
-                tint = accent,
-                modifier = Modifier.size(QalqonDimens.icon.sm),
-            )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(QalqonDimens.sizes.buttonDefault)
+                    .background(color = iconContainer, shape = CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = homeMetricIcon(metric.kind),
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(QalqonDimens.icon.sm),
+                )
+            }
+            // The chevron is shown only when the tile really has a destination.
+            if (onClick != null) {
+                Spacer(Modifier.weight(1f))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(QalqonDimens.icon.sm),
+                )
+            }
         }
         Text(
             text = stringResource(metric.labelRes),
@@ -957,7 +1030,27 @@ private fun HomeMetricTile(metric: HomeTodayMetric, modifier: Modifier = Modifie
             color = accent,
             // The full sentence is allowed to wrap; nothing here truncates it.
         )
+        // Real, state-derived nudge shown only while protection is inactive.
+        if (metric.kind == HomeTodayMetricKind.PROTECTION && metric.tone == QalqonStatusTone.INACTIVE) {
+            MetricActionBadge(label = stringResource(R.string.home_metric_activate), accent = accent)
+        }
     }
+}
+
+/** A small inline status badge nudging the parent toward the tile's real action. */
+@Composable
+private fun MetricActionBadge(label: String, accent: Color, modifier: Modifier = Modifier) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelSmall,
+        color = accent,
+        modifier = modifier
+            .background(color = accent.copy(alpha = 0.14f), shape = QalqonShapes.pillShape)
+            .padding(
+                horizontal = QalqonDimens.spacing.sm,
+                vertical = QalqonDimens.spacing.xs,
+            ),
+    )
 }
 
 /**
@@ -981,7 +1074,7 @@ private fun QuickActionsSection(
         QalqonSectionHeader(
             title = stringResource(R.string.home_quick_actions_title),
             supportingText = stringResource(R.string.home_quick_actions_subtitle),
-            leading = { HomeSectionIcon(Icons.AutoMirrored.Filled.List, MaterialTheme.colorScheme.primary) },
+            leading = { HomeSectionIcon(HomeQuickActionBolt, MaterialTheme.colorScheme.primary) },
         )
         actions.forEach { action ->
             val onClick = when (action) {
@@ -990,6 +1083,7 @@ private fun QuickActionsSection(
                 HomeQuickAction.PROTECTED_APPS -> onOpenProtectedApps
                 HomeQuickAction.REVIEW_REQUESTS -> onOpenRequests
             }
+            val (iconContainer, iconTint) = quickActionIconColors(action)
             QalqonCard(
                 modifier = Modifier.fillMaxWidth(),
                 bordered = true,
@@ -1001,16 +1095,13 @@ private fun QuickActionsSection(
                     Box(
                         modifier = Modifier
                             .size(QalqonDimens.sizes.buttonDefault)
-                            .background(
-                                color = MaterialTheme.colorScheme.secondaryContainer,
-                                shape = QalqonShapes.smallShape,
-                            ),
+                            .background(color = iconContainer, shape = CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             imageVector = homeQuickActionIcon(action),
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            tint = iconTint,
                             modifier = Modifier.size(QalqonDimens.icon.sm),
                         )
                     }
@@ -1038,6 +1129,22 @@ private fun QuickActionsSection(
             }
         }
     }
+}
+
+/**
+ * Colour-coded circular icon container per quick action, so the group is scannable:
+ * soft blue for children, soft purple for protected apps, the neutral secondary
+ * container for the remaining commands. All three come from theme roles.
+ */
+@Composable
+private fun quickActionIconColors(action: HomeQuickAction): Pair<Color, Color> = when (action) {
+    HomeQuickAction.MANAGE_CHILDREN ->
+        MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.primary
+    HomeQuickAction.PROTECTED_APPS ->
+        MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.tertiary
+    HomeQuickAction.PROTECTION_SETTINGS,
+    HomeQuickAction.REVIEW_REQUESTS,
+    -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
 }
 
 /** The glyph for each quick action; decorative, the label carries the meaning. */

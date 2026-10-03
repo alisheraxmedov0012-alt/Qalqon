@@ -294,7 +294,7 @@
     <string name="dashboard_capability_ready">Готово: %1$s</string>
     <string name="dashboard_capability_needed">Нужно: %1$s</string>
     <string name="dashboard_capability_ok">Возможности защиты готовы</string>
-    <string name="dashboard_capability_open">Настроить защиту</string>
+    <string name="dashboard_capability_open">Включить защиту</string>
     <string name="dashboard_active_title">Текущая защита</string>
     <string name="dashboard_active_none">Активного события защиты нет</string>
     <string name="dashboard_active_app">Приложение: %1$s</string>
@@ -612,7 +612,8 @@
     <string name="home_today_subtitle">Кратко об активности ребёнка</string>
     <string name="home_children_subtitle">Дети под контролем</string>
     <string name="home_quick_actions_title">Быстрые действия</string>
-    <string name="home_quick_actions_subtitle">Ключевые настройки</string>
+    <string name="home_quick_actions_subtitle">Быстрые настройки и управление</string>
+    <string name="home_metric_activate">Активировать</string>
     <string name="home_action_manage_children">Управление детьми</string>
     <string name="home_action_manage_children_desc">Просмотр и управление профилями детей</string>
     <string name="home_action_protection_desc">Статус защиты и разрешения</string>

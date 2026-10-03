@@ -28,7 +28,9 @@ private val LightColors = lightColorScheme(
     onSecondary = Color.White,
     secondaryContainer = Color(0xFFE3EDF7),
     onSecondaryContainer = Color(0xFF152A40),
-    background = Color(0xFFF7F9FC),
+    // A very light blue canvas (not pure white, not grey) so the white cards read as
+    // distinct premium surfaces floating on it.
+    background = Color(0xFFEEF3FB),
     onBackground = Color(0xFF1A1C1E),
     surface = Color.White,
     onSurface = Color(0xFF1A1C1E),

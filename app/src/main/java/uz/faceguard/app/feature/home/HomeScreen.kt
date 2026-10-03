@@ -1,8 +1,8 @@
 package uz.faceguard.app.feature.home
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -55,7 +54,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -290,6 +288,9 @@ fun HomeScreen(
     val parentProfile by viewModel.parentProfile.collectAsStateWithLifecycle()
 
     Scaffold(
+        // The light-blue canvas is what makes the white cards read as premium,
+        // floating surfaces rather than one flat grey page.
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             HomeHeader(
                 parentName = parentProfile?.displayName,
@@ -335,9 +336,11 @@ fun HomeScreen(
                     start = QalqonDimens.screenPadding,
                     end = QalqonDimens.screenPadding,
                     top = QalqonDimens.spacing.sm,
-                    bottom = QalqonDimens.spacing.xxl,
+                    bottom = QalqonDimens.spacing.lg,
                 ),
-                verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.lg),
+                // A compact, intentional vertical rhythm: the reference keeps the page
+                // tight rather than stacking large blocks with big gaps.
+                verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.md),
             ) {
                 // Priority order: the protection verdict, then anything that needs the
                 // parent's attention, then today's states, the children and the actions.
@@ -375,7 +378,7 @@ fun HomeScreen(
 /**
  * The Home header: a compact identity block rather than a Material app bar.
  *
- * The parent's initial sits on a large circular container, followed by the localized
+ * The parent's initial sits on a circular container, followed by the localized
  * greeting (the parent's own name when known, else the plain title) and a secondary
  * supporting line. The overflow holds the secondary destinations that no
  * bottom-navigation tab owns (Privacy, Help), so they stay reachable; the developer
@@ -395,96 +398,92 @@ private fun HomeHeader(
     val greeting = name?.let { stringResource(R.string.home_greeting, it) }
     val initial = name?.firstOrNull()?.uppercase()
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.background,
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(
+                start = QalqonDimens.screenPadding,
+                end = QalqonDimens.spacing.sm,
+                top = QalqonDimens.spacing.md,
+                bottom = QalqonDimens.spacing.sm,
+            ),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
+        // A known name shows its initial; an unknown name shows the QALQON protection
+        // mark, never an invented identity.
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    start = QalqonDimens.screenPadding,
-                    end = QalqonDimens.spacing.sm,
-                    top = QalqonDimens.spacing.sm,
-                    bottom = QalqonDimens.spacing.sm,
-                ),
-            verticalAlignment = Alignment.CenterVertically,
+                .size(QalqonDimens.sizes.buttonDefault)
+                .background(color = MaterialTheme.colorScheme.primaryContainer, shape = CircleShape),
+            contentAlignment = Alignment.Center,
         ) {
-            // Premium circular identity container. A known name shows its initial; an
-            // unknown name shows the QALQON protection mark, never an invented identity.
-            Box(
-                modifier = Modifier
-                    .size(QalqonDimens.sizes.buttonDefault)
-                    .background(color = MaterialTheme.colorScheme.primaryContainer, shape = CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (initial != null) {
-                    Text(
-                        text = initial,
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Filled.Lock,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(QalqonDimens.icon.md),
-                    )
-                }
-            }
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = QalqonDimens.spacing.md),
-            ) {
+            if (initial != null) {
                 Text(
-                    text = greeting ?: stringResource(R.string.home_title),
+                    text = initial,
                     style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
-                Text(
-                    text = stringResource(R.string.dashboard_subtitle),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+            } else {
+                Icon(
+                    imageVector = Icons.Filled.Lock,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(QalqonDimens.icon.md),
                 )
             }
-            Box {
-                IconButton(onClick = { menuExpanded = true }) {
-                    Icon(
-                        imageVector = Icons.Filled.MoreVert,
-                        contentDescription = stringResource(R.string.home_more_options),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = QalqonDimens.spacing.md),
+        ) {
+            Text(
+                text = greeting ?: stringResource(R.string.home_title),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = stringResource(R.string.dashboard_subtitle),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Box {
+            IconButton(onClick = { menuExpanded = true }) {
+                Icon(
+                    imageVector = Icons.Filled.MoreVert,
+                    contentDescription = stringResource(R.string.home_more_options),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.home_menu_privacy)) },
+                    onClick = {
+                        menuExpanded = false
+                        onOpenPrivacy()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.home_menu_help)) },
+                    onClick = {
+                        menuExpanded = false
+                        onOpenHelp()
+                    },
+                )
+                if (DebugFlags.DEBUG_SCREENS_ENABLED) {
                     DropdownMenuItem(
-                        text = { Text(stringResource(R.string.home_menu_privacy)) },
+                        text = { Text(stringResource(R.string.home_recognition_debug)) },
                         onClick = {
                             menuExpanded = false
-                            onOpenPrivacy()
+                            onOpenRecognition()
                         },
                     )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.home_menu_help)) },
-                        onClick = {
-                            menuExpanded = false
-                            onOpenHelp()
-                        },
-                    )
-                    if (DebugFlags.DEBUG_SCREENS_ENABLED) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.home_recognition_debug)) },
-                            onClick = {
-                                menuExpanded = false
-                                onOpenRecognition()
-                            },
-                        )
-                    }
                 }
             }
         }
@@ -492,12 +491,12 @@ private fun HomeHeader(
 }
 
 /**
- * The signature QALQON hero: protection state on a large, premium soft-blue surface.
+ * The signature QALQON protection hero — the Home screen's focal point.
  *
- * Composition is status-forward: the wordmark and the live state badge share the top
- * line, the dominant state copy and its supporting line sit beside a large protective
- * medallion, and the action-first full-width CTA closes the block. The order is
- * STATE -> EXPLANATION -> ACTION.
+ * Composed to the reference layout (Variant A): a semantic protection icon and the
+ * QALQON wordmark + live state copy on the left, a large protective shield/device
+ * emblem anchoring the right, and an action-first full-width CTA at the bottom. The
+ * order reads STATE -> EXPLANATION -> ACTION on a large, very light tonal surface.
  *
  * Presentation only: every value comes from [DashboardUiState] via the existing
  * presentation helpers — no protection logic, no fabricated state.
@@ -512,46 +511,47 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
     val runCount = (status == HomeProtectionStatus.ACTIVE || status == HomeProtectionStatus.BLOCKING) &&
         state.protectedAppsCount > 0
 
-    // Signature hero: a large, borderless soft-blue surface (distinct from the white
-    // bordered cards elsewhere) with a big protective medallion, the QALQON wordmark, a
-    // Compose-native shield+device motif, a dominant title, supporting line, an optional
-    // real count chip and an action-first full-width CTA.
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = QalqonShapes.largeShape,
         color = MaterialTheme.colorScheme.primaryContainer,
+        border = BorderStroke(
+            QalqonDimens.cardBorder,
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+        ),
         tonalElevation = QalqonDimens.elevation.flat,
     ) {
         Column(
             modifier = Modifier.padding(QalqonDimens.cardPadding),
             verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.md),
         ) {
-            // Top line: the wordmark, with the real protected-app count as a metadata
-            // chip while protection runs (never a fabricated figure).
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(R.string.app_name).uppercase(),
-                    style = MaterialTheme.typography.titleSmall,
-                    letterSpacing = 2.sp,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f),
-                    modifier = Modifier.weight(1f),
-                )
-                if (runCount) {
-                    QalqonStatusBadge(
-                        label = stringResource(R.string.home_protection_apps_count, state.protectedAppsCount),
-                        tone = tone,
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Left: the semantic protection state glyph on a soft container.
+                Box(
+                    modifier = Modifier
+                        .size(QalqonDimens.sizes.buttonLarge)
+                        .background(color = accent.copy(alpha = 0.20f), shape = QalqonShapes.largeShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Lock,
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.size(QalqonDimens.icon.md),
                     )
                 }
-            }
-            // Dominant state copy beside the protective medallion.
-            Row(verticalAlignment = Alignment.CenterVertically) {
+                Spacer(Modifier.size(QalqonDimens.spacing.md))
+                // Middle: the wordmark, the dominant state copy and its explanation.
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.xs),
                 ) {
+                    Text(
+                        text = stringResource(R.string.app_name).uppercase(),
+                        style = MaterialTheme.typography.labelMedium,
+                        letterSpacing = 2.sp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f),
+                    )
                     Text(
                         text = statusLabel,
                         style = MaterialTheme.typography.headlineSmall,
@@ -563,15 +563,16 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                     )
                 }
+                Spacer(Modifier.size(QalqonDimens.spacing.sm))
+                // Right: a restrained Compose-drawn shield+device emblem — product
+                // meaning, drawn entirely from the semantic accent color.
                 Box(
                     modifier = Modifier.size(QalqonDimens.icon.lg * 2),
                     contentAlignment = Alignment.Center,
                 ) {
-                    // A restrained status ring behind the Compose-drawn motif, so the
-                    // hero's focal point reads as a deliberate emblem.
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         drawCircle(
-                            color = accent.copy(alpha = 0.18f),
+                            color = accent.copy(alpha = 0.16f),
                             style = Stroke(width = size.minDimension * 0.06f),
                         )
                     }
@@ -586,6 +587,13 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
                     text = stringResource(R.string.dashboard_active_app, packageName),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+            // Real metadata chip: the actual protected-app count, only while protection runs.
+            if (runCount) {
+                QalqonStatusBadge(
+                    label = stringResource(R.string.home_protection_apps_count, state.protectedAppsCount),
+                    tone = tone,
                 )
             }
             Button(
@@ -698,7 +706,12 @@ private fun ChildrenSection(
         if (children.isEmpty()) {
             // Compact, intentional onboarding card: a friendly medallion, a bounded
             // explanation and one primary CTA — never a tall centred block.
-            QalqonCard(modifier = Modifier.fillMaxWidth(), bordered = false) {
+            QalqonCard(
+                modifier = Modifier.fillMaxWidth(),
+                bordered = false,
+                containerColor = MaterialTheme.colorScheme.surface,
+                elevation = QalqonDimens.elevation.raised,
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
@@ -887,12 +900,14 @@ private fun HomeSectionIcon(icon: ImageVector, tint: Color) {
 }
 
 /**
- * A compact metric tile for the Today grid.
+ * A compact metric card for the Today grid.
  *
- * Hierarchy is label -> value -> explanation: the icon anchors the metric, the label is
- * deliberately secondary, and the value carries the emphasis (semantic tone color). A
- * duration is short and numeric so it renders larger; a status/text value can be a full
- * sentence, so it renders smaller and WRAPS — never an ellipsis on important text.
+ * Reference treatment: a white surface with a hairline border and a soft lift, a
+ * semantic icon on a soft circular container, the metric title as a secondary label,
+ * an optional supporting caption and the real value as the prominent line in its
+ * semantic tone. The card is deliberately NOT clickable (the metric has no dedicated
+ * destination), so no chevron is drawn — a chevron would advertise an action that does
+ * not exist. Nothing here truncates: the supporting sentence wraps.
  */
 @Composable
 private fun HomeMetricTile(metric: HomeTodayMetric, modifier: Modifier = Modifier) {
@@ -904,17 +919,17 @@ private fun HomeMetricTile(metric: HomeTodayMetric, modifier: Modifier = Modifie
             (if (value.arg != null) stringResource(value.res, value.arg) else stringResource(value.res)) to
                 MaterialTheme.typography.bodyLarge
     }
-    // Borderless cool-tonal dashboard tile: a distinct surface layer from the white
-    // bordered cards, so the page is not one repeated rounded rectangle.
     QalqonCard(
         modifier = modifier,
-        bordered = false,
-        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        bordered = true,
+        containerColor = MaterialTheme.colorScheme.surface,
+        elevation = QalqonDimens.elevation.raised,
     ) {
+        // A soft circular icon container is the metric's semantic anchor.
         Box(
             modifier = Modifier
-                .size(QalqonDimens.icon.lg)
-                .background(color = accent.copy(alpha = 0.14f), shape = QalqonShapes.smallShape),
+                .size(QalqonDimens.sizes.buttonDefault)
+                .background(color = accent.copy(alpha = 0.14f), shape = CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -926,14 +941,8 @@ private fun HomeMetricTile(metric: HomeTodayMetric, modifier: Modifier = Modifie
         }
         Text(
             text = stringResource(metric.labelRes),
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = valueText,
-            style = valueStyle,
-            color = accent,
-            // The full sentence is allowed to wrap; nothing here truncates it.
         )
         metric.caption?.let { caption ->
             Text(
@@ -942,13 +951,20 @@ private fun HomeMetricTile(metric: HomeTodayMetric, modifier: Modifier = Modifie
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        Text(
+            text = valueText,
+            style = valueStyle,
+            color = accent,
+            // The full sentence is allowed to wrap; nothing here truncates it.
+        )
     }
 }
 
 /**
  * The contextual quick actions, each routed through the existing navigation callbacks
- * (so the lock gate and protected-route rules are unchanged). They live on one grouped,
- * tonal command-center surface with divided rows: the tertiary layer of the card system.
+ * (so the lock gate and protected-route rules are unchanged). Each action is its own
+ * compact white card — a soft icon container, a title, a one-line description and a
+ * chevron — so the group reads as a set of tappable commands rather than a settings list.
  */
 @Composable
 private fun QuickActionsSection(
@@ -967,33 +983,24 @@ private fun QuickActionsSection(
             supportingText = stringResource(R.string.home_quick_actions_subtitle),
             leading = { HomeSectionIcon(Icons.AutoMirrored.Filled.List, MaterialTheme.colorScheme.primary) },
         )
-        QalqonCard(
-            modifier = Modifier.fillMaxWidth(),
-            bordered = false,
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            contentPadding = QalqonDimens.spacing.none,
-        ) {
-            actions.forEachIndexed { index, action ->
-                val onClick = when (action) {
-                    HomeQuickAction.MANAGE_CHILDREN -> onOpenChildren
-                    HomeQuickAction.PROTECTION_SETTINGS -> onOpenProtection
-                    HomeQuickAction.PROTECTED_APPS -> onOpenProtectedApps
-                    HomeQuickAction.REVIEW_REQUESTS -> onOpenRequests
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(role = Role.Button, onClick = onClick)
-                        .heightIn(min = QalqonDimens.sizes.touchTarget)
-                        .padding(
-                            horizontal = QalqonDimens.cardPadding,
-                            vertical = QalqonDimens.rowPadding,
-                        ),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+        actions.forEach { action ->
+            val onClick = when (action) {
+                HomeQuickAction.MANAGE_CHILDREN -> onOpenChildren
+                HomeQuickAction.PROTECTION_SETTINGS -> onOpenProtection
+                HomeQuickAction.PROTECTED_APPS -> onOpenProtectedApps
+                HomeQuickAction.REVIEW_REQUESTS -> onOpenRequests
+            }
+            QalqonCard(
+                modifier = Modifier.fillMaxWidth(),
+                bordered = true,
+                containerColor = MaterialTheme.colorScheme.surface,
+                elevation = QalqonDimens.elevation.raised,
+                onClick = onClick,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(QalqonDimens.icon.lg)
+                            .size(QalqonDimens.sizes.buttonDefault)
                             .background(
                                 color = MaterialTheme.colorScheme.secondaryContainer,
                                 shape = QalqonShapes.smallShape,
@@ -1014,7 +1021,7 @@ private fun QuickActionsSection(
                     ) {
                         Text(
                             text = stringResource(homeQuickActionLabelRes(action)),
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = MaterialTheme.typography.titleSmall,
                         )
                         Text(
                             text = stringResource(homeQuickActionDescriptionRes(action)),
@@ -1026,13 +1033,6 @@ private fun QuickActionsSection(
                         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (index != actions.lastIndex) {
-                    QalqonDivider(
-                        modifier = Modifier.padding(
-                            start = QalqonDimens.cardPadding + QalqonDimens.icon.lg + QalqonDimens.spacing.md,
-                        ),
                     )
                 }
             }

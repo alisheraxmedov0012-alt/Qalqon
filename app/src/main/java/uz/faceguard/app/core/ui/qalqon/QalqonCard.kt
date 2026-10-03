@@ -45,6 +45,11 @@ fun QalqonCard(
     bordered: Boolean = true,
     containerColor: Color = MaterialTheme.colorScheme.surface,
     contentPadding: Dp = QalqonDimens.cardPadding,
+    /**
+     * Surface shadow. Defaults to flat, so every existing caller keeps its current
+     * look; a screen may pass [QalqonDimens.elevation.raised] for a subtle lift.
+     */
+    elevation: Dp = QalqonDimens.elevation.flat,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -61,12 +66,14 @@ fun QalqonCard(
     }
 
     // OutlinedCard gives the hairline border; a plain Card is used when borderless.
-    val elevation = CardDefaults.cardElevation(defaultElevation = QalqonDimens.elevation.flat)
+    // Both share the same token elevation so a lifted card looks identical in either form.
+    val cardElevation = CardDefaults.cardElevation(defaultElevation = elevation)
     if (bordered) {
         OutlinedCard(
             modifier = modifier.then(clickModifier),
             shape = shape,
             border = border!!,
+            elevation = cardElevation,
             colors = CardDefaults.outlinedCardColors(containerColor = containerColor),
             content = {
                 Column(
@@ -80,7 +87,7 @@ fun QalqonCard(
         Card(
             modifier = modifier.then(clickModifier),
             shape = shape,
-            elevation = elevation,
+            elevation = cardElevation,
             colors = CardDefaults.cardColors(containerColor = containerColor),
             content = {
                 Column(

@@ -61,10 +61,14 @@ class HomeCompositionTest {
     }
 
     @Test
-    fun theTodayTilesAreBorderlessTonalSurfaces() {
+    fun theTodayTilesArePremiumBorderedSurfaces() {
+        // Reference redesign: the Today metric tiles are white surfaces with a hairline
+        // border and a soft lift, so they read as premium cards on the light canvas
+        // (superseding the earlier flat tonal tiles).
         val tile = home.substringAfter("private fun HomeMetricTile(").substringBefore("/**")
-        assertTrue("the tile must drop the repeated border", tile.contains("bordered = false"))
-        assertTrue("the tile must use a distinct tonal surface", tile.contains("surfaceVariant"))
+        assertTrue("the tile must carry the hairline border", tile.contains("bordered = true"))
+        assertTrue("the tile must sit on the white card surface", tile.contains("MaterialTheme.colorScheme.surface"))
+        assertTrue("the tile must use the soft lift", tile.contains("elevation = QalqonDimens.elevation.raised"))
     }
 
     @Test

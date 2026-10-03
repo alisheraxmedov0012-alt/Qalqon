@@ -211,8 +211,9 @@ fun QalqonCapabilityRow(
 }
 
 /**
- * Alert row: severity dot + text, optionally clickable, always at least a full
- * touch target tall. Used for actionable warnings on the dashboard.
+ * Alert row: severity dot (or a caller-supplied semantic icon) + text, optionally
+ * clickable, always at least a full touch target tall. Used for actionable warnings
+ * on the dashboard.
  */
 @Composable
 fun QalqonAlertRow(
@@ -220,6 +221,7 @@ fun QalqonAlertRow(
     severity: QalqonAlertSeverity,
     modifier: Modifier = Modifier.fillMaxWidth(),
     onClick: (() -> Unit)? = null,
+    leadingIcon: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     val shape: Shape = RoundedCornerShape(QalqonShapes.medium)
@@ -238,12 +240,16 @@ fun QalqonAlertRow(
     }
 
     Row(modifier = rowModifier, verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .padding(end = QalqonDimens.spacing.sm)
-                .size(QalqonDimens.sizes.indicator)
-                .background(color = severityColor(severity), shape = CircleShape),
-        )
+        if (leadingIcon != null) {
+            Box(modifier = Modifier.padding(end = QalqonDimens.spacing.sm)) { leadingIcon() }
+        } else {
+            Box(
+                modifier = Modifier
+                    .padding(end = QalqonDimens.spacing.sm)
+                    .size(QalqonDimens.sizes.indicator)
+                    .background(color = severityColor(severity), shape = CircleShape),
+            )
+        }
         Text(
             text = text,
             style = MaterialTheme.typography.bodyMedium,

@@ -28,7 +28,15 @@ private val LightColors = lightColorScheme(
     onSecondary = Color.White,
     secondaryContainer = Color(0xFFE3EDF7),
     onSecondaryContainer = Color(0xFF152A40),
-    background = Color(0xFFF7F9FC),
+    // Soft-purple tertiary accent: the third, restrained accent the Home quick actions
+    // use to colour-code their icon containers (no raw colour in the screen itself).
+    tertiary = Color(0xFF6750A4),
+    onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFEDE7F6),
+    onTertiaryContainer = Color(0xFF311B92),
+    // A very light blue canvas (not pure white, not grey) so the white cards read as
+    // distinct premium surfaces floating on it.
+    background = Color(0xFFEEF3FB),
     onBackground = Color(0xFF1A1C1E),
     surface = Color.White,
     onSurface = Color(0xFF1A1C1E),
@@ -40,6 +48,21 @@ private val LightColors = lightColorScheme(
     onError = Color.White,
     errorContainer = Color(0xFFF9DEDC),
     onErrorContainer = Color(0xFF410E0B),
+    // M3 surface-container hierarchy (premium tonal layering). `surfaceContainerLowest`
+    // is the brightest card surface; the rest step down towards the screen background so
+    // screens can layer cards, sheets and the anchored bottom bar without raw colors.
+    surfaceDim = Color(0xFFDDE2E9),
+    surfaceBright = Color(0xFFFFFFFF),
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFF7F9FC),
+    surfaceContainer = Color(0xFFF1F4F9),
+    surfaceContainerHigh = Color(0xFFEBEFF5),
+    surfaceContainerHighest = Color(0xFFE5EAF1),
+    surfaceTint = Color(0xFF1E5B9E),
+    scrim = Color(0xFF000000),
+    inverseSurface = Color(0xFF2E3238),
+    inverseOnSurface = Color(0xFFF1F3F6),
+    inversePrimary = Color(0xFF9EC5F5),
 )
 
 private val DarkColors = darkColorScheme(
@@ -51,6 +74,11 @@ private val DarkColors = darkColorScheme(
     onSecondary = Color(0xFF0B1E33),
     secondaryContainer = Color(0xFF2A3B4D),
     onSecondaryContainer = Color(0xFFE3EDF7),
+    // Dark soft-purple tertiary, lighter/less saturated for a dark surface.
+    tertiary = Color(0xFFD0BCFF),
+    onTertiary = Color(0xFF381E72),
+    tertiaryContainer = Color(0xFF332D41),
+    onTertiaryContainer = Color(0xFFE8DEF8),
     background = Color(0xFF121417),
     onBackground = Color(0xFFE2E2E5),
     surface = Color(0xFF1B1E22),
@@ -63,6 +91,19 @@ private val DarkColors = darkColorScheme(
     onError = Color(0xFF601410),
     errorContainer = Color(0xFF8C1D18),
     onErrorContainer = Color(0xFFF9DEDC),
+    // Dark equivalents, so the same components layer correctly in dark theme.
+    surfaceDim = Color(0xFF121417),
+    surfaceBright = Color(0xFF383C42),
+    surfaceContainerLowest = Color(0xFF0D0F12),
+    surfaceContainerLow = Color(0xFF1B1E22),
+    surfaceContainer = Color(0xFF1F2328),
+    surfaceContainerHigh = Color(0xFF2A2F35),
+    surfaceContainerHighest = Color(0xFF33383F),
+    surfaceTint = Color(0xFF9EC5F5),
+    scrim = Color(0xFF000000),
+    inverseSurface = Color(0xFFE2E2E5),
+    inverseOnSurface = Color(0xFF2E3238),
+    inversePrimary = Color(0xFF1E5B9E),
 )
 
 /** Shape scale wired into Material so all components share the radius hierarchy. */

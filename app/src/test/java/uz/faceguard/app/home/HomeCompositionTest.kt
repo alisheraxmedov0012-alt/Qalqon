@@ -44,8 +44,8 @@ class HomeCompositionTest {
     @Test
     fun theHeroIsASignaturePremiumSurface() {
         val hero = home.substringAfter("private fun ProtectionStatusSection(").substringBefore("/** Compact attention")
-        assertTrue("the hero must be a soft-blue premium surface", hero.contains("Surface("))
-        assertTrue("the hero must use the QALQON blue surface", hero.contains("primaryContainer"))
+        assertTrue("the hero must be an icy premium surface", hero.contains("Surface("))
+        assertTrue("the hero must use the light icy-blue surface", hero.contains("surfaceContainerLow"))
         assertTrue("the hero must carry the QALQON wordmark", hero.contains("R.string.app_name"))
         assertTrue("the hero title must be dominant", hero.contains("typography.headlineSmall"))
         assertTrue("the hero must keep a full-width CTA", hero.contains("Modifier.fillMaxWidth()"))
@@ -54,17 +54,48 @@ class HomeCompositionTest {
     @Test
     fun theDashboardSectionsCarryAnIconMarker() {
         // The Today / Children / Quick actions headers use the shared section-icon marker,
-        // giving the page a single designed identity.
+        // giving the page a single designed identity. The Quick actions marker is the
+        // lightning bolt added by the reference refinement.
         assertTrue(home.contains("HomeSectionIcon(Icons.Filled.DateRange"))
         assertTrue(home.contains("HomeSectionIcon(Icons.Filled.Person"))
-        assertTrue(home.contains("HomeSectionIcon(Icons.AutoMirrored.Filled.List"))
+        assertTrue(home.contains("HomeSectionIcon(HomeQuickActionBolt"))
     }
 
     @Test
-    fun theTodayTilesAreBorderlessTonalSurfaces() {
+    fun theTodayTilesArePremiumBorderedSurfaces() {
+        // Reference redesign: the Today metric tiles are white surfaces with a hairline
+        // border and a soft lift, so they read as premium cards on the light canvas
+        // (superseding the earlier flat tonal tiles).
         val tile = home.substringAfter("private fun HomeMetricTile(").substringBefore("/**")
-        assertTrue("the tile must drop the repeated border", tile.contains("bordered = false"))
-        assertTrue("the tile must use a distinct tonal surface", tile.contains("surfaceVariant"))
+        assertTrue("the tile must carry the hairline border", tile.contains("bordered = true"))
+        assertTrue("the tile must sit on the white card surface", tile.contains("MaterialTheme.colorScheme.surface"))
+        assertTrue("the tile must use the soft lift", tile.contains("elevation = QalqonDimens.elevation.raised"))
+    }
+
+    @Test
+    fun theHeroCarriesTheQalqonShieldAndDeviceMotif() {
+        // The signature hero includes a Compose-native shield+device motif (no bitmap,
+        // no remote asset), drawn from the semantic accent color.
+        val hero = home.substringAfter("private fun ProtectionStatusSection(").substringBefore("/** Compact attention")
+        assertTrue("the hero must render the motif", hero.contains("QalqonProtectionMotif("))
+        val motif = home.substringAfter("private fun QalqonProtectionMotif(").substringBefore("/**")
+        assertTrue("the motif must be Compose-drawn", motif.contains("Canvas("))
+        assertTrue("the motif must not use a bitmap asset", !motif.contains("painterResource"))
+    }
+
+    @Test
+    fun theHeroCtaMeetsTheAccessibilityTouchTarget() {
+        val hero = home.substringAfter("private fun ProtectionStatusSection(").substringBefore("/** Compact attention")
+        assertTrue(
+            "the hero CTA must be at least the 48dp touch target",
+            hero.contains("height(QalqonDimens.sizes.buttonDefault)"),
+        )
+    }
+
+    @Test
+    fun theTodaySectionIsATwoColumnMetricGrid() {
+        val today = home.substringAfter("private fun TodaySection(").substringBefore("/** The glyph for each metric")
+        assertTrue("today must lay its metrics out two per row", today.contains("chunked(2)"))
     }
 
     @Test
@@ -87,7 +118,7 @@ class HomeCompositionTest {
     @Test
     fun theHeroIsAChipBackedPremiumSurface() {
         val hero = home.substringAfter("private fun ProtectionStatusSection(").substringBefore("/** Compact attention")
-        assertTrue("the hero must use the soft-blue premium surface", hero.contains("primaryContainer"))
+        assertTrue("the hero must use the light icy-blue premium surface", hero.contains("surfaceContainerLow"))
         assertTrue("the hero must show the real count as a badge", hero.contains("QalqonStatusBadge("))
     }
 

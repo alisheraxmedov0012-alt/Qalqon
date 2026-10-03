@@ -1,7 +1,7 @@
 package uz.faceguard.app.feature.home
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
@@ -28,9 +28,9 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,7 +38,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,10 +45,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -76,6 +82,7 @@ import uz.faceguard.app.core.debug.DebugFlags
 import uz.faceguard.app.core.protection.ProtectionRuntime
 import uz.faceguard.app.core.theme.QalqonDimens
 import uz.faceguard.app.core.theme.QalqonShapes
+import uz.faceguard.app.core.theme.QalqonTheme
 import uz.faceguard.app.core.ui.qalqon.QalqonAlertRow
 import uz.faceguard.app.core.ui.qalqon.QalqonAlertSeverity
 import uz.faceguard.app.core.ui.qalqon.QalqonCard
@@ -86,6 +93,7 @@ import uz.faceguard.app.core.ui.qalqon.QalqonErrorState
 import uz.faceguard.app.core.ui.qalqon.QalqonLoadingState
 import uz.faceguard.app.core.ui.qalqon.QalqonSectionHeader
 import uz.faceguard.app.core.ui.qalqon.QalqonStatusBadge
+import uz.faceguard.app.core.ui.qalqon.QalqonStatusTone
 import uz.faceguard.app.core.ui.qalqon.severityColor
 import uz.faceguard.app.core.ui.qalqon.toneColor
 import uz.faceguard.app.domain.eyesafety.EyeSafetyRepository
@@ -284,8 +292,11 @@ fun HomeScreen(
     val parentProfile by viewModel.parentProfile.collectAsStateWithLifecycle()
 
     Scaffold(
+        // The light-blue canvas is what makes the white cards read as premium,
+        // floating surfaces rather than one flat grey page.
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            HomeTopBar(
+            HomeHeader(
                 parentName = parentProfile?.displayName,
                 onOpenPrivacy = onOpenPrivacy,
                 onOpenHelp = onOpenHelp,
@@ -328,11 +339,15 @@ fun HomeScreen(
                 contentPadding = PaddingValues(
                     start = QalqonDimens.screenPadding,
                     end = QalqonDimens.screenPadding,
-                    top = QalqonDimens.spacing.lg,
-                    bottom = QalqonDimens.spacing.xxl,
+                    top = QalqonDimens.spacing.sm,
+                    bottom = QalqonDimens.spacing.lg,
                 ),
-                verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.lg),
+                // A compact, intentional vertical rhythm: the reference keeps the page
+                // tight rather than stacking large blocks with big gaps.
+                verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.md),
             ) {
+                // Priority order: the protection verdict, then anything that needs the
+                // parent's attention, then today's states, the children and the actions.
                 item { ProtectionStatusSection(dashboard, onOpenProtection) }
 
                 // The attention section is hidden entirely when the dashboard is calm.
@@ -348,10 +363,7 @@ fun HomeScreen(
                     }
                 }
 
-                // Recomposed dashboard order (V2): hero -> notice -> today -> children
-                // -> quick actions, so the useful dashboard information sits above the
-                // fold and the child area no longer dominates the screen.
-                item { TodaySection(dashboard, screenTimeSummary) }
+                item { TodaySection(dashboard, screenTimeSummary, onOpenProtection, onOpenChildPolicy) }
                 item { ChildrenSection(dashboard, screenTimeSummary, onOpenChildPolicy, onOpenChildren) }
                 item {
                     QuickActionsSection(
@@ -368,15 +380,17 @@ fun HomeScreen(
 }
 
 /**
- * The Home top app bar: a localized greeting (the parent's own name when known, else
- * the plain title) plus a one-line subtitle. The overflow holds the secondary
- * destinations that no bottom-navigation tab owns (Privacy, Help), so they stay
- * reachable; the developer diagnostics entry is present only when [DebugFlags]
- * enables the debug screens, so it never appears in a production UI.
+ * The Home header: a compact identity block rather than a Material app bar.
+ *
+ * The parent's initial sits on a circular container, followed by the localized
+ * greeting (the parent's own name when known, else the plain title) and a secondary
+ * supporting line. The overflow holds the secondary destinations that no
+ * bottom-navigation tab owns (Privacy, Help), so they stay reachable; the developer
+ * diagnostics entry is present only when [DebugFlags] enables the debug screens, so
+ * it never appears in a production UI.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HomeTopBar(
+private fun HomeHeader(
     parentName: String?,
     onOpenPrivacy: () -> Unit,
     onOpenHelp: () -> Unit,
@@ -388,51 +402,67 @@ private fun HomeTopBar(
     val greeting = name?.let { stringResource(R.string.home_greeting, it) }
     val initial = name?.firstOrNull()?.uppercase()
 
-    TopAppBar(
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Compact identity block: the parent's own initial, from the real
-                // profile name — no invented avatar artwork.
-                if (initial != null) {
-                    Box(
-                        modifier = Modifier
-                            .size(QalqonDimens.sizes.avatar)
-                            .background(
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                shape = CircleShape,
-                            ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = initial,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                    }
-                    Spacer(Modifier.size(QalqonDimens.spacing.md))
-                }
-                Column {
-                    Text(
-                        text = greeting ?: stringResource(R.string.home_title),
-                        style = MaterialTheme.typography.titleLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = stringResource(R.string.dashboard_subtitle),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(
+                start = QalqonDimens.screenPadding,
+                end = QalqonDimens.spacing.sm,
+                top = QalqonDimens.spacing.md,
+                bottom = QalqonDimens.spacing.sm,
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // A known name shows its initial; an unknown name shows the QALQON protection
+        // mark, never an invented identity.
+        Box(
+            modifier = Modifier
+                .size(QalqonDimens.sizes.buttonDefault)
+                .background(color = MaterialTheme.colorScheme.primaryContainer, shape = CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (initial != null) {
+                Text(
+                    text = initial,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Filled.Lock,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(QalqonDimens.icon.md),
+                )
             }
-        },
-        actions = {
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = QalqonDimens.spacing.md),
+        ) {
+            Text(
+                text = greeting ?: stringResource(R.string.home_title),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = stringResource(R.string.dashboard_subtitle),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Box {
             IconButton(onClick = { menuExpanded = true }) {
                 Icon(
                     imageVector = Icons.Filled.MoreVert,
                     contentDescription = stringResource(R.string.home_more_options),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
@@ -460,15 +490,17 @@ private fun HomeTopBar(
                     )
                 }
             }
-        },
-    )
+        }
+    }
 }
 
 /**
- * The signature QALQON hero (V3): protection state on a large, premium soft-blue surface
- * with a large rounded status glyph (semantic tone), a dominant title, a supporting line,
- * the real protected-app count as a metadata chip while protection runs, and a visually
- * dominant full-width CTA.
+ * The signature QALQON protection hero — the Home screen's focal point.
+ *
+ * Composed to the reference layout (Variant A): a semantic protection icon and the
+ * QALQON wordmark + live state copy on the left, a large protective shield/device
+ * emblem anchoring the right, and an action-first full-width CTA at the bottom. The
+ * order reads STATE -> EXPLANATION -> ACTION on a large, very light tonal surface.
  *
  * Presentation only: every value comes from [DashboardUiState] via the existing
  * presentation helpers — no protection logic, no fabricated state.
@@ -477,61 +509,57 @@ private fun HomeTopBar(
 private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: () -> Unit) {
     val status = homeProtectionStatus(state)
     val tone = homeProtectionTone(status)
-    val accent = toneColor(tone)
     val actionLabel = homeProtectionActionLabelRes(status)
+    val statusLabel = stringResource(homeProtectionLabelRes(status))
     val runCount = (status == HomeProtectionStatus.ACTIVE || status == HomeProtectionStatus.BLOCKING) &&
         state.protectedAppsCount > 0
 
-    // Signature hero: a large, borderless soft-blue surface (distinct from the white
-    // bordered cards elsewhere) with the QALQON wordmark, a big rounded status glyph,
-    // a dominant title and an action-first CTA. STATE -> EXPLANATION -> ACTION.
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = QalqonShapes.largeShape,
-        color = MaterialTheme.colorScheme.primaryContainer,
+        shape = QalqonShapes.xLargeShape,
+        // Reference mockup: a light icy-blue card surface, with no hard grey outline.
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         tonalElevation = QalqonDimens.elevation.flat,
     ) {
         Column(
-            modifier = Modifier.padding(QalqonDimens.spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.sm),
+            modifier = Modifier.padding(QalqonDimens.cardPadding),
+            verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.md),
         ) {
+            // Reference hero: the text block on the left, the illustration on the right.
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(QalqonDimens.sizes.buttonLarge)
-                        .background(color = accent.copy(alpha = 0.20f), shape = QalqonShapes.largeShape),
-                    contentAlignment = Alignment.Center,
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.xs),
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Lock,
-                        contentDescription = null,
-                        tint = accent,
-                        modifier = Modifier.size(QalqonDimens.icon.md),
+                    Text(
+                        text = stringResource(R.string.app_name).uppercase(),
+                        style = MaterialTheme.typography.labelMedium,
+                        letterSpacing = 2.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        text = statusLabel,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = stringResource(homeProtectionSupportingRes(status)),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 Spacer(Modifier.size(QalqonDimens.spacing.md))
-                Text(
-                    text = stringResource(R.string.app_name).uppercase(),
-                    style = MaterialTheme.typography.titleSmall,
-                    letterSpacing = 2.sp,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f),
+                // Right: the prominent shield + smartphone illustration (>= 100 dp), the
+                // hero's visual anchor — not a small status icon.
+                QalqonProtectionMotif(
+                    modifier = Modifier.size(QalqonDimens.sizes.illustration),
                 )
             }
-            Text(
-                text = stringResource(homeProtectionLabelRes(status)),
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-            Text(
-                text = stringResource(homeProtectionSupportingRes(status)),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
-            )
             state.blockedApp?.let { packageName ->
                 Text(
                     text = stringResource(R.string.dashboard_active_app, packageName),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             // Real metadata chip: the actual protected-app count, only while protection runs.
@@ -541,19 +569,39 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
                     tone = tone,
                 )
             }
+            // The hero's primary, full-width pill action in the mockup's deep blue, with
+            // a shield glyph (the mockup's "🛡️"), the label and a forward chevron. The
+            // shield is a real icon rather than an emoji glyph, per the product's icon rules.
             Button(
                 onClick = onOpenProtection,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = QalqonDimens.spacing.xs),
+                    .height(QalqonDimens.sizes.buttonDefault),
+                shape = QalqonShapes.pillShape,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = QalqonTheme.colors.cta,
+                    contentColor = QalqonTheme.colors.onCta,
+                ),
             ) {
+                Icon(
+                    imageVector = Icons.Filled.Lock,
+                    contentDescription = null,
+                    modifier = Modifier.size(QalqonDimens.icon.sm),
+                )
+                Spacer(Modifier.size(QalqonDimens.spacing.sm))
                 Text(stringResource(actionLabel))
+                Spacer(Modifier.size(QalqonDimens.spacing.sm))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    modifier = Modifier.size(QalqonDimens.icon.sm),
+                )
             }
         }
     }
 }
 
-/** Compact attention list; only rendered when [items] is not empty. */
+/** Compact attention list, only rendered when [items] is not empty. */
 @Composable
 private fun AttentionSection(
     items: List<HomeAttentionItem>,
@@ -573,6 +621,7 @@ private fun AttentionSection(
             QalqonAlertRow(
                 text = text,
                 severity = item.severity,
+                leadingIcon = { AttentionIcon(item.kind) },
                 onClick = when (item.kind) {
                     HomeAttentionKind.PENDING_REQUESTS -> onOpenRequests
                     HomeAttentionKind.CHILDREN_NEED_SETUP -> onOpenChildren
@@ -583,8 +632,34 @@ private fun AttentionSection(
     }
 }
 
+/** A compact semantic glyph for each attention condition; the message carries the meaning. */
+@Composable
+private fun AttentionIcon(kind: HomeAttentionKind) {
+    val tint = severityColor(QalqonAlertSeverity.WARNING)
+    Box(
+        modifier = Modifier
+            .size(QalqonDimens.icon.lg)
+            .background(color = tint.copy(alpha = 0.16f), shape = QalqonShapes.smallShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = homeAttentionIcon(kind),
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(QalqonDimens.icon.xs),
+        )
+    }
+}
+
+/** The glyph for each attention condition; decorative, the localized message carries it. */
+private fun homeAttentionIcon(kind: HomeAttentionKind): ImageVector = when (kind) {
+    HomeAttentionKind.PENDING_REQUESTS -> Icons.Filled.Notifications
+    HomeAttentionKind.CHILDREN_NEED_SETUP -> Icons.Filled.Person
+    HomeAttentionKind.NOTIFICATIONS_DISABLED -> Icons.Filled.Warning
+}
+
 /**
- * The children overview: one tappable card per child, or the existing empty state
+ * The children overview: one tappable card per child, or a compact onboarding card
  * when there is no child yet. It is an overview, not the future Child Detail hub —
  * tapping a child opens the existing per-child destination.
  */
@@ -610,19 +685,25 @@ private fun ChildrenSection(
     Column(verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.sm)) {
         QalqonSectionHeader(
             title = stringResource(R.string.children_section),
+            supportingText = stringResource(R.string.home_children_subtitle),
             leading = { HomeSectionIcon(Icons.Filled.Person, MaterialTheme.colorScheme.primary) },
             action = allAction,
         )
 
         if (children.isEmpty()) {
-            // Compact, intentional empty state: a bounded, borderless surface (row + CTA)
-            // instead of a tall centred block, so it no longer consumes a large vertical
-            // area and stops repeating the bordered-card geometry.
-            QalqonCard(modifier = Modifier.fillMaxWidth(), bordered = false) {
+            // Compact, intentional onboarding card: a friendly medallion, a bounded
+            // explanation and one primary CTA — never a tall centred block.
+            QalqonCard(
+                modifier = Modifier.fillMaxWidth(),
+                bordered = false,
+                containerColor = MaterialTheme.colorScheme.surface,
+                elevation = QalqonDimens.elevation.raised,
+                shape = QalqonShapes.xLargeShape,
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(QalqonDimens.sizes.avatar)
+                            .size(QalqonDimens.sizes.buttonDefault)
                             .background(
                                 color = MaterialTheme.colorScheme.primaryContainer,
                                 shape = CircleShape,
@@ -633,7 +714,7 @@ private fun ChildrenSection(
                             imageVector = Icons.Filled.Person,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(QalqonDimens.icon.sm),
+                            modifier = Modifier.size(QalqonDimens.icon.md),
                         )
                     }
                     Column(
@@ -643,7 +724,7 @@ private fun ChildrenSection(
                     ) {
                         Text(
                             text = stringResource(R.string.dashboard_child_none),
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = MaterialTheme.typography.titleSmall,
                         )
                         Text(
                             text = stringResource(R.string.dashboard_child_none_hint),
@@ -654,8 +735,16 @@ private fun ChildrenSection(
                 }
                 Button(
                     onClick = onOpenChildren,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(QalqonDimens.sizes.buttonDefault),
                 ) {
+                    Icon(
+                        imageVector = Icons.Filled.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(QalqonDimens.icon.sm),
+                    )
+                    Spacer(Modifier.size(QalqonDimens.spacing.sm))
                     Text(stringResource(R.string.dashboard_child_add))
                 }
             }
@@ -702,8 +791,17 @@ private fun ChildrenSection(
 
 /** The compact today-overview metrics, laid out two per row. */
 @Composable
-private fun TodaySection(state: DashboardUiState, screenTime: ScreenTimeSummaryUiState) {
+private fun TodaySection(
+    state: DashboardUiState,
+    screenTime: ScreenTimeSummaryUiState,
+    onOpenProtection: () -> Unit,
+    onOpenChildPolicy: (Long) -> Unit,
+) {
     val metrics = homeTodayMetrics(state, screenTime)
+    // The screen-time tile opens the selected child's detail hub (which owns screen
+    // time); with no child selected it has no destination and stays static.
+    val screenTimeTarget: (() -> Unit)? =
+        screenTime.childId?.let { childId -> { onOpenChildPolicy(childId) } }
     Column(verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.sm)) {
         QalqonSectionHeader(
             title = stringResource(R.string.home_today_title),
@@ -723,6 +821,13 @@ private fun TodaySection(state: DashboardUiState, screenTime: ScreenTimeSummaryU
                     HomeMetricTile(
                         metric = metric,
                         modifier = Modifier.weight(1f).fillMaxHeight(),
+                        onClick = when (metric.kind) {
+                            HomeTodayMetricKind.PROTECTION -> onOpenProtection
+                            HomeTodayMetricKind.SCREEN_TIME -> screenTimeTarget
+                            HomeTodayMetricKind.SCHEDULE,
+                            HomeTodayMetricKind.EYE_SAFETY,
+                            -> null
+                        },
                     )
                 }
                 if (rowMetrics.size == 1) Spacer(Modifier.weight(1f))
@@ -733,10 +838,202 @@ private fun TodaySection(state: DashboardUiState, screenTime: ScreenTimeSummaryU
 
 /** The glyph for each metric; decorative, so the localized label carries the meaning. */
 private fun homeMetricIcon(kind: HomeTodayMetricKind): ImageVector = when (kind) {
-    HomeTodayMetricKind.SCREEN_TIME -> Icons.Filled.DateRange
+    // Reference mockup: a clock for screen time and a shield for protection.
+    HomeTodayMetricKind.SCREEN_TIME -> HomeClockIcon
     HomeTodayMetricKind.SCHEDULE -> Icons.Filled.Info
     HomeTodayMetricKind.EYE_SAFETY -> Icons.Filled.Warning
-    HomeTodayMetricKind.PROTECTION -> Icons.Filled.Lock
+    HomeTodayMetricKind.PROTECTION -> HomeShieldIcon
+}
+
+/**
+ * The Home dashboard's own glyphs.
+ *
+ * The bundled Material icon set (`material-icons-core`) ships only ~50 glyphs and has
+ * no clock, shield or group icon (the extended set is thousands of assets and is not a
+ * dependency). These small hand-built vectors give the mockup's exact semantics without
+ * pulling in that weight. Each is a single 24×24 path; `Icon`'s tint overrides the fill,
+ * so one vector serves every theme and colour role.
+ */
+private fun homeIcon(name: String, build: ImageVector.Builder.() -> Unit): ImageVector =
+    ImageVector.Builder(
+        name = name,
+        defaultWidth = QalqonDimens.icon.lg,
+        defaultHeight = QalqonDimens.icon.lg,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).apply(build).build()
+
+/** An outlined clock (screen time / schedule). */
+private val HomeClockIcon: ImageVector by lazy {
+    homeIcon("HomeClock") {
+        // Outer ring + inner cut-out = the outline.
+        path(fill = SolidColor(Color.Black), pathFillType = PathFillType.EvenOdd) {
+            moveTo(12f, 2f)
+            arcTo(10f, 10f, 0f, isMoreThanHalf = true, isPositiveArc = true, x1 = 12f, y1 = 22f)
+            arcTo(10f, 10f, 0f, isMoreThanHalf = true, isPositiveArc = true, x1 = 12f, y1 = 2f)
+            close()
+            moveTo(12f, 4.4f)
+            arcTo(7.6f, 7.6f, 0f, isMoreThanHalf = true, isPositiveArc = false, x1 = 12f, y1 = 19.6f)
+            arcTo(7.6f, 7.6f, 0f, isMoreThanHalf = true, isPositiveArc = false, x1 = 12f, y1 = 4.4f)
+            close()
+        }
+        // Twelve-o'clock hand and three-o'clock hand.
+        path(fill = SolidColor(Color.Black)) {
+            moveTo(11.1f, 6.8f)
+            lineTo(12.9f, 6.8f)
+            lineTo(12.9f, 12.6f)
+            lineTo(11.1f, 12.6f)
+            close()
+            moveTo(12.4f, 11.1f)
+            lineTo(17.2f, 11.1f)
+            lineTo(17.2f, 12.9f)
+            lineTo(12.4f, 12.9f)
+            close()
+        }
+    }
+}
+
+/** A solid shield (protection / protected apps). */
+private val HomeShieldIcon: ImageVector by lazy {
+    homeIcon("HomeShield") {
+        path(fill = SolidColor(Color.Black)) {
+            moveTo(12f, 2f)
+            lineTo(20f, 5f)
+            lineTo(20f, 11f)
+            curveTo(20f, 16.2f, 16.6f, 20.2f, 12f, 22f)
+            curveTo(7.4f, 20.2f, 4f, 16.2f, 4f, 11f)
+            lineTo(4f, 5f)
+            close()
+        }
+    }
+}
+
+/** A group of people (manage children). */
+private val HomeGroupIcon: ImageVector by lazy {
+    homeIcon("HomeGroup") {
+        path(fill = SolidColor(Color.Black)) {
+            // Two heads.
+            moveTo(9f, 5.2f)
+            arcTo(3.1f, 3.1f, 0f, isMoreThanHalf = true, isPositiveArc = true, x1 = 9f, y1 = 11.4f)
+            arcTo(3.1f, 3.1f, 0f, isMoreThanHalf = true, isPositiveArc = true, x1 = 9f, y1 = 5.2f)
+            close()
+            moveTo(16.7f, 6.1f)
+            arcTo(2.6f, 2.6f, 0f, isMoreThanHalf = true, isPositiveArc = true, x1 = 16.7f, y1 = 11.3f)
+            arcTo(2.6f, 2.6f, 0f, isMoreThanHalf = true, isPositiveArc = true, x1 = 16.7f, y1 = 6.1f)
+            close()
+            // Two shoulders.
+            moveTo(3.4f, 19f)
+            curveTo(3.4f, 14.6f, 5.9f, 12.6f, 9f, 12.6f)
+            curveTo(12.1f, 12.6f, 14.6f, 14.6f, 14.6f, 19f)
+            close()
+            moveTo(15.2f, 18.9f)
+            curveTo(15.2f, 15.8f, 16.7f, 14.3f, 18.6f, 14.3f)
+            curveTo(20.5f, 14.3f, 22.1f, 15.9f, 22.1f, 18.9f)
+            close()
+        }
+    }
+}
+
+/**
+ * A Compose-drawn lightning bolt marking the Quick actions section.
+ *
+ * The bundled Material icon set has no bolt glyph (and the extended icon set is not a
+ * dependency), so the bolt is a small hand-built vector rather than an emoji or a
+ * bitmap. `Icon`'s tint overrides the fill, so a single vector serves every theme.
+ */
+private val HomeQuickActionBolt: ImageVector by lazy {
+    homeIcon("HomeQuickActionBolt") {
+        path(fill = SolidColor(Color.Black)) {
+            moveTo(13f, 2f)
+            lineTo(4f, 14f)
+            lineTo(11f, 14f)
+            lineTo(10f, 22f)
+            lineTo(20f, 10f)
+            lineTo(13f, 10f)
+            close()
+        }
+    }
+}
+
+/**
+ * The hero's protection illustration: a filled soft-blue shield with a stylized
+ * smartphone on top carrying a lock.
+ *
+ * Drawn entirely with Compose primitives (no bitmap, no remote asset, no extra
+ * dependency) from the theme palette, so it stays crisp at any size and correct in
+ * both light and dark themes. It is intentionally large (the hero sizes it to
+ * [uz.faceguard.app.core.theme.QalqonSizes.illustration], >= 100 dp) because it is the
+ * hero's visual anchor, not a status icon. `contentDescription` is deliberately absent:
+ * the hero's title already carries the meaning, so the illustration must not be
+ * announced twice.
+ */
+@Composable
+private fun QalqonProtectionMotif(modifier: Modifier = Modifier) {
+    // Reference mockup palette: a solid soft-blue shield with a lighter inner face for
+    // 2.5D depth, a vivid blue stroke and a clean white/blue smartphone.
+    val shieldFill = QalqonTheme.colors.illustrationShield
+    val shieldHighlight = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.55f)
+    val stroke = QalqonTheme.colors.illustrationStroke
+    val phoneFill = MaterialTheme.colorScheme.surfaceContainerLowest
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            // The shield outline, optionally scaled about its centre (the inner face).
+            fun shieldAt(scale: Float): Path {
+                fun x(f: Float) = w * 0.5f + (w * f - w * 0.5f) * scale
+                fun y(f: Float) = h * 0.5f + (h * f - h * 0.5f) * scale
+                return Path().apply {
+                    moveTo(x(0.5f), y(0.02f))
+                    lineTo(x(0.94f), y(0.20f))
+                    lineTo(x(0.94f), y(0.52f))
+                    quadraticBezierTo(x(0.94f), y(0.86f), x(0.5f), y(0.99f))
+                    quadraticBezierTo(x(0.06f), y(0.86f), x(0.06f), y(0.52f))
+                    lineTo(x(0.06f), y(0.20f))
+                    close()
+                }
+            }
+            // Solid soft-blue shield, then a lighter inner face for depth, so the emblem
+            // reads as a filled 2.5D badge rather than transparent line-art.
+            drawPath(shieldAt(1f), color = shieldFill)
+            drawPath(shieldAt(0.80f), color = shieldHighlight)
+            drawPath(shieldAt(1f), color = stroke, style = Stroke(width = h * 0.035f))
+
+            // The stylized smartphone sitting on the shield.
+            val phoneW = w * 0.48f
+            val phoneH = h * 0.58f
+            val phoneTop = h * 0.22f
+            val phoneLeft = (w - phoneW) / 2f
+            val phoneRadius = CornerRadius(phoneW * 0.20f)
+            drawRoundRect(
+                color = phoneFill,
+                topLeft = Offset(phoneLeft, phoneTop),
+                size = Size(phoneW, phoneH),
+                cornerRadius = phoneRadius,
+            )
+            drawRoundRect(
+                color = stroke,
+                topLeft = Offset(phoneLeft, phoneTop),
+                size = Size(phoneW, phoneH),
+                cornerRadius = phoneRadius,
+                style = Stroke(width = h * 0.03f),
+            )
+            // A speaker slot, so the rounded rectangle reads as a phone.
+            drawRoundRect(
+                color = stroke.copy(alpha = 0.7f),
+                topLeft = Offset(w * 0.5f - phoneW * 0.18f, phoneTop + h * 0.05f),
+                size = Size(phoneW * 0.36f, h * 0.022f),
+                cornerRadius = CornerRadius(h * 0.011f),
+            )
+        }
+        // The lock centred on the phone screen.
+        Icon(
+            imageVector = Icons.Filled.Lock,
+            contentDescription = null,
+            tint = stroke,
+            modifier = Modifier.size(QalqonDimens.icon.lg),
+        )
+    }
 }
 
 /**
@@ -760,48 +1057,79 @@ private fun HomeSectionIcon(icon: ImageVector, tint: Color) {
     }
 }
 
+/**
+ * A compact metric card for the Today grid.
+ *
+ * Reference treatment: a white surface with a hairline border and a soft lift, a
+ * semantic icon inside a tonal circular container (light blue for screen time, soft
+ * green for protection), the metric title as a secondary label, an optional supporting
+ * caption and the real value as the prominent line in its semantic tone. When the tile
+ * has a real destination it is clickable and shows a trailing chevron; with no
+ * destination it stays static and draws no chevron (never a fake affordance). Nothing
+ * truncates: the supporting sentence wraps.
+ */
 @Composable
-private fun HomeMetricTile(metric: HomeTodayMetric, modifier: Modifier = Modifier) {
+private fun HomeMetricTile(
+    metric: HomeTodayMetric,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+) {
     val accent = metric.tone?.let { toneColor(it) } ?: MaterialTheme.colorScheme.onSurfaceVariant
-    // A duration is short and numeric (prominent); a status/text value can be a full
-    // sentence, so it renders smaller and WRAPS — never an ellipsis on important text.
+    // The value is the tile's headline: a duration or a status reads in a prominent
+    // title style, never as plain secondary body copy.
     val (valueText, valueStyle) = when (val value = metric.value) {
         is HomeMetricValue.Duration ->
             durationLabel(value.ms) to MaterialTheme.typography.titleLarge
         is HomeMetricValue.Text ->
             (if (value.arg != null) stringResource(value.res, value.arg) else stringResource(value.res)) to
-                MaterialTheme.typography.bodyLarge
+                MaterialTheme.typography.titleMedium
     }
-    // Borderless cool-tonal dashboard tile: a distinct surface layer from the white
-    // bordered cards, so the page is not one repeated rounded rectangle.
+    // Colour-coded circular icon container, so the Today grid reads at a glance.
+    val (iconContainer, iconTint) = when (metric.kind) {
+        HomeTodayMetricKind.SCREEN_TIME ->
+            MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.primary
+        HomeTodayMetricKind.PROTECTION ->
+            QalqonTheme.colors.successContainer to QalqonTheme.colors.success
+        else ->
+            accent.copy(alpha = 0.14f) to accent
+    }
     QalqonCard(
         modifier = modifier,
-        bordered = false,
-        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        bordered = true,
+        containerColor = MaterialTheme.colorScheme.surface,
+        elevation = QalqonDimens.elevation.raised,
+        shape = QalqonShapes.xLargeShape,
+        onClick = onClick,
     ) {
-        Box(
-            modifier = Modifier
-                .size(QalqonDimens.icon.lg)
-                .background(color = accent.copy(alpha = 0.14f), shape = QalqonShapes.smallShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = homeMetricIcon(metric.kind),
-                contentDescription = null,
-                tint = accent,
-                modifier = Modifier.size(QalqonDimens.icon.sm),
-            )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(QalqonDimens.sizes.buttonDefault)
+                    .background(color = iconContainer, shape = CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = homeMetricIcon(metric.kind),
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(QalqonDimens.icon.sm),
+                )
+            }
+            // The chevron is shown only when the tile really has a destination.
+            if (onClick != null) {
+                Spacer(Modifier.weight(1f))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(QalqonDimens.icon.sm),
+                )
+            }
         }
         Text(
             text = stringResource(metric.labelRes),
             style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Text(
-            text = valueText,
-            style = valueStyle,
-            color = accent,
-            // The full sentence is allowed to wrap; nothing here truncates it.
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         metric.caption?.let { caption ->
             Text(
@@ -810,12 +1138,43 @@ private fun HomeMetricTile(metric: HomeTodayMetric, modifier: Modifier = Modifie
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        Text(
+            text = valueText,
+            style = valueStyle,
+            color = accent,
+            // The full sentence is allowed to wrap; nothing here truncates it.
+        )
+        // Real, state-derived nudge shown only while protection is inactive.
+        if (metric.kind == HomeTodayMetricKind.PROTECTION && metric.tone == QalqonStatusTone.INACTIVE) {
+            MetricActionBadge(label = stringResource(R.string.home_metric_activate))
+        }
     }
 }
 
 /**
- * At most three contextual quick actions, each routed through the existing
- * navigation callbacks (so the lock gate and protected-route rules are unchanged).
+ * The inactive-metric nudge. Reference mockup: a soft red/pink container with crimson
+ * text on the 8 dp (small) rounded shape.
+ */
+@Composable
+private fun MetricActionBadge(label: String, modifier: Modifier = Modifier) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelSmall,
+        color = QalqonTheme.colors.onDangerContainer,
+        modifier = modifier
+            .background(color = QalqonTheme.colors.dangerContainer, shape = QalqonShapes.smallShape)
+            .padding(
+                horizontal = QalqonDimens.spacing.sm,
+                vertical = QalqonDimens.spacing.xs,
+            ),
+    )
+}
+
+/**
+ * The contextual quick actions, each routed through the existing navigation callbacks
+ * (so the lock gate and protected-route rules are unchanged). Each action is its own
+ * compact white card — a soft icon container, a title, a one-line description and a
+ * chevron — so the group reads as a set of tappable commands rather than a settings list.
  */
 @Composable
 private fun QuickActionsSection(
@@ -832,45 +1191,35 @@ private fun QuickActionsSection(
         QalqonSectionHeader(
             title = stringResource(R.string.home_quick_actions_title),
             supportingText = stringResource(R.string.home_quick_actions_subtitle),
-            leading = { HomeSectionIcon(Icons.AutoMirrored.Filled.List, MaterialTheme.colorScheme.primary) },
+            leading = { HomeSectionIcon(HomeQuickActionBolt, MaterialTheme.colorScheme.primary) },
         )
-        // One grouped, borderless command-center surface with divided rows (a distinct
-        // layer from the tonal Today tiles and the soft-blue hero).
-        QalqonCard(
-            modifier = Modifier.fillMaxWidth(),
-            bordered = false,
-            contentPadding = QalqonDimens.spacing.none,
-        ) {
-            actions.forEachIndexed { index, action ->
-                val onClick = when (action) {
-                    HomeQuickAction.MANAGE_CHILDREN -> onOpenChildren
-                    HomeQuickAction.PROTECTION_SETTINGS -> onOpenProtection
-                    HomeQuickAction.PROTECTED_APPS -> onOpenProtectedApps
-                    HomeQuickAction.REVIEW_REQUESTS -> onOpenRequests
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(role = Role.Button, onClick = onClick)
-                        .padding(
-                            horizontal = QalqonDimens.cardPadding,
-                            vertical = QalqonDimens.rowPadding,
-                        ),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+        actions.forEach { action ->
+            val onClick = when (action) {
+                HomeQuickAction.MANAGE_CHILDREN -> onOpenChildren
+                HomeQuickAction.PROTECTION_SETTINGS -> onOpenProtection
+                HomeQuickAction.PROTECTED_APPS -> onOpenProtectedApps
+                HomeQuickAction.REVIEW_REQUESTS -> onOpenRequests
+            }
+            val (iconContainer, iconTint) = quickActionIconColors(action)
+            QalqonCard(
+                modifier = Modifier.fillMaxWidth(),
+                bordered = true,
+                containerColor = MaterialTheme.colorScheme.surface,
+                elevation = QalqonDimens.elevation.raised,
+                shape = QalqonShapes.largeShape,
+                onClick = onClick,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(QalqonDimens.sizes.avatar)
-                            .background(
-                                color = MaterialTheme.colorScheme.secondaryContainer,
-                                shape = CircleShape,
-                            ),
+                            .size(QalqonDimens.sizes.buttonDefault)
+                            .background(color = iconContainer, shape = CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             imageVector = homeQuickActionIcon(action),
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            tint = iconTint,
                             modifier = Modifier.size(QalqonDimens.icon.sm),
                         )
                     }
@@ -881,7 +1230,7 @@ private fun QuickActionsSection(
                     ) {
                         Text(
                             text = stringResource(homeQuickActionLabelRes(action)),
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = MaterialTheme.typography.titleSmall,
                         )
                         Text(
                             text = stringResource(homeQuickActionDescriptionRes(action)),
@@ -895,18 +1244,32 @@ private fun QuickActionsSection(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (index != actions.lastIndex) {
-                    QalqonDivider(modifier = Modifier.padding(start = QalqonDimens.spacing.xl))
-                }
             }
         }
     }
 }
 
+/**
+ * Colour-coded circular icon container per quick action, so the group is scannable:
+ * soft blue for children, soft purple for protected apps, the neutral secondary
+ * container for the remaining commands. All three come from theme roles.
+ */
+@Composable
+private fun quickActionIconColors(action: HomeQuickAction): Pair<Color, Color> = when (action) {
+    HomeQuickAction.MANAGE_CHILDREN ->
+        MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.primary
+    HomeQuickAction.PROTECTED_APPS ->
+        MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.tertiary
+    HomeQuickAction.PROTECTION_SETTINGS,
+    HomeQuickAction.REVIEW_REQUESTS,
+    -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
+}
+
 /** The glyph for each quick action; decorative, the label carries the meaning. */
 private fun homeQuickActionIcon(action: HomeQuickAction): ImageVector = when (action) {
-    HomeQuickAction.MANAGE_CHILDREN -> Icons.Filled.Person
+    // Reference mockup: a group for children, a shield for protected apps.
+    HomeQuickAction.MANAGE_CHILDREN -> HomeGroupIcon
     HomeQuickAction.PROTECTION_SETTINGS -> Icons.Filled.Lock
-    HomeQuickAction.PROTECTED_APPS -> Icons.AutoMirrored.Filled.List
+    HomeQuickAction.PROTECTED_APPS -> HomeShieldIcon
     HomeQuickAction.REVIEW_REQUESTS -> Icons.Filled.Notifications
 }

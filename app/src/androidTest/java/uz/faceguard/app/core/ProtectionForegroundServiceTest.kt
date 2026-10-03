@@ -160,22 +160,20 @@ class ProtectionForegroundServiceTest {
     }
 
     @Test
-    fun enablingProtection_activatesTheRuntimeAndStartsTheService() = runBlocking {
+    fun enablingProtection_activatesTheRuntimeAndStartsTheService() = withForegroundApp {
         session.setCurrentAccountId(1L)
         settingsRepository.setProtectionEnabled(true)
 
-        // Observe activation *before* the app is brought to the foreground. The
-        // runtime's observers run on the main thread, and launching the real
-        // activity can stall that thread on the emulator's first render; asserting
-        // first keeps the activation contract independent of UI responsiveness.
+        // Foreground the app first: the runtime publishes `state.active` from
+        // `Dispatchers.Main.immediate` collectors, so on the software-rendered CI
+        // emulator those collectors only advance once the activity launch has
+        // pumped/idled the main looper (see the sibling ScreenTimeCollectionLifecycleTest,
+        // which asserts the same activation from inside withForegroundApp). Asserting
+        // activation *before* the launch raced an unpumped main looper and timed out.
+        // `withForegroundApp` has already launched MainActivity and waited for idle here,
+        // which is also the real parent flow (protection is toggled while the app is visible).
         runtime.awaitActive(true)
-
-        // Foregrounding the app lets the runtime retry the foreground-service start
-        // that the platform refuses from the background (see ProtectionRuntime.onUiForeground).
-        ActivityScenario.launch(MainActivity::class.java).use {
-            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-            awaitRunning(true)
-        }
+        awaitRunning(true)
 
         settingsRepository.setProtectionEnabled(false)
         runtime.awaitActive(false)
@@ -183,15 +181,14 @@ class ProtectionForegroundServiceTest {
     }
 
     @Test
-    fun signingOut_deactivatesProtectionAndStopsTheService() = runBlocking {
+    fun signingOut_deactivatesProtectionAndStopsTheService() = withForegroundApp {
         session.setCurrentAccountId(1L)
         settingsRepository.setProtectionEnabled(true)
-        runtime.awaitActive(true)
 
-        ActivityScenario.launch(MainActivity::class.java).use {
-            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-            awaitRunning(true)
-        }
+        // Foreground first for the same reason as above: activation is published from the
+        // runtime's main-thread collectors, which need the main looper to be pumped.
+        runtime.awaitActive(true)
+        awaitRunning(true)
 
         session.clearSession()
         runtime.awaitActive(false)

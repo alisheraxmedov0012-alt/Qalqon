@@ -44,12 +44,18 @@ class QalqonSemanticColorsTest {
         "requestPending" to colors.requestPending,
         "requestApproved" to colors.requestApproved,
         "requestDenied" to colors.requestDenied,
+        "illustrationShield" to colors.illustrationShield,
+        "illustrationStroke" to colors.illustrationStroke,
+        "cta" to colors.cta,
+        "onCta" to colors.onCta,
+        "dangerContainer" to colors.dangerContainer,
+        "onDangerContainer" to colors.onDangerContainer,
     )
 
     @Test
     fun everySemanticTokenIsPresentInBothThemes() {
-        assertEquals(20, tokens(LightQalqonSemanticColors).size)
-        assertEquals(20, tokens(DarkQalqonSemanticColors).size)
+        assertEquals(26, tokens(LightQalqonSemanticColors).size)
+        assertEquals(26, tokens(DarkQalqonSemanticColors).size)
         assertEquals(
             tokens(LightQalqonSemanticColors).keys,
             tokens(DarkQalqonSemanticColors).keys,

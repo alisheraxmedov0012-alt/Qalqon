@@ -1,6 +1,7 @@
 package uz.faceguard.app.feature.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -73,6 +75,7 @@ import uz.faceguard.app.core.theme.QalqonDimens
 import uz.faceguard.app.core.ui.qalqon.QalqonAlertRow
 import uz.faceguard.app.core.ui.qalqon.QalqonCard
 import uz.faceguard.app.core.ui.qalqon.QalqonChildCard
+import uz.faceguard.app.core.ui.qalqon.QalqonDivider
 import uz.faceguard.app.core.ui.qalqon.QalqonEmptyState
 import uz.faceguard.app.core.ui.qalqon.QalqonErrorState
 import uz.faceguard.app.core.ui.qalqon.QalqonLoadingState
@@ -371,9 +374,10 @@ private fun HomeTopBar(
     onOpenRecognition: () -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
-    val name = parentName?.takeIf { it.isNotBlank() }
+    // Never present a phone number (or a blank value) as the parent's name.
+    val name = homeGreetingName(parentName)
     val greeting = name?.let { stringResource(R.string.home_greeting, it) }
-    val initial = name?.trim()?.firstOrNull()?.uppercase()
+    val initial = name?.firstOrNull()?.uppercase()
 
     TopAppBar(
         title = {
@@ -734,17 +738,26 @@ private fun QuickActionsSection(
 
     Column(verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.sm)) {
         QalqonSectionHeader(title = stringResource(R.string.home_quick_actions_title))
-        actions.forEach { action ->
-            QalqonCard(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = when (action) {
+        // One grouped card with divided rows: a clean, professional action list instead
+        // of a stack of separate cards. Each row is the full touch target.
+        QalqonCard(modifier = Modifier.fillMaxWidth(), contentPadding = QalqonDimens.spacing.none) {
+            actions.forEachIndexed { index, action ->
+                val onClick = when (action) {
                     HomeQuickAction.MANAGE_CHILDREN -> onOpenChildren
                     HomeQuickAction.PROTECTION_SETTINGS -> onOpenProtection
                     HomeQuickAction.PROTECTED_APPS -> onOpenProtectedApps
                     HomeQuickAction.REVIEW_REQUESTS -> onOpenRequests
-                },
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(role = Role.Button, onClick = onClick)
+                        .padding(
+                            horizontal = QalqonDimens.cardPadding,
+                            vertical = QalqonDimens.rowPadding,
+                        ),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Box(
                         modifier = Modifier
                             .size(QalqonDimens.sizes.avatar)
@@ -761,18 +774,29 @@ private fun QuickActionsSection(
                             modifier = Modifier.size(QalqonDimens.icon.sm),
                         )
                     }
-                    Text(
-                        text = stringResource(homeQuickActionLabelRes(action)),
-                        style = MaterialTheme.typography.bodyLarge,
+                    Column(
                         modifier = Modifier
                             .weight(1f)
                             .padding(start = QalqonDimens.spacing.md),
-                    )
+                    ) {
+                        Text(
+                            text = stringResource(homeQuickActionLabelRes(action)),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        Text(
+                            text = stringResource(homeQuickActionDescriptionRes(action)),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+                if (index != actions.lastIndex) {
+                    QalqonDivider(modifier = Modifier.padding(start = QalqonDimens.spacing.xl))
                 }
             }
         }

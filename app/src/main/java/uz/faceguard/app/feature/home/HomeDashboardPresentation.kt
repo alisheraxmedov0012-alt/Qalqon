@@ -5,6 +5,7 @@ import uz.faceguard.app.R
 import uz.faceguard.app.core.protection.ProtectionState
 import uz.faceguard.app.core.ui.qalqon.QalqonAlertSeverity
 import uz.faceguard.app.core.ui.qalqon.QalqonStatusTone
+import uz.faceguard.app.core.util.Validation
 import uz.faceguard.app.domain.model.RestrictionLevel
 import uz.faceguard.app.domain.schedule.ScheduleResolution
 
@@ -21,6 +22,21 @@ import uz.faceguard.app.domain.schedule.ScheduleResolution
  * Everything here is pure (no Android framework, only resource ids), so the
  * dashboard's information architecture is directly unit-testable on the JVM.
  */
+
+// ------------------------------------------------------------- greeting name
+
+/**
+ * The name the Home greeting may use, or `null` when it must fall back to a neutral
+ * greeting.
+ *
+ * A registered name is shown verbatim; a blank name, or a value that is actually a
+ * phone number (a data shape that must never be presented as a person's name), yields
+ * `null` so the header shows the plain greeting instead of a phone number. Pure.
+ */
+fun homeGreetingName(displayName: String?): String? {
+    val trimmed = displayName?.trim().orEmpty()
+    return trimmed.takeIf { it.isNotEmpty() && !Validation.isPhoneLike(it) }
+}
 
 // ---------------------------------------------------------------- protection
 
@@ -328,6 +344,15 @@ fun homeQuickActionLabelRes(action: HomeQuickAction): Int = when (action) {
     HomeQuickAction.PROTECTION_SETTINGS -> R.string.protection_title
     HomeQuickAction.PROTECTED_APPS -> R.string.home_menu_protected_apps
     HomeQuickAction.REVIEW_REQUESTS -> R.string.requests_title
+}
+
+/** The one-line supporting description under each quick action's title. */
+@StringRes
+fun homeQuickActionDescriptionRes(action: HomeQuickAction): Int = when (action) {
+    HomeQuickAction.MANAGE_CHILDREN -> R.string.home_action_manage_children_desc
+    HomeQuickAction.PROTECTION_SETTINGS -> R.string.home_action_protection_desc
+    HomeQuickAction.PROTECTED_APPS -> R.string.home_action_protected_apps_desc
+    HomeQuickAction.REVIEW_REQUESTS -> R.string.home_action_requests_desc
 }
 
 /**

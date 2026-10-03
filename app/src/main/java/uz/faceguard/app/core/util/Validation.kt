@@ -12,7 +12,29 @@ object Validation {
 
     fun isValidPhone(phone: String): Boolean = normalizePhone(phone).length in 7..15
 
-    fun isValidFullName(name: String): Boolean = name.trim().length >= 3
+    /**
+     * A display name must be a real name, not a phone number. A phone-like value
+     * (only digits, or digits with the usual phone punctuation) previously passed the
+     * old "length >= 3" check, so a phone could be stored as the parent's name and then
+     * shown as the Home greeting. It is rejected here so bad data can never be persisted.
+     */
+    fun isValidFullName(name: String): Boolean {
+        val trimmed = name.trim()
+        return trimmed.length >= 3 && !isPhoneLike(trimmed)
+    }
+
+    /**
+     * True when [raw] carries no letters and reads as a phone number (at least 3 digits,
+     * with only digits and the usual separators). Pure and unit-testable.
+     */
+    fun isPhoneLike(raw: String): Boolean {
+        val trimmed = raw.trim()
+        if (trimmed.any { it.isLetter() }) return false
+        val digits = trimmed.count(Char::isDigit)
+        return digits >= 3 && trimmed.all { it.isDigit() || it in PHONE_SEPARATORS }
+    }
+
+    private val PHONE_SEPARATORS = setOf(' ', '+', '-', '(', ')', '.', '/')
 
     /** PINs may be 4 or 6 digits. Anything else is malformed. */
     fun isValidPin(pin: String): Boolean =

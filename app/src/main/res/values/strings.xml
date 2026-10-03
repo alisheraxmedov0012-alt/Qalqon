@@ -612,6 +612,10 @@
     <string name="home_today_title">Bugun</string>
     <string name="home_quick_actions_title">Tezkor amallar</string>
     <string name="home_action_manage_children">Bolalarni boshqarish</string>
+    <string name="home_action_manage_children_desc">Farzand profillarini ko‘rish va boshqarish</string>
+    <string name="home_action_protection_desc">Himoya holati va ruxsatlarni sozlash</string>
+    <string name="home_action_protected_apps_desc">Himoyalanadigan ilovalarni tanlash</string>
+    <string name="home_action_requests_desc">Boladan kelgan so‘rovlarni ko‘rish</string>
     <string name="home_status_off_hint">Himoya hozircha o\'chirilgan</string>
     <string name="home_status_active_hint">Himoya faol va ishlayapti</string>
     <string name="home_status_setup_hint">Himoyani yoqish uchun ruxsatlarni to\'ldiring</string>

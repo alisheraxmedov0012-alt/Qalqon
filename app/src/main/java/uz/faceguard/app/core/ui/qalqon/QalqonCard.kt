@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -50,10 +51,15 @@ fun QalqonCard(
      * look; a screen may pass [QalqonDimens.elevation.raised] for a subtle lift.
      */
     elevation: Dp = QalqonDimens.elevation.flat,
+    /**
+     * Corner shape. Defaults to the shared [QalqonDimens.cardCorner], so existing
+     * callers are unchanged; a screen may pass a softer radius (e.g.
+     * [uz.faceguard.app.core.theme.QalqonShapes.xLargeShape]) for a premium surface.
+     */
+    shape: Shape = androidx.compose.foundation.shape.RoundedCornerShape(QalqonDimens.cardCorner),
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val shape = androidx.compose.foundation.shape.RoundedCornerShape(QalqonDimens.cardCorner)
     val border = if (bordered) {
         BorderStroke(QalqonDimens.cardBorder, MaterialTheme.colorScheme.outlineVariant)
     } else {

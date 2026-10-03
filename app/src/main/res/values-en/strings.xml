@@ -609,7 +609,9 @@
     <string name="home_attention_title">Needs attention</string>
     <string name="home_attention_children_setup">Some children still need face setup</string>
     <string name="home_today_title">Today</string>
+    <string name="home_today_subtitle">A quick look at your child\'s activity</string>
     <string name="home_quick_actions_title">Quick actions</string>
+    <string name="home_quick_actions_subtitle">Key controls</string>
     <string name="home_action_manage_children">Manage children</string>
     <string name="home_action_manage_children_desc">View and manage child profiles</string>
     <string name="home_action_protection_desc">Protection status and permissions</string>

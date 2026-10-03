@@ -609,7 +609,9 @@
     <string name="home_attention_title">Требует внимания</string>
     <string name="home_attention_children_setup">У некоторых детей ещё не настроено лицо</string>
     <string name="home_today_title">Сегодня</string>
+    <string name="home_today_subtitle">Кратко об активности ребёнка</string>
     <string name="home_quick_actions_title">Быстрые действия</string>
+    <string name="home_quick_actions_subtitle">Ключевые настройки</string>
     <string name="home_action_manage_children">Управление детьми</string>
     <string name="home_action_manage_children_desc">Просмотр и управление профилями детей</string>
     <string name="home_action_protection_desc">Статус защиты и разрешения</string>

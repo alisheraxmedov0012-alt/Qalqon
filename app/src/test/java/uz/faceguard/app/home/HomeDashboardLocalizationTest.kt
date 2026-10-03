@@ -94,7 +94,6 @@ class HomeDashboardLocalizationTest {
     fun theDashboardUsesQalqonComponents() {
         val screen = read("feature/home/HomeScreen.kt")
         listOf(
-            "QalqonStatusCard(",
             "QalqonSectionHeader(",
             "QalqonChildCard(",
             "QalqonAlertRow(",

@@ -610,7 +610,9 @@
     <string name="home_attention_title">Diqqat talab qiladi</string>
     <string name="home_attention_children_setup">Ba\'zi bolalar uchun yuz hali sozlanmagan</string>
     <string name="home_today_title">Bugun</string>
+    <string name="home_today_subtitle">Bolangiz faoliyati haqida qisqacha</string>
     <string name="home_quick_actions_title">Tezkor amallar</string>
+    <string name="home_quick_actions_subtitle">Muhim boshqaruvlar</string>
     <string name="home_action_manage_children">Bolalarni boshqarish</string>
     <string name="home_action_manage_children_desc">Farzand profillarini ko‘rish va boshqarish</string>
     <string name="home_action_protection_desc">Himoya holati va ruxsatlarni sozlash</string>

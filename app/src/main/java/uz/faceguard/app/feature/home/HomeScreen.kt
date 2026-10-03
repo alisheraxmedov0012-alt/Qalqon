@@ -72,6 +72,7 @@ import uz.faceguard.app.R
 import uz.faceguard.app.core.debug.DebugFlags
 import uz.faceguard.app.core.protection.ProtectionRuntime
 import uz.faceguard.app.core.theme.QalqonDimens
+import uz.faceguard.app.core.theme.QalqonShapes
 import uz.faceguard.app.core.ui.qalqon.QalqonAlertRow
 import uz.faceguard.app.core.ui.qalqon.QalqonCard
 import uz.faceguard.app.core.ui.qalqon.QalqonChildCard
@@ -80,6 +81,7 @@ import uz.faceguard.app.core.ui.qalqon.QalqonEmptyState
 import uz.faceguard.app.core.ui.qalqon.QalqonErrorState
 import uz.faceguard.app.core.ui.qalqon.QalqonLoadingState
 import uz.faceguard.app.core.ui.qalqon.QalqonSectionHeader
+import uz.faceguard.app.core.ui.qalqon.QalqonStatusBadge
 import uz.faceguard.app.core.ui.qalqon.toneColor
 import uz.faceguard.app.domain.eyesafety.EyeSafetyRepository
 import uz.faceguard.app.domain.model.AppSettings
@@ -458,9 +460,10 @@ private fun HomeTopBar(
 }
 
 /**
- * The primary element and the Home hero (V2): the current protection state on a large,
- * tone-tinted surface, with a large status glyph, a dominant title, a supporting line,
- * the real protected-app count while protection runs, and the existing full-width CTA.
+ * The signature QALQON hero (V3): protection state on a large, premium soft-blue surface
+ * with a large rounded status glyph (semantic tone), a dominant title, a supporting line,
+ * the real protected-app count as a metadata chip while protection runs, and a visually
+ * dominant full-width CTA.
  *
  * Presentation only: every value comes from [DashboardUiState] via the existing
  * presentation helpers — no protection logic, no fabricated state.
@@ -468,53 +471,53 @@ private fun HomeTopBar(
 @Composable
 private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: () -> Unit) {
     val status = homeProtectionStatus(state)
-    val tone = toneColor(homeProtectionTone(status))
+    val tone = homeProtectionTone(status)
+    val accent = toneColor(tone)
     val actionLabel = homeProtectionActionLabelRes(status)
+    val runCount = (status == HomeProtectionStatus.ACTIVE || status == HomeProtectionStatus.BLOCKING) &&
+        state.protectedAppsCount > 0
+
     QalqonCard(
         modifier = Modifier.fillMaxWidth(),
-        containerColor = tone.copy(alpha = 0.12f),
+        containerColor = MaterialTheme.colorScheme.primaryContainer,
         contentPadding = QalqonDimens.spacing.lg,
     ) {
-        // Large status glyph: the strongest visual anchor on the screen.
+        // Large rounded status glyph — the strongest visual anchor on the screen.
         Box(
             modifier = Modifier
                 .size(QalqonDimens.sizes.buttonLarge)
-                .background(color = tone.copy(alpha = 0.18f), shape = CircleShape),
+                .background(color = accent.copy(alpha = 0.18f), shape = QalqonShapes.largeShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = Icons.Filled.Lock,
                 contentDescription = null,
-                tint = tone,
+                tint = accent,
                 modifier = Modifier.size(QalqonDimens.icon.md),
             )
         }
         Text(
             text = stringResource(homeProtectionLabelRes(status)),
             style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
         )
         Text(
             text = stringResource(homeProtectionSupportingRes(status)),
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
         )
         state.blockedApp?.let { packageName ->
             Text(
                 text = stringResource(R.string.dashboard_active_app, packageName),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
         }
-        // Real, non-fabricated context: the actual protected-app count, shown only while
-        // protection is actually running. No invented figures.
-        if (
-            (status == HomeProtectionStatus.ACTIVE || status == HomeProtectionStatus.BLOCKING) &&
-            state.protectedAppsCount > 0
-        ) {
-            Text(
-                text = stringResource(R.string.home_protection_apps_count, state.protectedAppsCount),
-                style = MaterialTheme.typography.labelLarge,
-                color = tone,
+        // Real metadata chip: the actual protected-app count, only while protection runs.
+        if (runCount) {
+            QalqonStatusBadge(
+                label = stringResource(R.string.home_protection_apps_count, state.protectedAppsCount),
+                tone = tone,
             )
         }
         Button(onClick = onOpenProtection, modifier = Modifier.fillMaxWidth()) {
@@ -706,11 +709,20 @@ private fun homeMetricIcon(kind: HomeTodayMetricKind): ImageVector = when (kind)
 @Composable
 private fun HomeMetricTile(metric: HomeTodayMetric, modifier: Modifier = Modifier) {
     val accent = metric.tone?.let { toneColor(it) } ?: MaterialTheme.colorScheme.onSurfaceVariant
+    // A duration is short and numeric (prominent); a status/text value can be a full
+    // sentence, so it renders smaller and WRAPS — never an ellipsis on important text.
+    val (valueText, valueStyle) = when (val value = metric.value) {
+        is HomeMetricValue.Duration ->
+            durationLabel(value.ms) to MaterialTheme.typography.titleLarge
+        is HomeMetricValue.Text ->
+            (if (value.arg != null) stringResource(value.res, value.arg) else stringResource(value.res)) to
+                MaterialTheme.typography.bodyLarge
+    }
     QalqonCard(modifier = modifier) {
         Box(
             modifier = Modifier
                 .size(QalqonDimens.icon.lg)
-                .background(color = accent.copy(alpha = 0.12f), shape = CircleShape),
+                .background(color = accent.copy(alpha = 0.14f), shape = QalqonShapes.smallShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -720,34 +732,22 @@ private fun HomeMetricTile(metric: HomeTodayMetric, modifier: Modifier = Modifie
                 modifier = Modifier.size(QalqonDimens.icon.sm),
             )
         }
-        val valueText = when (val value = metric.value) {
-            is HomeMetricValue.Duration -> durationLabel(value.ms)
-            is HomeMetricValue.Text ->
-                if (value.arg != null) stringResource(value.res, value.arg) else stringResource(value.res)
-        }
-        Text(
-            text = valueText,
-            style = MaterialTheme.typography.titleLarge,
-            color = metric.tone?.let { toneColor(it) } ?: MaterialTheme.colorScheme.onSurface,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
         Text(
             text = stringResource(metric.labelRes),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = valueText,
+            style = valueStyle,
+            color = accent,
+            // The full sentence is allowed to wrap; nothing here truncates it.
         )
         metric.caption?.let { caption ->
             Text(
                 text = caption,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                // The caption carries real explanatory text (e.g. why a metric has no
-                // value); it must wrap rather than truncate to an ellipsis.
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
             )
         }
     }

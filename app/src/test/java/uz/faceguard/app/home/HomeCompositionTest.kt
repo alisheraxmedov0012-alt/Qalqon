@@ -1,6 +1,7 @@
 package uz.faceguard.app.home
 
 import java.io.File
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -53,6 +54,24 @@ class HomeCompositionTest {
     fun todayAndQuickActionsHaveSectionSubtitles() {
         assertTrue(home.contains("R.string.home_today_subtitle"))
         assertTrue(home.contains("R.string.home_quick_actions_subtitle"))
+    }
+
+    @Test
+    fun theTodayMetricTileNeverEllipsisesImportantText() {
+        // The metric tile carries the real value/label/caption; none of it may be
+        // truncated with an ellipsis — it must wrap instead.
+        val tile = home.substringAfter("private fun HomeMetricTile(").substringBefore("/**")
+        assertTrue("the tile must render the label", tile.contains("metric.labelRes"))
+        assertTrue("the tile must render the value", tile.contains("valueText"))
+        assertFalse("the metric tile must not ellipsise", tile.contains("TextOverflow.Ellipsis"))
+        assertFalse("the metric tile must not cap important text", tile.contains("maxLines"))
+    }
+
+    @Test
+    fun theHeroIsAChipBackedPremiumSurface() {
+        val hero = home.substringAfter("private fun ProtectionStatusSection(").substringBefore("/** Compact attention")
+        assertTrue("the hero must use the soft-blue premium surface", hero.contains("primaryContainer"))
+        assertTrue("the hero must show the real count as a badge", hero.contains("QalqonStatusBadge("))
     }
 
     private fun read(relativePath: String): String =

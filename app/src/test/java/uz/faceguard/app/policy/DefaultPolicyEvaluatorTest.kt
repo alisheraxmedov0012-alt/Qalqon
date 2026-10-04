@@ -107,6 +107,21 @@ class DefaultPolicyEvaluatorTest {
         assertEquals(ProtectionAction.HARD_BLOCK, (decision as PolicyDecision.Protect).action)
     }
 
+    // 6b
+    @Test
+    fun `the bare no-face default fails closed`() {
+        // A caller that only turns protection on (no explicit no-face action) must still
+        // fail closed on a covered/revoked camera: the default itself is a soft block.
+        val onlyEnabled = PolicySettings(enabled = true)
+        assertEquals(ProtectionAction.SOFT_BLOCK, onlyEnabled.noFaceAction)
+
+        val decision = evaluator.evaluate(
+            context(UserIdentity.NO_FACE, settings = onlyEnabled, isProtectedApp = true),
+        )
+        assertTrue("no-face with the default must protect", decision is PolicyDecision.Protect)
+        assertEquals(ProtectionAction.SOFT_BLOCK, (decision as PolicyDecision.Protect).action)
+    }
+
     // 7
     @Test
     fun `camera obstruction fails safe with configured action`() {

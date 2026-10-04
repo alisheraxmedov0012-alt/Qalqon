@@ -40,16 +40,20 @@ object QalqonSpacing {
     val xxl: Dp = 32.dp
 }
 
-/** Corner-radius hierarchy: 8 / 12 / 16 / pill. */
+/** Corner-radius hierarchy: 8 / 12 / 16 / 20 / pill. */
 object QalqonShapes {
     val small: Dp = 8.dp
     val medium: Dp = 12.dp
     val large: Dp = 16.dp
+
+    /** 20 dp — the softer, more premium radius the Home cards use. */
+    val xLarge: Dp = 20.dp
     val pill: Dp = 999.dp
 
     val smallShape = RoundedCornerShape(small)
     val mediumShape = RoundedCornerShape(medium)
     val largeShape = RoundedCornerShape(large)
+    val xLargeShape = RoundedCornerShape(xLarge)
     val pillShape = RoundedCornerShape(pill)
 }
 
@@ -86,6 +90,20 @@ object QalqonSizes {
 
     /** Child avatar diameter. */
     val avatar: Dp = 40.dp
+
+    /**
+     * Home hero illustration box. Kept at (or above) 100 dp so the protection graphic
+     * reads as a real illustration rather than a small icon.
+     */
+    val illustration: Dp = 104.dp
+
+    /**
+     * The compact hero's illustration (about 72 dp) and round status glyph (about
+     * 44 dp). Smaller than [illustration] so the restyled hero is roughly half the
+     * previous height while the emblem stays a real, visible graphic.
+     */
+    val heroIllustration: Dp = 72.dp
+    val heroStatusIcon: Dp = 44.dp
 
     /** Hairline border. */
     val border: Dp = 1.dp

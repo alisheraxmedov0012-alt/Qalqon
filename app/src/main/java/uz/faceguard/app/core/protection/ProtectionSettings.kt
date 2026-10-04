@@ -11,7 +11,8 @@ import uz.faceguard.app.domain.model.ScanMode
 data class ProtectionSettings(
     val enabled: Boolean = false,
     val unknownUserPolicy: BlockPolicy = BlockPolicy.SOFT_BLOCK,
-    val noFacePolicy: BlockPolicy = BlockPolicy.ALLOW,
+    /** Fail-closed default; mirrors [AppSettings.noFacePolicy]. */
+    val noFacePolicy: BlockPolicy = BlockPolicy.SOFT_BLOCK,
     val recoveryDelayMs: Long = 30_000L,
     val scanMode: ScanMode = ScanMode.BALANCED,
     val lowBatteryBehaviorEnabled: Boolean = true,

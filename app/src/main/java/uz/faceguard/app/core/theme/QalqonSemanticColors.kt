@@ -46,6 +46,17 @@ data class QalqonSemanticColors(
     val requestPending: Color,
     val requestApproved: Color,
     val requestDenied: Color,
+
+    // Home hero illustration + primary CTA (reference mockup palette).
+    // The shield fill / stroke and the CTA are deliberately a brighter, more saturated
+    // blue than `primary`, so the hero illustration and its action read as one vivid
+    // accent. The danger container/text style the inactive-metric nudge.
+    val illustrationShield: Color,
+    val illustrationStroke: Color,
+    val cta: Color,
+    val onCta: Color,
+    val dangerContainer: Color,
+    val onDangerContainer: Color,
 )
 
 /** Light-theme semantic mapping. */
@@ -53,7 +64,9 @@ val LightQalqonSemanticColors = QalqonSemanticColors(
     success = Color(0xFF2E7D32),
     onSuccess = Color(0xFFFFFFFF),
     successContainer = Color(0xFFDCEFDC),
-    warning = Color(0xFFB26A00),
+    // AA-compliant amber: >= 4.5:1 on the light surface, so a warning dot/border/icon
+    // and any warning-tinted text stay readable.
+    warning = Color(0xFFA65E00),
     onWarning = Color(0xFFFFFFFF),
     warningContainer = Color(0xFFFFEFD4),
     info = Color(0xFF1E5B9E),
@@ -63,7 +76,7 @@ val LightQalqonSemanticColors = QalqonSemanticColors(
     protectionActive = Color(0xFF2E7D32),
     protectionInactive = Color(0xFF6B7280),
     protectionBlocking = Color(0xFFC62828),
-    protectionWarning = Color(0xFFB26A00),
+    protectionWarning = Color(0xFFA65E00),
 
     capabilityGranted = Color(0xFF2E7D32),
     capabilityMissing = Color(0xFFC62828),
@@ -74,6 +87,14 @@ val LightQalqonSemanticColors = QalqonSemanticColors(
     requestPending = Color(0xFFB26A00),
     requestApproved = Color(0xFF2E7D32),
     requestDenied = Color(0xFFC62828),
+
+    // Reference mockup: soft pastel shield, vivid blue stroke, deep blue CTA, soft red nudge.
+    illustrationShield = Color(0xFFDCE8FF),
+    illustrationStroke = Color(0xFF2563EB),
+    cta = Color(0xFF1D61E0),
+    onCta = Color(0xFFFFFFFF),
+    dangerContainer = Color(0xFFFEE2E2),
+    onDangerContainer = Color(0xFFC81E1E),
 )
 
 /** Dark-theme semantic mapping (lighter, less saturated for dark surfaces). */
@@ -102,6 +123,15 @@ val DarkQalqonSemanticColors = QalqonSemanticColors(
     requestPending = Color(0xFFF0C070),
     requestApproved = Color(0xFF8FD694),
     requestDenied = Color(0xFFF2A9A4),
+
+    // Dark equivalents: a deep shield, a lighter stroke, a readable blue CTA and a
+    // muted red nudge for dark surfaces.
+    illustrationShield = Color(0xFF1B3350),
+    illustrationStroke = Color(0xFF9EC5F5),
+    cta = Color(0xFF3B82F6),
+    onCta = Color(0xFF08182E),
+    dangerContainer = Color(0xFF3A1D20),
+    onDangerContainer = Color(0xFFF2A9A4),
 )
 
 /**

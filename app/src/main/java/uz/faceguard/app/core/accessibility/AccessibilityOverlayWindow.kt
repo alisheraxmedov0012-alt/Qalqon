@@ -122,9 +122,11 @@ class AccessibilityOverlayWindow(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             // Touchable (no FLAG_NOT_TOUCHABLE); not focusable so IME/keys/BACK are
-            // not captured. FLAG_LAYOUT_IN_SCREEN gives full-screen coverage.
+            // not captured. FLAG_LAYOUT_IN_SCREEN gives full-screen coverage, and
+            // FLAG_SECURE keeps the blocking window out of screenshots/Recents.
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_SECURE,
             PixelFormat.TRANSLUCENT,
         )
     }

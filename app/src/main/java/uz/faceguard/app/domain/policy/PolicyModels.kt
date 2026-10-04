@@ -207,7 +207,13 @@ data class PolicySettings(
     val activationDelayMs: Long = 0L,
     val childAction: ProtectionAction = ProtectionAction.HARD_BLOCK,
     val unknownUserAction: ProtectionAction = ProtectionAction.SOFT_BLOCK,
-    val noFaceAction: ProtectionAction = ProtectionAction.ALLOW,
+    /**
+     * Action when no face is visible ([UserIdentity.NO_FACE]) for a protected app.
+     *
+     * Fail-closed default, matching [uz.faceguard.app.domain.model.BlockPolicy]:
+     * a covered/revoked/obstructed camera must not silently pass a protected app.
+     */
+    val noFaceAction: ProtectionAction = ProtectionAction.SOFT_BLOCK,
     val obstructionAction: ProtectionAction = ProtectionAction.SOFT_BLOCK,
     /**
      * Group 9: action when the presentation is a spoof ([LivenessState.SPOOF]).

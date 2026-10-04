@@ -62,9 +62,11 @@ class HomeVisualRefinementTest {
 
     @Test
     fun theRefinementIntroducedNoNewMetricKinds() {
-        // The metrics stay exactly the four derivable from existing data.
+        // SCREEN_TIME / SCHEDULE / EYE_SAFETY are the derivable metrics; the
+        // PROTECTION_SUMMARY tile is the conditional protection-coverage tile, which
+        // never repeats the hero's status copy.
         assertEquals(
-            listOf("SCREEN_TIME", "SCHEDULE", "EYE_SAFETY", "PROTECTION"),
+            listOf("SCREEN_TIME", "SCHEDULE", "EYE_SAFETY", "PROTECTION_SUMMARY"),
             HomeTodayMetricKind.entries.map { it.name },
         )
     }
@@ -72,7 +74,7 @@ class HomeVisualRefinementTest {
     @Test
     fun theQuickActionsStayExactlyTheExistingDestinations() {
         assertEquals(
-            listOf("MANAGE_CHILDREN", "PROTECTION_SETTINGS", "PROTECTED_APPS", "REVIEW_REQUESTS"),
+            listOf("PROTECTED_APPS", "SCREEN_TIME", "RULES"),
             HomeQuickAction.entries.map { it.name },
         )
         HomeQuickAction.entries.forEach { action ->

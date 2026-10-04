@@ -1,9 +1,14 @@
 package uz.faceguard.app.core.protection
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.media.AudioManager
+import android.net.Uri
+import android.provider.Settings
 import android.util.Log
+import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.Instant
 import java.time.ZoneId
@@ -17,6 +22,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -43,6 +49,8 @@ import uz.faceguard.app.domain.model.ChildProfile
 import uz.faceguard.app.domain.model.ParentProfile
 import uz.faceguard.app.domain.model.ScanMode
 import uz.faceguard.app.domain.policy.AppPolicy
+import uz.faceguard.app.domain.protection.ProtectionCapability
+import uz.faceguard.app.domain.protection.missingProtectionCapabilities
 import uz.faceguard.app.domain.policy.ChildAppPolicyRepository
 import uz.faceguard.app.domain.notification.AppNotificationDispatcher
 import uz.faceguard.app.domain.notification.AppNotificationEvent
@@ -75,6 +83,22 @@ data class ProtectionRuntimeState(
     val foregroundApp: String? = null,
     val overlayGranted: Boolean = false,
     val usageAccessGranted: Boolean = false,
+    /**
+     * Phase 14: whether the CAMERA permission is currently held. Tracked by the
+     * runtime (not only by [uz.faceguard.app.feature.protection.ProtectionScreen]),
+     * so a revoked/never-granted camera is visible in the protection state and can
+     * never be mistaken for "recognition is running". It is deliberately NOT part
+     * of [ready]: blocking an app needs the overlay, not the camera, and the
+     * fail-closed no-face policy still protects without a frame.
+     */
+    val cameraGranted: Boolean = false,
+    /**
+     * True while the service is running without the camera foreground type (it was
+     * started in the background, e.g. restored after a reboot, and the camera type
+     * has not been claimed in a legal foreground moment yet). Defaults to true so a
+     * fresh session is never reported as limited before the service says otherwise.
+     */
+    val cameraForegroundReady: Boolean = true,
     /** True when the user has explicitly enabled QALQON's accessibility service. */
     val accessibilityEnabled: Boolean = false,
     /**
@@ -124,6 +148,36 @@ data class ProtectionRuntimeState(
     /** All prerequisites for protection to actually block are satisfied. */
     val ready: Boolean
         get() = active && parentFaceEnrolled && protectedCount > 0 && usageAccessGranted && overlayGranted
+
+    /**
+     * The capabilities protection needs but that are currently missing, or empty
+     * when protection is switched off. A switched-off device is not "degraded" — it
+     * simply is not protecting, and must not be nagged about.
+     */
+    val degradedCapabilities: Set<ProtectionCapability>
+        get() = if (!enabled) {
+            emptySet()
+        } else {
+            missingProtectionCapabilities(
+                accessibilityEnabled = accessibilityEnabled,
+                overlayGranted = overlayGranted,
+                usageAccessGranted = usageAccessGranted,
+                cameraGranted = cameraGranted,
+            )
+        }
+
+    /** True when protection is requested but only partially effective. */
+    val degraded: Boolean get() = degradedCapabilities.isNotEmpty()
+
+    /**
+     * True after a background (e.g. post-reboot) restore while the camera foreground
+     * type has not been claimed yet, so the camera — and therefore recognition — is
+     * limited until the app is next opened. Distinct from a missing camera
+     * *permission* ([cameraGranted]): here the permission is held, the type simply
+     * could not be claimed from a non-foreground context.
+     */
+    val cameraLimitedAfterBoot: Boolean
+        get() = enabled && active && cameraGranted && !cameraForegroundReady
 }
 
 /**
@@ -560,6 +614,24 @@ class ProtectionRuntime @Inject constructor(
         scope.launch {
             scheduler.lastEvent.collect { value -> _state.update { it.copy(lastTrigger = value?.trigger?.name ?: "") } }
         }
+        // Degraded protection: whenever the set of missing capabilities changes while
+        // protection is requested, tell the parent once per distinct set. The
+        // coordinator's dedup key (the set itself) collapses repeats, so a steady
+        // degraded state never spams and a newly lost/restored capability notifies.
+        scope.launch {
+            _state
+                .map { it.degradedCapabilities }
+                .distinctUntilChanged()
+                .collect { missing ->
+                    val owner = accountId ?: return@collect
+                    if (missing.isEmpty()) return@collect
+                    runCatching {
+                        notificationCoordinator.onEvent(
+                            AppNotificationEvent.ProtectionDegraded(owner, missing, clock()),
+                        )
+                    }
+                }
+        }
     }
 
     private fun syncContext() {
@@ -584,6 +656,7 @@ class ProtectionRuntime @Inject constructor(
                 childrenFaceEnrolled = children.count { child -> child.isFaceEnrolled },
                 overlayGranted = overlay.hasPermission(),
                 usageAccessGranted = monitor.hasUsageAccess(),
+                cameraGranted = hasCameraPermission(),
             )
         }
     }
@@ -659,6 +732,20 @@ class ProtectionRuntime @Inject constructor(
     }
 
     /**
+     * Reports whether the foreground service currently holds the camera foreground
+     * type. The service owns the claim (it is the only component that may start the
+     * camera session); the runtime only mirrors it so the parent can be told that
+     * recognition is limited until the app is opened again.
+     *
+     * Called with `false` when the service starts in the background (e.g. after a
+     * reboot) where the camera type cannot be claimed, and with `true` once the
+     * claim succeeds in a legal foreground moment.
+     */
+    fun setCameraForegroundReady(ready: Boolean) {
+        _state.update { it.copy(cameraForegroundReady = ready) }
+    }
+
+    /**
      * PIN-based parent emergency unlock; verified against the stored PIN.
      *
      * Phase 8 (PIN lockout UX): the typed [PinVerification] is reported to the
@@ -685,11 +772,23 @@ class ProtectionRuntime @Inject constructor(
                 overlayGranted = overlay.hasPermission(),
                 usageAccessGranted = monitor.hasUsageAccess(),
                 accessibilityEnabled = AccessibilityCapability.isEnabled(context),
+                cameraGranted = hasCameraPermission(),
                 notificationsEnabled = runCatching { notificationDispatcher.areNotificationsEnabled() }.getOrDefault(true),
                 securityState = securityStateHolder.state.value,
             )
         }
     }
+
+    /**
+     * Whether the CAMERA permission is currently held.
+     *
+     * Probed from the injected application context by the runtime itself, so a
+     * revocation made in system settings is reflected in the protection state even
+     * if the Protection screen is never opened.
+     */
+    private fun hasCameraPermission(): Boolean =
+        ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
 
     /**
      * Group 7: the accessibility service is bound. It becomes the authoritative
@@ -811,6 +910,24 @@ class ProtectionRuntime @Inject constructor(
     fun overlayPermissionIntent(): Intent = overlay.permissionIntent()
 
     fun accessibilitySettingsIntent(): Intent = AccessibilityCapability.settingsIntent()
+
+    /**
+     * The system settings page that fixes [capability], so both the Home and the
+     * Protection degraded banner can point at exactly the right screen.
+     *
+     * Camera has no dedicated settings page of its own, so it opens the app's
+     * details page (where the permission can be re-granted) — uniform across both
+     * screens and available without an Activity-scoped permission API.
+     */
+    fun capabilitySettingsIntent(capability: ProtectionCapability): Intent = when (capability) {
+        ProtectionCapability.ACCESSIBILITY -> accessibilitySettingsIntent()
+        ProtectionCapability.OVERLAY -> overlayPermissionIntent()
+        ProtectionCapability.USAGE_ACCESS -> usageAccessIntent()
+        ProtectionCapability.CAMERA -> Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", context.packageName, null)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+    }
 
     private companion object {
         const val TAG = "ProtectionRuntime"

@@ -26,7 +26,8 @@ class HomeDashboardLocalizationTest {
         "home_attention_children_setup",
         "home_today_title",
         "home_quick_actions_title",
-        "home_action_manage_children",
+        "home_action_screen_time",
+        "home_action_rules",
         "home_status_off_hint",
         "home_status_active_hint",
         "home_status_setup_hint",
@@ -93,10 +94,12 @@ class HomeDashboardLocalizationTest {
     @Test
     fun theDashboardUsesQalqonComponents() {
         val screen = read("feature/home/HomeScreen.kt")
+        // The banner area reuses the shared QalqonStatusBanner (superseding the earlier
+        // QalqonAlertRow rows now that attention + degraded are one banner list).
         listOf(
             "QalqonSectionHeader(",
             "QalqonChildCard(",
-            "QalqonAlertRow(",
+            "QalqonStatusBanner(",
             "QalqonEmptyState(",
             "QalqonErrorState(",
             "QalqonLoadingState(",

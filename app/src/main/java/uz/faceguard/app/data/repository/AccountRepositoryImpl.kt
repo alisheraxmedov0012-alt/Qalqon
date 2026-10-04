@@ -63,7 +63,6 @@ class AccountRepositoryImpl @Inject constructor(
                 id = id,
                 fullName = fullName.trim(),
                 phoneNumber = normalizedPhone,
-                pinHash = hash,
             ),
         )
     }
@@ -127,18 +126,22 @@ class AccountRepositoryImpl @Inject constructor(
     /**
      * Transparent upgrade: after the first successful verification of a legacy hash
      * the account is re-hashed with PBKDF2. The PIN never leaves this call.
+     *
+     * Failure-isolated: `PinHasher.hash` now rejects a malformed salt rather than
+     * zero-filling it, so a (never-expected) failure here must not break a login that
+     * has already succeeded — the account simply stays on its legacy hash.
      */
     private suspend fun upgradeLegacyHashIfNeeded(entity: UserAccountEntity, pin: String) {
         if (!PinHasher.needsUpgrade(entity.pinHash)) return
         val salt = PinHasher.randomSalt()
-        accountDao.updatePinHash(entity.id, PinHasher.hash(pin, salt), salt)
+        runCatching { PinHasher.hash(pin, salt) }
+            .onSuccess { upgraded -> accountDao.updatePinHash(entity.id, upgraded, salt) }
     }
 
     private fun UserAccountEntity.toDomain() = UserAccount(
         id = id,
         fullName = fullName,
         phoneNumber = phoneNumber,
-        pinHash = pinHash,
         createdAt = createdAt,
     )
 }

@@ -81,7 +81,7 @@ class DashboardAggregatorTest {
         val id = MutableStateFlow<Long?>(null)
         override val currentAccountId: Flow<Long?> = id
         override suspend fun getCurrentAccount(): UserAccount? =
-            id.value?.let { UserAccount(id = it, fullName = "Parent", phoneNumber = "123", pinHash = "hash") }
+            id.value?.let { UserAccount(id = it, fullName = "Parent", phoneNumber = "123") }
         override suspend fun register(fullName: String, phoneNumber: String, pin: String) = error("not used")
         override suspend fun login(phoneNumber: String, pin: String) = error("not used")
         override suspend fun logout() { id.value = null }

@@ -7,6 +7,7 @@ import uz.faceguard.app.core.ui.qalqon.QalqonAlertSeverity
 import uz.faceguard.app.core.ui.qalqon.QalqonStatusTone
 import uz.faceguard.app.core.util.Validation
 import uz.faceguard.app.domain.model.RestrictionLevel
+import uz.faceguard.app.domain.protection.ProtectionCapability
 import uz.faceguard.app.domain.schedule.ScheduleResolution
 
 /**
@@ -90,65 +91,133 @@ fun homeProtectionActionLabelRes(status: HomeProtectionStatus): Int = when (stat
 
 fun homeProtectionTone(status: HomeProtectionStatus): QalqonStatusTone = when (status) {
     HomeProtectionStatus.ACTIVE -> QalqonStatusTone.ACTIVE
-    HomeProtectionStatus.OFF -> QalqonStatusTone.INACTIVE
+    // OFF is a warning, not a neutral: the device is unprotected and the parent must act.
+    HomeProtectionStatus.OFF -> QalqonStatusTone.WARNING
     HomeProtectionStatus.BLOCKING -> QalqonStatusTone.BLOCKING
     HomeProtectionStatus.RECOVERING -> QalqonStatusTone.WARNING
     HomeProtectionStatus.SETUP_REQUIRED -> QalqonStatusTone.WARNING
 }
 
-// ----------------------------------------------------------------- attention
+/**
+ * The semantic surface treatment of the protection hero (Compose-free).
+ *
+ * ON is green, OFF/setup/recovering are amber, a live block is red. The Compose layer
+ * maps this to theme tokens and animates between them; keeping the decision here makes
+ * the state -> colour contract unit-testable without Android.
+ */
+enum class HomeHeroSurface { SUCCESS, WARNING, BLOCKING }
 
-/** The real, actionable conditions the attention section may surface. */
-enum class HomeAttentionKind { PENDING_REQUESTS, CHILDREN_NEED_SETUP, NOTIFICATIONS_DISABLED }
+fun homeProtectionHeroSurface(status: HomeProtectionStatus): HomeHeroSurface = when (status) {
+    HomeProtectionStatus.ACTIVE -> HomeHeroSurface.SUCCESS
+    HomeProtectionStatus.BLOCKING -> HomeHeroSurface.BLOCKING
+    HomeProtectionStatus.OFF,
+    HomeProtectionStatus.SETUP_REQUIRED,
+    HomeProtectionStatus.RECOVERING,
+    -> HomeHeroSurface.WARNING
+}
 
-data class HomeAttentionItem(
-    val kind: HomeAttentionKind,
-    @StringRes val messageRes: Int,
+/**
+ * Whether the hero's primary "turn on / manage protection" action may be used.
+ *
+ * Protection cannot be turned on before a child profile exists (there is nothing to
+ * protect), so the CTA is disabled until then and the child-add action is the parent's
+ * first step. Compose-free so the empty-state rule is unit-testable.
+ */
+fun homeCanEnableProtection(state: DashboardUiState): Boolean = state.hasChild
+
+// ------------------------------------------------------------------- setup
+
+/** The three one-time steps a parent must complete before protection fully works. */
+enum class HomeSetupStepKind { CHILD_ADDED, PERMISSIONS_GRANTED, PROTECTION_ON }
+
+/** One setup step and whether it is already satisfied. */
+data class HomeSetupStep(val kind: HomeSetupStepKind, val done: Boolean)
+
+/**
+ * The "Sozlash holati" checklist: child profile added -> permissions granted ->
+ * protection on. Ordered as the parent should complete them. Every flag is real state,
+ * never a fabricated progress value.
+ */
+fun homeSetupSteps(state: DashboardUiState): List<HomeSetupStep> = listOf(
+    HomeSetupStep(HomeSetupStepKind.CHILD_ADDED, state.children.isNotEmpty()),
+    HomeSetupStep(HomeSetupStepKind.PERMISSIONS_GRANTED, state.enforcementReady),
+    HomeSetupStep(HomeSetupStepKind.PROTECTION_ON, state.protectionEnabled),
+)
+
+/** True once every setup step is satisfied, so the card can hide itself. */
+fun homeSetupComplete(state: DashboardUiState): Boolean = homeSetupSteps(state).all { it.done }
+
+// ------------------------------------------------------------------ banners
+
+/**
+ * The real, actionable conditions the single Home banner area may surface. The banner
+ * area is deliberately one list (not several stacked components) so the page has one
+ * place for "something needs you", ordered most severe first.
+ */
+enum class HomeBannerKind {
+    /** Protection lost a capability it needs (accessibility/overlay/usage/camera). */
+    PROTECTION_DEGRADED,
+
+    /** Restored after a reboot but the camera type is not claimed yet (limited until opened). */
+    CAMERA_LIMITED,
+
+    /** The OS would not deliver our notifications. */
+    NOTIFICATIONS_DISABLED,
+
+    /** A child asked for more time and the parent must decide. */
+    PENDING_REQUESTS,
+
+    /** A child profile still needs face enrollment. */
+    CHILDREN_NEED_SETUP,
+}
+
+/**
+ * One entry in the Home banner area. [count] is only ever a genuine count (pending
+ * requests); nothing is fabricated.
+ */
+data class HomeBanner(
+    val kind: HomeBannerKind,
     val severity: QalqonAlertSeverity,
-    /** Only set for counted conditions (pending requests); never fabricated. */
     val count: Int? = null,
 )
 
-/** The attention section is compact by design: at most this many items. */
-const val HOME_ATTENTION_MAX = 3
+/** The banner area is compact by design: at most this many entries. */
+const val HOME_BANNER_MAX = 3
 
 /**
- * The attention items to show, in priority order, or an empty list when the
- * dashboard is calm (the section is then hidden entirely — never an empty card).
+ * The Home banner area, most severe first, or an empty list when nothing needs the
+ * parent. Every condition comes from a real field / the protection runtime state.
  *
- * Every condition comes from a real field; nothing is invented, and a count is only
- * attached when the underlying value is a genuine count.
+ * This single list replaces the earlier separate "attention" and "degraded" cards, so
+ * the same condition can never be shown twice.
  */
-fun homeAttentionItems(state: DashboardUiState): List<HomeAttentionItem> = buildList {
+fun homeBanners(
+    state: DashboardUiState,
+    degradedCapabilities: Set<ProtectionCapability> = emptySet(),
+    cameraLimitedAfterBoot: Boolean = false,
+): List<HomeBanner> = buildList {
+    if (degradedCapabilities.isNotEmpty()) {
+        add(HomeBanner(HomeBannerKind.PROTECTION_DEGRADED, QalqonAlertSeverity.WARNING))
+    }
+    if (cameraLimitedAfterBoot) {
+        add(HomeBanner(HomeBannerKind.CAMERA_LIMITED, QalqonAlertSeverity.WARNING))
+    }
+    if (!state.notificationsEnabled) {
+        add(HomeBanner(HomeBannerKind.NOTIFICATIONS_DISABLED, QalqonAlertSeverity.WARNING))
+    }
     if (state.pendingRequestCount > 0) {
         add(
-            HomeAttentionItem(
-                kind = HomeAttentionKind.PENDING_REQUESTS,
-                messageRes = R.string.dashboard_requests_pending,
+            HomeBanner(
+                kind = HomeBannerKind.PENDING_REQUESTS,
                 severity = QalqonAlertSeverity.WARNING,
                 count = state.pendingRequestCount,
             ),
         )
     }
     if (state.children.any { !it.isFaceEnrolled }) {
-        add(
-            HomeAttentionItem(
-                kind = HomeAttentionKind.CHILDREN_NEED_SETUP,
-                messageRes = R.string.home_attention_children_setup,
-                severity = QalqonAlertSeverity.WARNING,
-            ),
-        )
+        add(HomeBanner(HomeBannerKind.CHILDREN_NEED_SETUP, QalqonAlertSeverity.WARNING))
     }
-    if (!state.notificationsEnabled) {
-        add(
-            HomeAttentionItem(
-                kind = HomeAttentionKind.NOTIFICATIONS_DISABLED,
-                messageRes = R.string.dashboard_notifications_disabled,
-                severity = QalqonAlertSeverity.WARNING,
-            ),
-        )
-    }
-}.take(HOME_ATTENTION_MAX)
+}.take(HOME_BANNER_MAX)
 
 // ------------------------------------------------------------------ children
 
@@ -181,7 +250,7 @@ fun homeChildSummaries(state: DashboardUiState): List<HomeChildSummary> =
 
 // --------------------------------------------------------------------- today
 
-enum class HomeTodayMetricKind { SCREEN_TIME, SCHEDULE, EYE_SAFETY, PROTECTION }
+enum class HomeTodayMetricKind { SCREEN_TIME, SCHEDULE, EYE_SAFETY, PROTECTION_SUMMARY }
 
 /**
  * A metric's value. [Duration] carries exact milliseconds and is rendered with the
@@ -191,7 +260,7 @@ enum class HomeTodayMetricKind { SCREEN_TIME, SCHEDULE, EYE_SAFETY, PROTECTION }
  * name — user data, never UI copy).
  */
 sealed interface HomeMetricValue {
-    data class Text(@StringRes val res: Int, val arg: String? = null) : HomeMetricValue
+    data class Text(@StringRes val res: Int, val arg: Any? = null) : HomeMetricValue
     data class Duration(val ms: Long) : HomeMetricValue
 }
 
@@ -208,11 +277,14 @@ data class HomeTodayMetric(
 )
 
 /**
- * The "Today" overview: screen time, schedule, eye safety and protection, using only
- * data the existing aggregator/evaluator already produced.
+ * The "Today" overview: screen time plus, only when relevant, a protection-coverage
+ * tile — using only data the existing aggregator/evaluator already produced.
  *
- * A metric with no reliable data is rendered as its own honest state ("usage data
- * unavailable", "no screen-time child selected") — never as a fabricated zero.
+ * The protection tile is deliberately NOT the hero's status copy: it reports how many
+ * apps are actually covered, so protection status is never printed twice. It appears
+ * only while protection is enabled and at least one app is protected ("relevant");
+ * otherwise the hero and the setup checklist already own that message. A metric with no
+ * reliable data is rendered as its own honest state — never as a fabricated zero.
  */
 fun homeTodayMetrics(
     state: DashboardUiState,
@@ -221,7 +293,27 @@ fun homeTodayMetrics(
     screenTimeMetric(screenTime)?.let { add(it) }
     if (state.hasChild) add(scheduleMetric(state.scheduleResolution))
     state.eyeSafety?.let { add(eyeSafetyMetric(it, state.child?.name)) }
-    add(protectionMetric(state))
+    protectionSummaryMetric(state)?.let { add(it) }
+}
+
+/**
+ * The protection-coverage tile, or `null` when it is not relevant.
+ *
+ * Relevant = protection is on and at least one app is protected. The value is the real
+ * protected-app count (never a fabricated figure), and the tile says nothing about the
+ * on/off state — that is the hero's job.
+ */
+private fun protectionSummaryMetric(state: DashboardUiState): HomeTodayMetric? {
+    if (!state.protectionEnabled || state.protectedAppsCount <= 0) return null
+    return HomeTodayMetric(
+        kind = HomeTodayMetricKind.PROTECTION_SUMMARY,
+        labelRes = R.string.dashboard_apps_title,
+        value = HomeMetricValue.Text(
+            R.string.home_protection_apps_count,
+            state.protectedAppsCount,
+        ),
+        tone = homeProtectionTone(homeProtectionStatus(state)),
+    )
 }
 
 private fun screenTimeMetric(summary: ScreenTimeSummaryUiState): HomeTodayMetric? {
@@ -321,57 +413,41 @@ private fun eyeSafetyMetric(section: EyeSafetySection, childName: String?): Home
     )
 }
 
-private fun protectionMetric(state: DashboardUiState): HomeTodayMetric {
-    val status = homeProtectionStatus(state)
-    return HomeTodayMetric(
-        kind = HomeTodayMetricKind.PROTECTION,
-        labelRes = R.string.dashboard_protection_title,
-        value = HomeMetricValue.Text(homeProtectionLabelRes(status)),
-        tone = homeProtectionTone(status),
-    )
-}
-
 // -------------------------------------------------------------- quick actions
 
-enum class HomeQuickAction { MANAGE_CHILDREN, PROTECTION_SETTINGS, PROTECTED_APPS, REVIEW_REQUESTS }
+/**
+ * The useful quick actions. Deliberately excludes "manage children" (it duplicates the
+ * bottom-navigation Children tab) and the contextual extras that are now surfaced by the
+ * banner area; the three everyday destinations remain.
+ */
+enum class HomeQuickAction { PROTECTED_APPS, SCREEN_TIME, RULES }
 
 /** The quick-actions section never shows more than this many actions. */
 const val HOME_QUICK_ACTIONS_MAX = 3
 
 @StringRes
 fun homeQuickActionLabelRes(action: HomeQuickAction): Int = when (action) {
-    HomeQuickAction.MANAGE_CHILDREN -> R.string.home_action_manage_children
-    HomeQuickAction.PROTECTION_SETTINGS -> R.string.protection_title
     HomeQuickAction.PROTECTED_APPS -> R.string.home_menu_protected_apps
-    HomeQuickAction.REVIEW_REQUESTS -> R.string.requests_title
+    HomeQuickAction.SCREEN_TIME -> R.string.home_action_screen_time
+    HomeQuickAction.RULES -> R.string.home_action_rules
 }
 
 /** The one-line supporting description under each quick action's title. */
 @StringRes
 fun homeQuickActionDescriptionRes(action: HomeQuickAction): Int = when (action) {
-    HomeQuickAction.MANAGE_CHILDREN -> R.string.home_action_manage_children_desc
-    HomeQuickAction.PROTECTION_SETTINGS -> R.string.home_action_protection_desc
     HomeQuickAction.PROTECTED_APPS -> R.string.home_action_protected_apps_desc
-    HomeQuickAction.REVIEW_REQUESTS -> R.string.home_action_requests_desc
+    HomeQuickAction.SCREEN_TIME -> R.string.home_action_screen_time_desc
+    HomeQuickAction.RULES -> R.string.home_action_rules_desc
 }
 
 /**
- * The contextual quick actions: at most [HOME_QUICK_ACTIONS_MAX], chosen from the
- * existing state rather than always showing every option. Every action maps to an
- * existing, protected route.
+ * The quick actions: the three everyday destinations, always in the same order, every
+ * one mapping to an existing, protected route. "Manage children" is intentionally absent
+ * because the bottom-navigation Children tab already owns it.
  */
-fun homeQuickActions(state: DashboardUiState): List<HomeQuickAction> = buildList {
-    if (state.pendingRequestCount > 0) add(HomeQuickAction.REVIEW_REQUESTS)
-    if (state.children.isEmpty() || state.children.any { !it.isFaceEnrolled }) {
-        add(HomeQuickAction.MANAGE_CHILDREN)
-    }
-    if (state.protectionEnabled && !state.enforcementReady) add(HomeQuickAction.PROTECTION_SETTINGS)
-    if (state.protectedAppsCount == 0) add(HomeQuickAction.PROTECTED_APPS)
-
-    // Nothing needs attention: offer the three everyday management shortcuts.
-    if (isEmpty()) {
-        add(HomeQuickAction.MANAGE_CHILDREN)
-        add(HomeQuickAction.PROTECTION_SETTINGS)
-        add(HomeQuickAction.PROTECTED_APPS)
-    }
-}.distinct().take(HOME_QUICK_ACTIONS_MAX)
+fun homeQuickActions(@Suppress("UNUSED_PARAMETER") state: DashboardUiState): List<HomeQuickAction> =
+    listOf(
+        HomeQuickAction.PROTECTED_APPS,
+        HomeQuickAction.SCREEN_TIME,
+        HomeQuickAction.RULES,
+    )

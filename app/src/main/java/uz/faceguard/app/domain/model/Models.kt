@@ -6,7 +6,10 @@ data class UserAccount(
     val id: Long = 0,
     val fullName: String,
     val phoneNumber: String,
-    val pinHash: String,
+    /**
+     * No credential material here: the PIN hash and salt live only in the data layer
+     * (`UserAccountEntity`). The domain/UI must never see them.
+     */
     val createdAt: Long = System.currentTimeMillis(),
 )
 
@@ -94,7 +97,14 @@ data class AppSettings(
     val scanMode: ScanMode = ScanMode.BALANCED,
     val recoveryDelayMs: Long = DEFAULT_RECOVERY_DELAY_MS,
     val unknownUserPolicy: BlockPolicy = BlockPolicy.SOFT_BLOCK,
-    val noFacePolicy: BlockPolicy = BlockPolicy.ALLOW,
+    /**
+     * What to do when no face is visible for a protected app.
+     *
+     * Fail-closed by default: a covered, revoked or obstructed camera must not
+     * silently pass a protected app through, so "no face" defaults to a
+     * recoverable soft block rather than ALLOW. A parent can still relax it.
+     */
+    val noFacePolicy: BlockPolicy = BlockPolicy.SOFT_BLOCK,
     val lowBatteryBehaviorEnabled: Boolean = true,
 ) {
     companion object {

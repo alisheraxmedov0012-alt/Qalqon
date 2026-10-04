@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -45,10 +46,20 @@ fun QalqonCard(
     bordered: Boolean = true,
     containerColor: Color = MaterialTheme.colorScheme.surface,
     contentPadding: Dp = QalqonDimens.cardPadding,
+    /**
+     * Surface shadow. Defaults to flat, so every existing caller keeps its current
+     * look; a screen may pass [QalqonDimens.elevation.raised] for a subtle lift.
+     */
+    elevation: Dp = QalqonDimens.elevation.flat,
+    /**
+     * Corner shape. Defaults to the shared [QalqonDimens.cardCorner], so existing
+     * callers are unchanged; a screen may pass a softer radius (e.g.
+     * [uz.faceguard.app.core.theme.QalqonShapes.xLargeShape]) for a premium surface.
+     */
+    shape: Shape = androidx.compose.foundation.shape.RoundedCornerShape(QalqonDimens.cardCorner),
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val shape = androidx.compose.foundation.shape.RoundedCornerShape(QalqonDimens.cardCorner)
     val border = if (bordered) {
         BorderStroke(QalqonDimens.cardBorder, MaterialTheme.colorScheme.outlineVariant)
     } else {
@@ -61,12 +72,14 @@ fun QalqonCard(
     }
 
     // OutlinedCard gives the hairline border; a plain Card is used when borderless.
-    val elevation = CardDefaults.cardElevation(defaultElevation = QalqonDimens.elevation.flat)
+    // Both share the same token elevation so a lifted card looks identical in either form.
+    val cardElevation = CardDefaults.cardElevation(defaultElevation = elevation)
     if (bordered) {
         OutlinedCard(
             modifier = modifier.then(clickModifier),
             shape = shape,
             border = border!!,
+            elevation = cardElevation,
             colors = CardDefaults.outlinedCardColors(containerColor = containerColor),
             content = {
                 Column(
@@ -80,7 +93,7 @@ fun QalqonCard(
         Card(
             modifier = modifier.then(clickModifier),
             shape = shape,
-            elevation = elevation,
+            elevation = cardElevation,
             colors = CardDefaults.cardColors(containerColor = containerColor),
             content = {
                 Column(

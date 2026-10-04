@@ -30,8 +30,27 @@ class PolicySettingsMappingTest {
         assertEquals(ScanMode.BALANCED, defaults.scanMode)
         assertEquals(AppSettings.DEFAULT_RECOVERY_DELAY_MS, defaults.recoveryDelayMs)
         assertEquals(BlockPolicy.SOFT_BLOCK, defaults.unknownUserPolicy)
-        assertEquals(BlockPolicy.ALLOW, defaults.noFacePolicy)
+        assertEquals(
+            "no-face must fail closed (covered/revoked camera cannot pass)",
+            BlockPolicy.SOFT_BLOCK,
+            defaults.noFacePolicy,
+        )
         assertEquals(true, defaults.lowBatteryBehaviorEnabled)
+    }
+
+    @Test
+    fun `the no-face default fails closed end to end`() {
+        // Persisted default -> evaluator policy -> engine snapshot all agree.
+        assertEquals(
+            "AppSettings -> PolicySettings must keep the fail-closed no-face action",
+            ProtectionAction.SOFT_BLOCK,
+            AppSettings().toPolicySettings().noFaceAction,
+        )
+        assertEquals(
+            "the engine settings snapshot must mirror the fail-closed default",
+            BlockPolicy.SOFT_BLOCK,
+            uz.faceguard.app.core.protection.ProtectionSettings().noFacePolicy,
+        )
     }
 
     // ------------------------------------------------------------ enum parsing

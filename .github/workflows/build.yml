@@ -83,7 +83,14 @@ jobs:
         ram-size: 2048M
         disk-size: 4G
         disable-animations: true
-        emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+        # CI-only stability: `-no-snapshot` is the action's own default (the previous
+        # override dropped it), so the emulator never loads or saves an AVD snapshot on
+        # the shared runner. Snapshot state is a documented source of non-deterministic
+        # stalls, and the action README's snapshot-caching example uses this exact option
+        # string *only* for the snapshot-generating step, adding `-no-snapshot-save` for
+        # the step that actually runs tests. GPU stays on the recommended software
+        # renderer (`swiftshader_indirect`).
+        emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
         script: |
           adb devices
           ./gradlew :app:connectedDebugAndroidTest --stacktrace

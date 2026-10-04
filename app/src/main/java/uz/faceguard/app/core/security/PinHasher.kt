@@ -39,12 +39,19 @@ object PinHasher {
     /** PBKDF2 envelope for a PIN and its (hex) salt. */
     fun hash(pin: String, saltHex: String): String {
         val derived = derive(pin, saltHex, ITERATIONS)
+            ?: throw IllegalArgumentException(
+                "salt is not valid hex; a malformed salt is a programming error, never zero-filled",
+            )
         return listOf(SCHEME, DIGEST, ITERATIONS.toString(), saltHex, derived.toHex()).joinToString(SEPARATOR)
     }
 
     /**
      * Verifies [pin] against a stored hash. Supports both the PBKDF2 envelope and
      * the legacy salted SHA-256 value (compared in constant time).
+     *
+     * Malformed stored data (including a malformed salt in the envelope) can only
+     * ever return `false` — verification of untrusted input never throws and never
+     * substitutes a zero-filled salt.
      */
     fun verify(pin: String, storedHash: String, legacySaltHex: String): Boolean {
         if (!storedHash.startsWith("$SCHEME$SEPARATOR")) {
@@ -56,14 +63,23 @@ object PinHasher {
         val iterations = parts[2].toIntOrNull() ?: return false
         val salt = parts[3]
         if (iterations <= 0 || salt.isBlank() || parts[4].isBlank()) return false
-        return constantTimeEquals(derive(pin, salt, iterations).toHex(), parts[4])
+        val derived = derive(pin, salt, iterations) ?: return false
+        return constantTimeEquals(derived.toHex(), parts[4])
     }
 
     /** True when [storedHash] is still the legacy scheme and should be upgraded. */
     fun needsUpgrade(storedHash: String): Boolean = !storedHash.startsWith("$SCHEME$SEPARATOR")
 
-    private fun derive(pin: String, saltHex: String, iterations: Int): ByteArray {
-        val spec = PBEKeySpec(pin.toCharArray(), fromHex(saltHex), iterations, KEY_LENGTH_BITS)
+    /**
+     * PBKDF2 derivation, or `null` when [saltHex] is not valid hex.
+     *
+     * Returning null (rather than substituting zero bytes) is what keeps a malformed
+     * salt from silently producing a guessable hash.
+     */
+    private fun derive(pin: String, saltHex: String, iterations: Int): ByteArray? {
+        val salt = fromHex(saltHex) ?: return null
+        if (salt.isEmpty()) return null
+        val spec = PBEKeySpec(pin.toCharArray(), salt, iterations, KEY_LENGTH_BITS)
         return try {
             SecretKeyFactory.getInstance(ALGORITHM).generateSecret(spec).encoded
         } finally {
@@ -81,10 +97,19 @@ object PinHasher {
 
     private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
 
-    private fun fromHex(hex: String): ByteArray {
-        if (hex.length % 2 != 0) return ByteArray(0)
-        return ByteArray(hex.length / 2) { i ->
-            hex.substring(i * 2, i * 2 + 2).toIntOrNull(16)?.toByte() ?: 0
+    /**
+     * Strict hex decoding: `null` for an empty/odd-length string or any character
+     * outside `[0-9a-fA-F]`. Deliberately **no** zero-fill — a malformed salt must
+     * never be silently replaced with a predictable value.
+     */
+    private fun fromHex(hex: String): ByteArray? {
+        if (hex.isEmpty() || hex.length % 2 != 0) return null
+        val out = ByteArray(hex.length / 2)
+        for (i in out.indices) {
+            val hi = hex[i * 2].digitToIntOrNull(16) ?: return null
+            val lo = hex[i * 2 + 1].digitToIntOrNull(16) ?: return null
+            out[i] = ((hi shl 4) or lo).toByte()
         }
+        return out
     }
 }

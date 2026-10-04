@@ -143,7 +143,8 @@ class SettingsViewModelTest {
         assertEquals(false, settings.protectionEnabled)
         assertEquals(ScanMode.BALANCED, settings.scanMode)
         assertEquals(BlockPolicy.SOFT_BLOCK, settings.unknownUserPolicy)
-        assertEquals(BlockPolicy.ALLOW, settings.noFacePolicy)
+        // No-face fails closed by default.
+        assertEquals(BlockPolicy.SOFT_BLOCK, settings.noFacePolicy)
         assertEquals(AppSettings.DEFAULT_RECOVERY_DELAY_MS, settings.recoveryDelayMs)
         assertEquals(true, settings.lowBatteryBehaviorEnabled)
     }

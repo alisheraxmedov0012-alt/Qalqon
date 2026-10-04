@@ -411,5 +411,6 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   deliberately left unchanged (needs real-device evidence). `assembleDebug` PASS;
   `assembleRelease` compiles but packaging still fails at the intentional signing
   gate. Instrumented tests compile in `assembleDebug` but cannot execute locally
-  (no emulator/KVM); they run in CI.
+  (no emulator/KVM); they run in CI. CI run `37210605668` on this commit:
+  `build` + `Instrumented tests (API 35)` both PASS.
 

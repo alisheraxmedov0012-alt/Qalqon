@@ -45,7 +45,7 @@ telemetry, analytics, pricing, and any new roadmap phase.
 | `/dev/kvm` | **No** | `ls /dev/kvm` → not found |
 | CPU virtualization (vmx/svm) | **No** | `grep -c 'vmx\|svm' /proc/cpuinfo` → 0 |
 | JVM unit tests | **Yes** | `:app:testDebugUnitTest` (JDK 17 + Android SDK 35) |
-| CI instrumentation (API 35 emulator) | Configured | `.github/workflows/build.yml` → `connectedDebugAndroidTest` on push/PR |
+| CI instrumentation (API 35 emulator) | Configured & executed | `.github/workflows/build.yml` → `connectedDebugAndroidTest`; run `37210605668` on this commit: `build` success + `Instrumented tests (API 35)` success |
 
 ---
 
@@ -64,7 +64,7 @@ manifest/source** unless a real-device or emulator run is noted. No row is
 | 31 | 12 | Included | FGS background-start restriction (`ForegroundServiceStartNotAllowedException`); both the launcher and the boot path are wrapped, and a rejected start degrades instead of crashing. | STATIC ANALYSIS ONLY |
 | 33 | 13 | Included | `POST_NOTIFICATIONS` runtime permission (requested from the Requests screen); FGS still runs if it is denied (notification suppressed only). | STATIC ANALYSIS ONLY |
 | 34 | 14 | Included | Mandatory FGS types; camera type requires while-in-use + `FOREGROUND_SERVICE_CAMERA` (declared); `RECEIVER_EXPORTED/NOT_EXPORTED` required **except** for receivers registered only for protected system broadcasts — `ScanScheduler` registers only `ACTION_SCREEN_ON`, which is protected, so no flag is required (verified against the platform exception). | STATIC ANALYSIS ONLY |
-| 35 | 15 | compileSdk/targetSdk | `camera`/`dataSync`/`media*` FGS starts are forbidden from `BOOT_COMPLETED`; the boot path claims **only** `specialUse`, and the `camera` type is claimed later from a foreground moment. `specialUse` requires a subtype property (declared). | CI EMULATOR (pending); otherwise STATIC ANALYSIS ONLY |
+| 35 | 15 | compileSdk/targetSdk | `camera`/`dataSync`/`media*` FGS starts are forbidden from `BOOT_COMPLETED`; the boot path claims **only** `specialUse`, and the `camera` type is claimed later from a foreground moment. `specialUse` requires a subtype property (declared). | CI EMULATOR PASS (run 37210605668); otherwise STATIC ANALYSIS ONLY |
 | 36+ | 16+ | Not targeted | compileSdk 35 / targetSdk 35. Not assessed; no SDK 36 platform or runtime was available. | NOT TESTED |
 
 ---
@@ -137,7 +137,7 @@ exercised, `❌` failed, `NT` **NOT TESTED** (no device/emulator).
 
 | Manufacturer | Model | Android | API | OEM skin | Protection ON/OFF | Foreground Service | Background | Doze | Battery Opt. | Overlay | Accessibility | Usage Access | Reboot | Lock Screen | Screen OFF/ON | Rotation | Split Screen | Notification | Process Death | Recovery | Required Config | Result | Known Limitation |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Google | CI emulator (x86_64) | 15 | 35 | AOSP | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | — | CI EMULATOR (instrumented job; pending this run) | Instrumented tests, not real hardware |
+| Google | CI emulator (x86_64) | 15 | 35 | AOSP | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | — | CI EMULATOR PASS (run 37210605668) | Instrumented tests, not real hardware |
 | Google | Pixel | — | — | Pixel UI | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | — | NOT TESTED | No device |
 | Samsung | Galaxy | — | — | One UI | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | Likely: exempt battery/background restrictions | NOT TESTED | No device |
 | Xiaomi/Redmi | — | — | — | MIUI/HyperOS | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | NT | Likely: autostart + no battery saver | NOT TESTED | No device |

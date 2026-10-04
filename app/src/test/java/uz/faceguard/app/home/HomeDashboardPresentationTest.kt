@@ -23,6 +23,7 @@ import uz.faceguard.app.feature.home.EyeSafetySection
 import uz.faceguard.app.feature.home.HOME_ATTENTION_MAX
 import uz.faceguard.app.feature.home.HOME_QUICK_ACTIONS_MAX
 import uz.faceguard.app.feature.home.HomeAttentionKind
+import uz.faceguard.app.feature.home.HomeHeroSurface
 import uz.faceguard.app.feature.home.HomeMetricValue
 import uz.faceguard.app.feature.home.HomeProtectionStatus
 import uz.faceguard.app.feature.home.HomeQuickAction
@@ -35,6 +36,7 @@ import uz.faceguard.app.feature.home.ScreenTimeSummaryUiState
 import uz.faceguard.app.feature.home.homeAttentionItems
 import uz.faceguard.app.feature.home.homeChildSummaries
 import uz.faceguard.app.feature.home.homeProtectionLabelRes
+import uz.faceguard.app.feature.home.homeProtectionHeroSurface
 import uz.faceguard.app.feature.home.homeProtectionStatus
 import uz.faceguard.app.feature.home.homeProtectionSupportingRes
 import uz.faceguard.app.feature.home.homeProtectionTone
@@ -65,7 +67,9 @@ class HomeDashboardPresentationTest {
     fun inactiveProtectionIsReportedWhenTheSettingIsOff() {
         val status = homeProtectionStatus(readyState(protectionEnabled = false))
         assertEquals(HomeProtectionStatus.OFF, status)
-        assertEquals(QalqonStatusTone.INACTIVE, homeProtectionTone(status))
+        // OFF is a warning state (amber), not neutral: an unprotected device needs action.
+        assertEquals(QalqonStatusTone.WARNING, homeProtectionTone(status))
+        assertEquals(HomeHeroSurface.WARNING, homeProtectionHeroSurface(status))
     }
 
     @Test

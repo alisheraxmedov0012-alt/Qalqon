@@ -90,10 +90,29 @@ fun homeProtectionActionLabelRes(status: HomeProtectionStatus): Int = when (stat
 
 fun homeProtectionTone(status: HomeProtectionStatus): QalqonStatusTone = when (status) {
     HomeProtectionStatus.ACTIVE -> QalqonStatusTone.ACTIVE
-    HomeProtectionStatus.OFF -> QalqonStatusTone.INACTIVE
+    // OFF is a warning, not a neutral: the device is unprotected and the parent must act.
+    HomeProtectionStatus.OFF -> QalqonStatusTone.WARNING
     HomeProtectionStatus.BLOCKING -> QalqonStatusTone.BLOCKING
     HomeProtectionStatus.RECOVERING -> QalqonStatusTone.WARNING
     HomeProtectionStatus.SETUP_REQUIRED -> QalqonStatusTone.WARNING
+}
+
+/**
+ * The semantic surface treatment of the protection hero (Compose-free).
+ *
+ * ON is green, OFF/setup/recovering are amber, a live block is red. The Compose layer
+ * maps this to theme tokens and animates between them; keeping the decision here makes
+ * the state -> colour contract unit-testable without Android.
+ */
+enum class HomeHeroSurface { SUCCESS, WARNING, BLOCKING }
+
+fun homeProtectionHeroSurface(status: HomeProtectionStatus): HomeHeroSurface = when (status) {
+    HomeProtectionStatus.ACTIVE -> HomeHeroSurface.SUCCESS
+    HomeProtectionStatus.BLOCKING -> HomeHeroSurface.BLOCKING
+    HomeProtectionStatus.OFF,
+    HomeProtectionStatus.SETUP_REQUIRED,
+    HomeProtectionStatus.RECOVERING,
+    -> HomeHeroSurface.WARNING
 }
 
 // ----------------------------------------------------------------- attention

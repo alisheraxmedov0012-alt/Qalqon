@@ -45,7 +45,10 @@ class HomeCompositionTest {
     fun theHeroIsASignaturePremiumSurface() {
         val hero = home.substringAfter("private fun ProtectionStatusSection(").substringBefore("/** Compact attention")
         assertTrue("the hero must be an icy premium surface", hero.contains("Surface("))
-        assertTrue("the hero must use the light icy-blue surface", hero.contains("surfaceContainerLow"))
+        // The hero surface is now state-tinted (green ON / amber OFF / red blocking),
+        // driven by the semantic hero-surface mapping rather than one fixed colour.
+        assertTrue("the hero must be state-tinted", hero.contains("homeProtectionHeroSurface(status)"))
+        assertTrue("the hero must animate its state colour", hero.contains("animateColorAsState("))
         assertTrue("the hero must carry the QALQON wordmark", hero.contains("R.string.app_name"))
         assertTrue("the hero title must be dominant", hero.contains("typography.headlineSmall"))
         assertTrue("the hero must keep a full-width CTA", hero.contains("Modifier.fillMaxWidth()"))
@@ -118,7 +121,7 @@ class HomeCompositionTest {
     @Test
     fun theHeroIsAChipBackedPremiumSurface() {
         val hero = home.substringAfter("private fun ProtectionStatusSection(").substringBefore("/** Compact attention")
-        assertTrue("the hero must use the light icy-blue premium surface", hero.contains("surfaceContainerLow"))
+        assertTrue("the hero must map its state to a semantic surface", hero.contains("homeProtectionHeroSurface("))
         assertTrue("the hero must show the real count as a badge", hero.contains("QalqonStatusBadge("))
     }
 

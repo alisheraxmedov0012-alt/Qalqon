@@ -1,6 +1,8 @@
 package uz.faceguard.app.feature.home
 
 import android.content.Intent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -544,6 +546,9 @@ private fun HomeHeader(
     }
 }
 
+/** Duration of the hero's state-colour cross-fade; short enough to feel instant. */
+private const val HERO_COLOR_ANIM_MS = 300
+
 /**
  * The signature QALQON protection hero — the Home screen's focal point.
  *
@@ -564,11 +569,34 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
     val runCount = (status == HomeProtectionStatus.ACTIVE || status == HomeProtectionStatus.BLOCKING) &&
         state.protectedAppsCount > 0
 
+    // ON = green, OFF/setup/recovering = amber, a live block = red. The colour is a
+    // semantic token, animated so a state change reads as a calm transition rather
+    // than a hard swap.
+    val heroSurface = homeProtectionHeroSurface(status)
+    val cardColor by animateColorAsState(
+        targetValue = when (heroSurface) {
+            HomeHeroSurface.SUCCESS -> QalqonTheme.colors.successContainer
+            HomeHeroSurface.WARNING -> QalqonTheme.colors.warningContainer
+            HomeHeroSurface.BLOCKING -> MaterialTheme.colorScheme.errorContainer
+        },
+        animationSpec = tween(durationMillis = HERO_COLOR_ANIM_MS),
+        label = "heroCardColor",
+    )
+    val shieldAccent by animateColorAsState(
+        targetValue = when (heroSurface) {
+            HomeHeroSurface.SUCCESS -> QalqonTheme.colors.protectionActive
+            HomeHeroSurface.WARNING -> QalqonTheme.colors.protectionWarning
+            HomeHeroSurface.BLOCKING -> QalqonTheme.colors.protectionBlocking
+        },
+        animationSpec = tween(durationMillis = HERO_COLOR_ANIM_MS),
+        label = "heroShieldColor",
+    )
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = QalqonShapes.xLargeShape,
-        // Reference mockup: a light icy-blue card surface, with no hard grey outline.
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        // State-tinted surface (green when protected, amber when off, red when blocking).
+        color = cardColor,
         tonalElevation = QalqonDimens.elevation.flat,
     ) {
         Column(
@@ -585,7 +613,7 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
                         text = stringResource(R.string.app_name).uppercase(),
                         style = MaterialTheme.typography.labelMedium,
                         letterSpacing = 2.sp,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
                         text = statusLabel,
@@ -602,6 +630,7 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
                 // Right: the prominent shield + smartphone illustration (>= 100 dp), the
                 // hero's visual anchor — not a small status icon.
                 QalqonProtectionMotif(
+                    accent = shieldAccent,
                     modifier = Modifier.size(QalqonDimens.sizes.illustration),
                 )
             }
@@ -1021,12 +1050,13 @@ private val HomeQuickActionBolt: ImageVector by lazy {
  * announced twice.
  */
 @Composable
-private fun QalqonProtectionMotif(modifier: Modifier = Modifier) {
-    // Reference mockup palette: a solid soft-blue shield with a lighter inner face for
-    // 2.5D depth, a vivid blue stroke and a clean white/blue smartphone.
-    val shieldFill = QalqonTheme.colors.illustrationShield
+private fun QalqonProtectionMotif(accent: Color, modifier: Modifier = Modifier) {
+    // Premium shield rendered in the current state's semantic accent (green when
+    // protected, amber when off, red when blocking), with a lighter inner face for
+    // 2.5D depth and a clean white/blue smartphone.
+    val shieldFill = accent.copy(alpha = 0.18f)
     val shieldHighlight = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.55f)
-    val stroke = QalqonTheme.colors.illustrationStroke
+    val stroke = accent
     val phoneFill = MaterialTheme.colorScheme.surfaceContainerLowest
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Canvas(modifier = Modifier.fillMaxSize()) {

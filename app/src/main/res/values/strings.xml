@@ -229,7 +229,7 @@
     <string name="protection_req_ok">Tayyor</string>
     <string name="protection_emergency_hint">Blokni vaqtincha ochish uchun PIN-kodni kiriting.</string>
     <string name="protection_tech_title">Texnik ma\'lumotlar</string>
-    <string name="protection_limit_note">Himoya hozircha Qalqon ochiq turganda to\'liq ishlaydi. Qalqon fonda bo\'lganda kamerani ishlatish uchun tizim xizmati keyingi bosqichda qo\'shiladi.</string>
+    <string name="protection_limit_note">Himoya tizim xizmati orqali fonda ham ishlaydi. Kamera Qalqon ochilganda ishga tushadi va keyin fonda tanib olishni davom ettiradi; qayta ishga tushgandan so\'ng, Qalqonni keyingi ochganingizda davom etadi.</string>
     <string name="parent_details_title">Ma\'lumotlaringiz</string>
     <string name="parent_details_subtitle">Bu ma\'lumotlar sizni bolalardan ajratish uchun ishlatiladi.</string>
     <string name="parent_phone_label">Telefon raqami: %1$s</string>
@@ -245,6 +245,7 @@
     <string name="settings_no_face_policy_hint">Kamera yuzni ko\'rmasa nima qilishini tanlaydi.</string>
     <string name="settings_low_battery_hint">Batareya kam bo\'lganda tekshirishni sekinlashtiradi.</string>
     <string name="error_generic">Xatolik: %1$s</string>
+    <string name="error_unexpected">Kutilmagan xatolik yuz berdi. Iltimos, qayta urinib ko\'ring.</string>
     <string name="enroll_hint_no_face">Yuzingizni kameraga qarating</string>
     <string name="enroll_hint_look_straight">To\'g\'riga qarang</string>
     <string name="enroll_hint_too_far">Yaqinroq keling</string>

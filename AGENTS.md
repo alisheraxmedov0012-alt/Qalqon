@@ -449,3 +449,19 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   anti-spoof model behind the existing seam, optionally + a random active
   challenge. Real-device spoof testing NOT TESTED (Stage 10).
 
+
+- Stage 6 (UX / Product Quality) audit deliverable:
+  `docs/STAGE6_UX_PRODUCT_QUALITY.md`. The finished 7-phase UI/UX redesign was
+  audited (not redesigned): 31 screens, 793 strings with exact uz/en/ru parity,
+  no hardcoded user-facing strings, paired empty/hint states, 66 a11y
+  semantics/onClickLabel usages. UX score 82/100. Two P2 fixes: (1) the
+  Parent profile and Face enrollment ViewModels surfaced a raw `Throwable`
+  message / class name to the user via a Toast — now logged (`Log.w`) and the UI
+  gets the new generic localized `error_unexpected` (both `_errorMessage` fields
+  are `Int?` resource ids); (2) `protection_limit_note` falsely claimed background
+  camera "will need a system service in a later phase" though the FGS already
+  exists — corrected in all three locales. New JVM source-contract test
+  `polish/Stage6UxClarityTest` (6 tests). Accessbility = static/source-contract
+  audit only (no TalkBack), real-device QA deferred to Stage 10. No security,
+  schema, dependency, network or legacy-name change. JVM total 1852 -> 1858.
+

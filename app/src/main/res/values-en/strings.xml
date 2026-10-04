@@ -228,7 +228,7 @@
     <string name="protection_req_ok">Ready</string>
     <string name="protection_emergency_hint">Enter the PIN to temporarily lift the block.</string>
     <string name="protection_tech_title">Technical details</string>
-    <string name="protection_limit_note">Protection currently works fully while Qalqon is open. Keeping the camera alive in the background will need a system service in a later phase.</string>
+    <string name="protection_limit_note">Protection keeps running in the background through a system service. The camera starts when Qalqon is opened and then keeps recognizing in the background; after a restart, it resumes the next time you open Qalqon.</string>
     <string name="parent_details_title">Your details</string>
     <string name="parent_details_subtitle">These details are used to tell you apart from your child.</string>
     <string name="parent_phone_label">Phone number: %1$s</string>
@@ -244,6 +244,7 @@
     <string name="settings_no_face_policy_hint">What Qalqon does when the camera sees no face.</string>
     <string name="settings_low_battery_hint">Slows checking down when the battery is low.</string>
     <string name="error_generic">Error: %1$s</string>
+    <string name="error_unexpected">Something went wrong. Please try again.</string>
     <string name="enroll_hint_no_face">Look at the camera</string>
     <string name="enroll_hint_look_straight">Look straight</string>
     <string name="enroll_hint_too_far">Come a bit closer</string>

@@ -1,5 +1,6 @@
 package uz.faceguard.app.feature.enrollment
 
+import android.util.Log
 import android.widget.Toast
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
@@ -128,9 +129,9 @@ class FaceEnrollmentViewModel @Inject constructor(
     private val _ui = MutableStateFlow(Ui(required = qualityConfig.framesRequired))
     val ui: StateFlow<Ui> = _ui
 
-    /** Last failure text, surfaced as a Toast; cleared by [consumeError]. */
-    private val _errorMessage = MutableStateFlow<String?>(null)
-    val errorMessage: StateFlow<String?> = _errorMessage
+    /** Last failure, surfaced as a Toast; a resource id so no technical detail leaks. */
+    private val _errorMessage = MutableStateFlow<Int?>(null)
+    val errorMessage: StateFlow<Int?> = _errorMessage
 
     /**
      * The live frames behind the collector's selected samples. EnrollmentFrame is
@@ -314,10 +315,16 @@ class FaceEnrollmentViewModel @Inject constructor(
         _errorMessage.value = null
     }
 
-    /** Surfaces a failure to the UI instead of letting it reach the crash handler. */
+    /**
+     * Reports a failure without exposing internal detail to the user.
+     *
+     * The exception (message / class) is written to logcat for diagnosis, but the
+     * UI only receives a generic, localized message — a parent must never be shown
+     * a raw exception string.
+     */
     fun reportError(error: Throwable) {
-        val detail = error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName
-        _errorMessage.value = detail
+        Log.w(TAG, "face enrollment operation failed", error)
+        _errorMessage.value = R.string.error_unexpected
     }
 
     private fun clearCollection(hintRes: Int? = null, stage: EnrollmentStage? = null) {
@@ -377,6 +384,10 @@ class FaceEnrollmentViewModel @Inject constructor(
                 EnrollmentStage.QUALITY_CHECK -> R.string.enroll_hint_quality_retry
             }
         }
+
+    private companion object {
+        const val TAG = "FaceEnrollment"
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
@@ -394,8 +405,8 @@ fun FaceEnrollmentScreen(
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
 
     LaunchedEffect(errorMessage) {
-        val detail = errorMessage ?: return@LaunchedEffect
-        Toast.makeText(context, context.getString(R.string.error_generic, detail), Toast.LENGTH_LONG).show()
+        val messageRes = errorMessage ?: return@LaunchedEffect
+        Toast.makeText(context, context.getString(messageRes), Toast.LENGTH_LONG).show()
         viewModel.consumeError()
     }
 

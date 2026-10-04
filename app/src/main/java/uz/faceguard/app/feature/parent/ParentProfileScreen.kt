@@ -1,5 +1,6 @@
 package uz.faceguard.app.feature.parent
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -65,9 +66,9 @@ class ParentProfileViewModel @Inject constructor(
     private val _ui = MutableStateFlow(ParentProfileUiState(uiState = UiState.Loading))
     val ui: StateFlow<ParentProfileUiState> = _ui
 
-    /** Last failure text, surfaced as a Toast; cleared by [consumeError]. */
-    private val _errorMessage = MutableStateFlow<String?>(null)
-    val errorMessage: StateFlow<String?> = _errorMessage
+    /** Last failure, surfaced as a Toast; a resource id so no technical detail leaks. */
+    private val _errorMessage = MutableStateFlow<Int?>(null)
+    val errorMessage: StateFlow<Int?> = _errorMessage
 
     init {
         viewModelScope.launch {
@@ -122,10 +123,20 @@ class ParentProfileViewModel @Inject constructor(
         _errorMessage.value = null
     }
 
-    /** Surfaces a failure to the UI instead of letting it reach the crash handler. */
+    /**
+     * Reports a failure without exposing internal detail to the user.
+     *
+     * The exception (message / class) is written to logcat for diagnosis, but the
+     * UI only receives a generic, localized message — a parent must never be shown
+     * a raw exception string.
+     */
     fun reportError(error: Throwable) {
-        val detail = error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName
-        _errorMessage.value = detail
+        Log.w(TAG, "parent profile operation failed", error)
+        _errorMessage.value = R.string.error_unexpected
+    }
+
+    private companion object {
+        const val TAG = "ParentProfile"
     }
 }
 
@@ -141,8 +152,8 @@ fun ParentProfileScreen(
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
 
     LaunchedEffect(errorMessage) {
-        val detail = errorMessage ?: return@LaunchedEffect
-        Toast.makeText(context, context.getString(R.string.error_generic, detail), Toast.LENGTH_LONG).show()
+        val messageRes = errorMessage ?: return@LaunchedEffect
+        Toast.makeText(context, context.getString(messageRes), Toast.LENGTH_LONG).show()
         viewModel.consumeError()
     }
 

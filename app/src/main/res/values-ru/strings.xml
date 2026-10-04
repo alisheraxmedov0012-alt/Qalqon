@@ -228,7 +228,7 @@
     <string name="protection_req_ok">Готово</string>
     <string name="protection_emergency_hint">Введите PIN, чтобы временно снять блокировку.</string>
     <string name="protection_tech_title">Технические данные</string>
-    <string name="protection_limit_note">Сейчас защита полностью работает, пока Qalqon открыт. Для работы камеры в фоне на следующем этапе потребуется системная служба.</string>
+    <string name="protection_limit_note">Защита продолжает работать в фоне через системную службу. Камера включается при открытии Qalqon и затем продолжает распознавание в фоне; после перезапуска она возобновляется при следующем открытии Qalqon.</string>
     <string name="parent_details_title">Ваши данные</string>
     <string name="parent_details_subtitle">Эти данные используются, чтобы отличать вас от ребёнка.</string>
     <string name="parent_phone_label">Номер телефона: %1$s</string>
@@ -244,6 +244,7 @@
     <string name="settings_no_face_policy_hint">Что делать, если камера не видит лицо.</string>
     <string name="settings_low_battery_hint">Замедляет проверку при низком заряде батареи.</string>
     <string name="error_generic">Ошибка: %1$s</string>
+    <string name="error_unexpected">Произошла непредвиденная ошибка. Попробуйте ещё раз.</string>
     <string name="enroll_hint_no_face">Посмотрите в камеру</string>
     <string name="enroll_hint_look_straight">Смотрите прямо</string>
     <string name="enroll_hint_too_far">Подойдите ближе</string>

@@ -63,6 +63,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
@@ -567,6 +568,12 @@ private fun HomeHeader(
 private const val HERO_COLOR_ANIM_MS = 300
 
 /**
+ * At or above this font scale the hero stacks vertically (illustration below the text)
+ * instead of staying a Row, so 200% text never clips.
+ */
+private const val HERO_STACK_FONT_SCALE = 1.5f
+
+/**
  * The OS page where the parent can re-enable Qalqon's notifications. Deep-links to the
  * app's own notification settings, so the banner's action lands on the right screen.
  */
@@ -576,12 +583,14 @@ private fun notificationSettingsIntent(context: android.content.Context): Intent
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
 /**
- * The signature QALQON protection hero — the Home screen's focal point.
+ * The compact QALQON protection hero — the Home screen's focal point.
  *
- * Composed to the reference layout (Variant A): a semantic protection icon and the
- * QALQON wordmark + live state copy on the left, a large protective shield/device
- * emblem anchoring the right, and an action-first full-width CTA at the bottom. The
- * order reads STATE -> EXPLANATION -> ACTION on a large, very light tonal surface.
+ * Layout (restyled to the reference): a round, state-coloured status glyph plus the
+ * title and one short subtitle on the left, the primary CTA full-width inside that
+ * left column, and a simplified shield+phone illustration on the right. The hero is
+ * deliberately about half the previous height. At large font scale (>= 1.5x) the
+ * illustration moves below the text and the block stacks vertically instead of
+ * clipping.
  *
  * Presentation only: every value comes from [DashboardUiState] via the existing
  * presentation helpers — no protection logic, no fabricated state.
@@ -592,12 +601,12 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
     val tone = homeProtectionTone(status)
     val actionLabel = homeProtectionActionLabelRes(status)
     val statusLabel = stringResource(homeProtectionLabelRes(status))
+    val supporting = stringResource(homeProtectionSupportingRes(status))
     val runCount = (status == HomeProtectionStatus.ACTIVE || status == HomeProtectionStatus.BLOCKING) &&
         state.protectedAppsCount > 0
 
     // ON = green, OFF/setup/recovering = amber, a live block = red. The colour is a
-    // semantic token, animated so a state change reads as a calm transition rather
-    // than a hard swap.
+    // semantic token, animated so a state change reads as a calm transition.
     val heroSurface = homeProtectionHeroSurface(status)
     val cardColor by animateColorAsState(
         targetValue = when (heroSurface) {
@@ -608,7 +617,7 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
         animationSpec = tween(durationMillis = HERO_COLOR_ANIM_MS),
         label = "heroCardColor",
     )
-    val shieldAccent by animateColorAsState(
+    val accent by animateColorAsState(
         targetValue = when (heroSurface) {
             HomeHeroSurface.SUCCESS -> QalqonTheme.colors.protectionActive
             HomeHeroSurface.WARNING -> QalqonTheme.colors.protectionWarning
@@ -618,103 +627,142 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
         label = "heroShieldColor",
     )
 
+    // Large font scale must stack rather than clip.
+    val stackVertically = LocalDensity.current.fontScale >= HERO_STACK_FONT_SCALE
+    val ctaLabel = stringResource(actionLabel)
+    val ctaEnabled = homeCanEnableProtection(state)
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = QalqonShapes.xLargeShape,
-        // State-tinted surface (green when protected, amber when off, red when blocking).
         color = cardColor,
         tonalElevation = QalqonDimens.elevation.flat,
     ) {
-        Column(
-            modifier = Modifier.padding(QalqonDimens.cardPadding),
-            verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.md),
-        ) {
-            // Reference hero: the text block on the left, the illustration on the right.
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        if (stackVertically) {
+            Column(
+                modifier = Modifier.padding(QalqonDimens.cardPadding),
+                verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.sm),
+            ) {
+                HeroStatusBlock(statusLabel = statusLabel, supporting = supporting, accent = accent)
+                QalqonProtectionMotif(
+                    accent = accent,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .size(QalqonDimens.sizes.heroIllustration),
+                )
+                HeroCta(label = ctaLabel, enabled = ctaEnabled, onClick = onOpenProtection)
+                HeroFootnote(state = state, runCount = runCount)
+            }
+        } else {
+            Row(
+                modifier = Modifier.padding(QalqonDimens.cardPadding),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.xs),
+                    verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.sm),
                 ) {
-                    Text(
-                        text = stringResource(R.string.app_name).uppercase(),
-                        style = MaterialTheme.typography.labelMedium,
-                        letterSpacing = 2.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = statusLabel,
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = stringResource(homeProtectionSupportingRes(status)),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    HeroStatusBlock(statusLabel = statusLabel, supporting = supporting, accent = accent)
+                    HeroCta(label = ctaLabel, enabled = ctaEnabled, onClick = onOpenProtection)
+                    HeroFootnote(state = state, runCount = runCount)
                 }
                 Spacer(Modifier.size(QalqonDimens.spacing.md))
-                // Right: the prominent shield + smartphone illustration (>= 100 dp), the
-                // hero's visual anchor — not a small status icon.
                 QalqonProtectionMotif(
-                    accent = shieldAccent,
-                    modifier = Modifier.size(QalqonDimens.sizes.illustration),
-                )
-            }
-            state.blockedApp?.let { packageName ->
-                Text(
-                    text = stringResource(R.string.dashboard_active_app, packageName),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            // Real metadata chip: the actual protected-app count, only while protection runs.
-            if (runCount) {
-                QalqonStatusBadge(
-                    label = stringResource(R.string.home_protection_apps_count, state.protectedAppsCount),
-                    tone = tone,
-                )
-            }
-            // The hero's primary, full-width pill action in the mockup's deep blue, with
-            // a shield glyph (the mockup's "🛡️"), the label and a forward chevron. The
-            // shield is a real icon rather than an emoji glyph, per the product's icon rules.
-            //
-            // Protection cannot be turned on before a child exists, so the CTA is disabled
-            // in that case and a short explanation sits beneath it — "Bola qo'shish" in the
-            // Children section is then the first primary action the parent can take.
-            Button(
-                onClick = onOpenProtection,
-                enabled = homeCanEnableProtection(state),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(QalqonDimens.sizes.buttonDefault),
-                shape = QalqonShapes.pillShape,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = QalqonTheme.colors.cta,
-                    contentColor = QalqonTheme.colors.onCta,
-                ),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Lock,
-                    contentDescription = null,
-                    modifier = Modifier.size(QalqonDimens.icon.sm),
-                )
-                Spacer(Modifier.size(QalqonDimens.spacing.sm))
-                Text(stringResource(actionLabel))
-                Spacer(Modifier.size(QalqonDimens.spacing.sm))
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    modifier = Modifier.size(QalqonDimens.icon.sm),
-                )
-            }
-            if (!state.hasChild) {
-                Text(
-                    text = stringResource(R.string.home_protection_needs_child),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    accent = accent,
+                    modifier = Modifier.size(QalqonDimens.sizes.heroIllustration),
                 )
             }
         }
+    }
+}
+
+/** The round state glyph + title + one short subtitle, shared by both hero layouts. */
+@Composable
+private fun HeroStatusBlock(statusLabel: String, supporting: String, accent: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(QalqonDimens.sizes.heroStatusIcon)
+                .background(color = accent.copy(alpha = 0.18f), shape = CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Lock,
+                contentDescription = null,
+                tint = accent,
+                modifier = Modifier.size(QalqonDimens.icon.md),
+            )
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = QalqonDimens.spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.xs / 2),
+        ) {
+            Text(
+                text = statusLabel,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = supporting,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** The hero's primary action, filling the width available to it. */
+@Composable
+private fun HeroCta(label: String, enabled: Boolean, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(QalqonDimens.sizes.buttonDefault),
+        shape = QalqonShapes.pillShape,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = QalqonTheme.colors.cta,
+            contentColor = QalqonTheme.colors.onCta,
+        ),
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Lock,
+            contentDescription = null,
+            modifier = Modifier.size(QalqonDimens.icon.sm),
+        )
+        Spacer(Modifier.size(QalqonDimens.spacing.sm))
+        Text(label)
+        Spacer(Modifier.size(QalqonDimens.spacing.sm))
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            modifier = Modifier.size(QalqonDimens.icon.sm),
+        )
+    }
+}
+
+/**
+ * The hero's small footnote: the real protected-app count while protection runs, plus
+ * the "add a child first" hint when there is no child yet.
+ */
+@Composable
+private fun HeroFootnote(state: DashboardUiState, runCount: Boolean) {
+    if (runCount) {
+        Text(
+            text = stringResource(R.string.home_protection_apps_count, state.protectedAppsCount),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    if (!state.hasChild) {
+        Text(
+            text = stringResource(R.string.home_protection_needs_child),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

@@ -97,6 +97,14 @@ object QalqonSizes {
      */
     val illustration: Dp = 104.dp
 
+    /**
+     * The compact hero's illustration (about 72 dp) and round status glyph (about
+     * 44 dp). Smaller than [illustration] so the restyled hero is roughly half the
+     * previous height while the emblem stays a real, visible graphic.
+     */
+    val heroIllustration: Dp = 72.dp
+    val heroStatusIcon: Dp = 44.dp
+
     /** Hairline border. */
     val border: Dp = 1.dp
 

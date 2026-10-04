@@ -44,14 +44,24 @@ class HomeCompositionTest {
     @Test
     fun theHeroIsASignaturePremiumSurface() {
         val hero = home.substringAfter("private fun ProtectionStatusSection(").substringBefore("/** Compact attention")
-        assertTrue("the hero must be an icy premium surface", hero.contains("Surface("))
-        // The hero surface is now state-tinted (green ON / amber OFF / red blocking),
-        // driven by the semantic hero-surface mapping rather than one fixed colour.
+        assertTrue("the hero must be a state-tinted Surface", hero.contains("Surface("))
+        // State-tinted (green ON / amber OFF / red blocking), driven by the semantic
+        // hero-surface mapping and animated between states.
         assertTrue("the hero must be state-tinted", hero.contains("homeProtectionHeroSurface(status)"))
         assertTrue("the hero must animate its state colour", hero.contains("animateColorAsState("))
-        assertTrue("the hero must carry the QALQON wordmark", hero.contains("R.string.app_name"))
-        assertTrue("the hero title must be dominant", hero.contains("typography.headlineSmall"))
+        assertTrue("the hero title must be dominant", hero.contains("typography.titleLarge"))
         assertTrue("the hero must keep a full-width CTA", hero.contains("Modifier.fillMaxWidth()"))
+    }
+
+    @Test
+    fun theHeroIsCompactAndStacksAtLargeFontScale() {
+        // Restyled: the hero is a compact horizontal block that stacks vertically once
+        // the font scale is large, so 200% text never clips.
+        val hero = home.substringAfter("private fun ProtectionStatusSection(").substringBefore("/** Compact attention")
+        assertTrue("the hero must react to the font scale", hero.contains("fontScale"))
+        assertTrue("the hero must stack at a large font scale", hero.contains("HERO_STACK_FONT_SCALE"))
+        assertTrue("the hero must draw the round status glyph", hero.contains("heroStatusIcon"))
+        assertTrue("the hero must use the compact illustration", hero.contains("heroIllustration"))
     }
 
     @Test
@@ -122,7 +132,7 @@ class HomeCompositionTest {
     fun theHeroIsAChipBackedPremiumSurface() {
         val hero = home.substringAfter("private fun ProtectionStatusSection(").substringBefore("/** Compact attention")
         assertTrue("the hero must map its state to a semantic surface", hero.contains("homeProtectionHeroSurface("))
-        assertTrue("the hero must show the real count as a badge", hero.contains("QalqonStatusBadge("))
+        assertTrue("the hero must keep its shield illustration", hero.contains("QalqonProtectionMotif("))
     }
 
     @Test

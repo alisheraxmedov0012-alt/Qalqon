@@ -27,16 +27,20 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
 ## Env notes
 - The dev container is ephemeral: `/workspace/project` survives, but the JDK and
   Android SDK on the image do NOT. After a reset, reinstall them before building:
-  - `sudo apt-get install -y openjdk-21-jdk-headless unzip`
+  - JDK 17 (the project target / CI version): `sudo apt-get install -y unzip` then
+    download Temurin 17 from `https://api.adoptium.net/v3/binary/latest/17/ga/linux/x64/jdk/hotspot/normal/eclipse`
+    and unpack to `/opt/jdk` (Debian 13 only ships openjdk-21/25, which also compile).
   - `curl -sSL -o /tmp/cmdtools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip`
     then unpack into `$HOME/Android/Sdk/cmdline-tools/latest`
   - `sdkmanager --licenses`, then install `platform-tools platforms;android-35 build-tools;35.0.0`
   - write gitignored `local.properties` with `sdk.dir=$HOME/Android/Sdk`
 - Build env for every command: `HOME=/home/openhands`, `ANDROID_HOME=$HOME/Android/Sdk`,
-  `JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64`, `PATH=$JAVA_HOME/bin:$PATH`.
-  AGP 8.7.2 / Kotlin 2.0.21 / SDK 35. JDK 21 works even though CI pins 17.
-- `gradlew` has no execute bit at baseline: run `bash ./gradlew <task>` instead of
-  `chmod +x` (which would leave a spurious mode change in `git status`).
+  `JAVA_HOME=$JAVA_HOME` (JDK 17), `PATH=$JAVA_HOME/bin:$PATH`.
+  AGP 8.7.2 / Kotlin 2.3.21 / KSP 2.3.6 / Hilt 2.58 / Room 2.7.2 /
+  Compose BOM 2024.12.01 / Gradle 9.7.1 / SDK 35, min SDK 26, Java+Kotlin target 17.
+  CI pins JDK 17 (temurin); JDK 21 also compiles but is not the target.
+- `gradlew` IS executable now (mode 100755, commit `build: mark gradlew executable`).
+  Run `./gradlew <task>` directly; CI's `chmod +x` is a harmless no-op.
 - `:app:assembleDebug` is wired to also run `testDebugUnitTest` and
   `assembleDebugAndroidTest`, so it verifies the JVM suite and compiles the
   instrumented tests in one go.

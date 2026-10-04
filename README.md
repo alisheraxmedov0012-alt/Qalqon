@@ -190,9 +190,11 @@ No `INTERNET` permission. The app cannot talk to a network.
   (or Device Admin); a WindowManager overlay only works while our process is
   alive and permission is granted.
 - UsageStats foreground detection can lag or be throttled on some OEM builds.
-- Room uses `fallbackToDestructiveMigration` — no migration history yet.
-- No automated tests: validation is via Python source checks (no Android
-  toolchain in this environment).
+- Room ships explicit, additive migrations (schema v3 → v10) with no
+  destructive fallback; a future destructive change still needs a hand-written
+  migration.
+- The JVM unit suite (1700+ tests) runs anywhere; the instrumented
+  (`androidTest`) suite needs an emulator/device and runs in CI.
 
 ## Recommended next development order
 
@@ -697,10 +699,11 @@ sync; the app remains fully functional with sync disabled or absent.
   granted. It is not a guaranteed background guard: a production app needs a
   foreground service plus an AccessibilityService (or Device Admin) to overlay
   other apps reliably while backgrounded.
-- **No real migrations.** Room uses `fallbackToDestructiveMigration`; a
-  release build needs explicit migrations.
-- **No automated tests.** Validation is via Python source checks only (XML
-  parse, brace balance, string parity); a JVM/CI toolchain was unavailable.
+- **Migrations are explicit.** Room is at schema v10 with an additive
+  migration chain (v3 → v10); a destructive fallback is not used, so a release
+  build must keep adding a migration for every schema change.
+- **Test coverage is split.** 1700+ JVM unit tests run without a device;
+  the Room/DAO/engine instrumented tests run in CI on an API 35 emulator.
 - **Activity log retention** is capped at the newest 100 events with no
   automatic pruning job.
 

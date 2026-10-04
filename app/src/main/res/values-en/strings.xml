@@ -412,6 +412,7 @@
     <string name="app_category_other">Other</string>
     <string name="screentime_summary_today">Today\'s screen time</string>
     <string name="screentime_summary_no_target">No screen-time child selected</string>
+    <string name="home_screentime_select_child_action">Select child</string>
     <string name="screentime_summary_unavailable">Usage data unavailable</string>
     <string name="screentime_summary_error">Could not load screen-time data</string>
     <string name="screentime_duration_minutes">%1$d min</string>

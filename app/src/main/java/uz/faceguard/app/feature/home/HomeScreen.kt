@@ -415,7 +415,7 @@ fun HomeScreen(
                     )
                 }
 
-                item { TodaySection(dashboard, screenTimeSummary, onOpenChildPolicy) }
+                item { TodaySection(dashboard, screenTimeSummary, onOpenChildPolicy, onOpenChildren) }
                 item { ChildrenSection(dashboard, screenTimeSummary, onOpenChildPolicy, onOpenChildren) }
                 item {
                     QuickActionsSection(
@@ -924,6 +924,7 @@ private fun TodaySection(
     state: DashboardUiState,
     screenTime: ScreenTimeSummaryUiState,
     onOpenChildPolicy: (Long) -> Unit,
+    onOpenScreenTimeChild: () -> Unit,
 ) {
     val metrics = homeTodayMetrics(state, screenTime)
     // The screen-time tile opens the selected child's detail hub (which owns screen
@@ -946,6 +947,10 @@ private fun TodaySection(
                 horizontalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.md),
             ) {
                 rowMetrics.forEach { metric ->
+                    // The screen-time tile with no target offers a real button to pick a child.
+                    val needsChild = metric.kind == HomeTodayMetricKind.SCREEN_TIME &&
+                        metric.value is HomeMetricValue.Text &&
+                        (metric.value as HomeMetricValue.Text).res == R.string.screentime_summary_no_target
                     HomeMetricTile(
                         metric = metric,
                         modifier = Modifier.weight(1f).fillMaxHeight(),
@@ -955,6 +960,8 @@ private fun TodaySection(
                             HomeTodayMetricKind.EYE_SAFETY,
                             -> null
                         },
+                        inlineActionLabelRes = if (needsChild) R.string.home_screentime_select_child_action else null,
+                        onInlineAction = if (needsChild) onOpenScreenTimeChild else null,
                     )
                 }
                 if (rowMetrics.size == 1) Spacer(Modifier.weight(1f))
@@ -1200,6 +1207,8 @@ private fun HomeMetricTile(
     metric: HomeTodayMetric,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    @androidx.annotation.StringRes inlineActionLabelRes: Int? = null,
+    onInlineAction: (() -> Unit)? = null,
 ) {
     val accent = metric.tone?.let { toneColor(it) } ?: MaterialTheme.colorScheme.onSurfaceVariant
     // The value is the tile's headline: a duration or a status reads in a prominent
@@ -1269,6 +1278,15 @@ private fun HomeMetricTile(
             color = accent,
             // The full sentence is allowed to wrap; nothing here truncates it.
         )
+        // A real, tappable button for the tile's one inline action (e.g. select a child).
+        if (inlineActionLabelRes != null && onInlineAction != null) {
+            Button(
+                onClick = onInlineAction,
+                modifier = Modifier.heightIn(min = QalqonDimens.sizes.touchTarget),
+            ) {
+                Text(stringResource(inlineActionLabelRes))
+            }
+        }
     }
 }
 

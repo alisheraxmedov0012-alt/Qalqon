@@ -413,6 +413,7 @@
     <string name="app_category_other">Boshqa</string>
     <string name="screentime_summary_today">Bugungi ekran vaqti</string>
     <string name="screentime_summary_no_target">Ekran vaqti uchun bola tanlanmagan</string>
+    <string name="home_screentime_select_child_action">Bola tanlash</string>
     <string name="screentime_summary_unavailable">Foydalanish ma\'lumoti mavjud emas</string>
     <string name="screentime_summary_error">Ma\'lumotni yuklab bo\'lmadi</string>
     <string name="screentime_duration_minutes">%1$d daqiqa</string>

@@ -50,6 +50,7 @@ import uz.faceguard.app.core.security.BiometricPolicy
 import uz.faceguard.app.core.theme.QalqonDimens
 import uz.faceguard.app.core.ui.AppLoadingButton
 import uz.faceguard.app.core.ui.AppPinField
+import uz.faceguard.app.core.ui.SecureScreenFlag
 import uz.faceguard.app.domain.repository.AccountRepository
 import uz.faceguard.app.domain.security.formatLockoutRemaining
 
@@ -219,6 +220,9 @@ fun PinUnlockScreen(
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val context = LocalContext.current
+
+    // A PIN is being typed: exclude this window from screenshots/Recents.
+    SecureScreenFlag()
 
     LaunchedEffect(ui.unlocked) { if (ui.unlocked) onUnlocked() }
 

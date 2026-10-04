@@ -29,6 +29,7 @@ import uz.faceguard.app.R
 import uz.faceguard.app.core.security.AppLockState
 import uz.faceguard.app.core.ui.AppLoadingButton
 import uz.faceguard.app.core.ui.AppPinField
+import uz.faceguard.app.core.ui.SecureScreenFlag
 import uz.faceguard.app.core.ui.UiState
 import uz.faceguard.app.core.util.Validation
 import uz.faceguard.app.domain.model.AuthResult
@@ -110,6 +111,9 @@ fun CreatePinScreen(
     viewModel: CreatePinViewModel = hiltViewModel(),
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
+
+    // A PIN is being typed: exclude this window from screenshots/Recents.
+    SecureScreenFlag()
 
     LaunchedEffect(ui.state) { if (ui.state is UiState.Success) onCreated() }
 

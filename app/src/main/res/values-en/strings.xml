@@ -279,7 +279,7 @@
     <string name="child_policy_open">Set</string>
     <string name="settings_load_error">Couldn\'t load settings. Please try again.</string>
 
-    <string name="dashboard_subtitle">Your child\'s protection status and settings in one place</string>
+    <string name="dashboard_subtitle">Protection at a glance</string>
     <string name="dashboard_schedule_none">No schedule applies right now</string>
     <string name="dashboard_schedule_conflict">Schedule conflict: %1$s</string>
     <string name="dashboard_error">Could not load dashboard data</string>

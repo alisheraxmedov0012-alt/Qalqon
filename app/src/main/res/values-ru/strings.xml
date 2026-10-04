@@ -279,7 +279,7 @@
     <string name="child_policy_open">Настроить</string>
     <string name="settings_load_error">Не удалось загрузить настройки. Попробуйте ещё раз.</string>
 
-    <string name="dashboard_subtitle">Статус защиты и настройки ребёнка в одном месте</string>
+    <string name="dashboard_subtitle">Защита под контролем</string>
     <string name="dashboard_schedule_none">Сейчас расписание не действует</string>
     <string name="dashboard_schedule_conflict">Конфликт расписаний: %1$s</string>
     <string name="dashboard_error">Не удалось загрузить данные</string>

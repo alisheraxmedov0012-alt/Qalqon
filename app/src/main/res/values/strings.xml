@@ -280,7 +280,7 @@
     <string name="child_policy_open">Sozlash</string>
     <string name="settings_load_error">Sozlamalarni yuklab bo\'lmadi. Qayta urinib ko\'ring.</string>
 
-    <string name="dashboard_subtitle">Bola himoyasi holati va sozlamalari bir joyda</string>
+    <string name="dashboard_subtitle">Himoya holati bir joyda</string>
     <string name="dashboard_schedule_none">Hozir jadval ta\'sir qilmayapti</string>
     <string name="dashboard_schedule_conflict">Jadval ziddiyati: %1$s</string>
     <string name="dashboard_error">Ma\'lumotlarni yuklab bo\'lmadi</string>

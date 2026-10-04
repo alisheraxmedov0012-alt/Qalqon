@@ -55,6 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
@@ -388,14 +389,31 @@ fun HomeScreen(
                 )
             }
 
-            DashboardStatus.READY -> LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(
-                    start = QalqonDimens.screenPadding,
-                    end = QalqonDimens.screenPadding,
-                    top = QalqonDimens.spacing.sm,
-                    bottom = QalqonDimens.spacing.lg,
-                ),
+            DashboardStatus.READY -> Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    // Light, airy canvas: a very subtle vertical gradient so the white
+                    // cards float rather than sit on one flat grey page. Both stops are
+                    // theme tokens, never raw colours.
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.background,
+                                MaterialTheme.colorScheme.surfaceContainerLow,
+                            ),
+                        ),
+                    ),
+            ) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        start = QalqonDimens.screenPadding,
+                        end = QalqonDimens.screenPadding,
+                        top = QalqonDimens.spacing.sm,
+                        // Extra bottom room so the last card never sits under the bar.
+                        bottom = QalqonDimens.spacing.xxl,
+                    ),
                 // A compact, intentional vertical rhythm: the reference keeps the page
                 // tight rather than stacking large blocks with big gaps.
                 verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.md),
@@ -443,6 +461,7 @@ fun HomeScreen(
                         onOpenScreenTime = screenTimeAction,
                         onOpenRules = onOpenSettings,
                     )
+                }
                 }
             }
         }

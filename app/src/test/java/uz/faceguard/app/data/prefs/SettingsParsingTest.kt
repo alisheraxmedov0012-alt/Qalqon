@@ -122,7 +122,11 @@ class SettingsParsingTest {
         assertEquals(ScanMode.BALANCED, defaults.scanMode)
         assertEquals(30_000L, defaults.recoveryDelayMs)
         assertEquals(BlockPolicy.SOFT_BLOCK, defaults.unknownUserPolicy)
-        assertEquals(BlockPolicy.ALLOW, defaults.noFacePolicy)
+        assertEquals(
+            "no-face must fail closed: a covered camera cannot pass a protected app",
+            BlockPolicy.SOFT_BLOCK,
+            defaults.noFacePolicy,
+        )
         assertEquals(true, defaults.lowBatteryBehaviorEnabled)
     }
 

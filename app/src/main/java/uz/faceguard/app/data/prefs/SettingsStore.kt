@@ -120,7 +120,7 @@ class SettingsStore @Inject constructor(
         ),
         noFacePolicy = parseEnumValue(
             stringValue(accountId, KEY_NO_FACE_POLICY),
-            BlockPolicy.ALLOW,
+            BlockPolicy.SOFT_BLOCK,
         ),
         lowBatteryBehaviorEnabled = booleanValue(accountId, KEY_LOW_BATTERY_BEHAVIOR, true),
     )

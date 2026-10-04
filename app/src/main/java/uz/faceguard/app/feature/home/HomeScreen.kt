@@ -1,6 +1,7 @@
 package uz.faceguard.app.feature.home
 
 import android.content.Intent
+import android.provider.Settings
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -111,7 +113,11 @@ import uz.faceguard.app.domain.model.AppSettings
 import uz.faceguard.app.domain.model.ParentProfile
 import uz.faceguard.app.domain.model.UserAccount
 import uz.faceguard.app.domain.policy.ChildAppPolicyRepository
+import uz.faceguard.app.core.ui.protectionCapabilityLabelRes
+import uz.faceguard.app.core.ui.qalqon.QalqonStatusBanner
+import uz.faceguard.app.domain.protection.PROTECTION_CAPABILITY_PRIORITY
 import uz.faceguard.app.domain.protection.ProtectionCapability
+import uz.faceguard.app.domain.protection.highestPriorityMissing
 import uz.faceguard.app.domain.repository.AccountRepository
 import uz.faceguard.app.domain.repository.ActivityLogRepository
 import uz.faceguard.app.domain.repository.ChildProfileRepository
@@ -385,37 +391,31 @@ fun HomeScreen(
                 // tight rather than stacking large blocks with big gaps.
                 verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.md),
             ) {
-                // Priority order: the protection verdict, then anything that needs the
-                // parent's attention, then today's states, the children and the actions.
+                // Priority order: the protection verdict, then the single banner area
+                // (most severe first), then today's states, the children and the actions.
                 item { ProtectionStatusSection(dashboard, onOpenProtection) }
 
-                // Degraded protection: a persistent warning whenever a capability the
-                // parent relies on is missing, with a one-tap jump to the right settings
-                // page. Renders nothing while protection is healthy.
+                // ONE banner area: degraded protection, camera-limited-after-boot,
+                // notifications off, pending requests and children needing setup are
+                // merged into a single, most-severe-first list — never separate cards.
                 item {
-                    ProtectionDegradedBanner(
-                        missing = protectionState.degradedCapabilities,
-                        onFix = { capability ->
+                    HomeBannerArea(
+                        banners = homeBanners(
+                            state = dashboard,
+                            degradedCapabilities = protectionState.degradedCapabilities,
+                            cameraLimitedAfterBoot = protectionState.cameraLimitedAfterBoot,
+                        ),
+                        degradedCapabilities = protectionState.degradedCapabilities,
+                        onFixCapability = { capability ->
                             context.startActivity(viewModel.capabilitySettingsIntent(capability))
                         },
-                        cameraLimitedAfterBoot = protectionState.cameraLimitedAfterBoot,
+                        onEnableNotifications = { context.startActivity(notificationSettingsIntent(context)) },
+                        onOpenRequests = onOpenRequests,
+                        onOpenChildren = onOpenChildren,
                     )
                 }
 
-                // The attention section is hidden entirely when the dashboard is calm.
-                val attention = homeAttentionItems(dashboard)
-                if (attention.isNotEmpty()) {
-                    item {
-                        AttentionSection(
-                            items = attention,
-                            onOpenRequests = onOpenRequests,
-                            onOpenChildren = onOpenChildren,
-                            onOpenSettings = onOpenSettings,
-                        )
-                    }
-                }
-
-                item { TodaySection(dashboard, screenTimeSummary, onOpenProtection, onOpenChildPolicy) }
+                item { TodaySection(dashboard, screenTimeSummary, onOpenChildPolicy) }
                 item { ChildrenSection(dashboard, screenTimeSummary, onOpenChildPolicy, onOpenChildren) }
                 item {
                     QuickActionsSection(
@@ -550,6 +550,15 @@ private fun HomeHeader(
 private const val HERO_COLOR_ANIM_MS = 300
 
 /**
+ * The OS page where the parent can re-enable Qalqon's notifications. Deep-links to the
+ * app's own notification settings, so the banner's action lands on the right screen.
+ */
+private fun notificationSettingsIntent(context: android.content.Context): Intent =
+    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+/**
  * The signature QALQON protection hero — the Home screen's focal point.
  *
  * Composed to the reference layout (Variant A): a semantic protection icon and the
@@ -680,61 +689,99 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
     }
 }
 
-/** Compact attention list, only rendered when [items] is not empty. */
+/**
+ * The single Home banner area.
+ *
+ * Renders [banners] (already ordered most-severe-first by [homeBanners]) using the
+ * shared [QalqonStatusBanner], each with its real action button when one exists. The
+ * whole area renders nothing when the list is empty, so the caller can place it
+ * unconditionally.
+ */
 @Composable
-private fun AttentionSection(
-    items: List<HomeAttentionItem>,
+private fun HomeBannerArea(
+    banners: List<HomeBanner>,
+    degradedCapabilities: Set<ProtectionCapability>,
+    onFixCapability: (ProtectionCapability) -> Unit,
+    onEnableNotifications: () -> Unit,
     onOpenRequests: () -> Unit,
     onOpenChildren: () -> Unit,
-    onOpenSettings: () -> Unit,
 ) {
+    if (banners.isEmpty()) return
+
     Column(verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.sm)) {
-        QalqonSectionHeader(
-            title = stringResource(R.string.home_attention_title),
-            leading = { HomeSectionIcon(Icons.Filled.Warning, severityColor(QalqonAlertSeverity.WARNING)) },
-        )
-        items.forEach { item ->
-            val text = item.count
-                ?.let { count -> stringResource(item.messageRes, count) }
-                ?: stringResource(item.messageRes)
-            QalqonAlertRow(
-                text = text,
-                severity = item.severity,
-                leadingIcon = { AttentionIcon(item.kind) },
-                onClick = when (item.kind) {
-                    HomeAttentionKind.PENDING_REQUESTS -> onOpenRequests
-                    HomeAttentionKind.CHILDREN_NEED_SETUP -> onOpenChildren
-                    HomeAttentionKind.NOTIFICATIONS_DISABLED -> onOpenSettings
-                },
-            )
+        banners.forEach { banner ->
+            when (banner.kind) {
+                HomeBannerKind.PROTECTION_DEGRADED -> {
+                    val names = PROTECTION_CAPABILITY_PRIORITY
+                        .filter { it in degradedCapabilities }
+                        .map { stringResource(protectionCapabilityLabelRes(it)) }
+                        .joinToString(", ")
+                    QalqonStatusBanner(
+                        title = stringResource(R.string.protection_degraded_title),
+                        text = stringResource(R.string.protection_degraded_body, names),
+                        severity = banner.severity,
+                        action = {
+                            degradedCapabilities.highestPriorityMissing()?.let { capability ->
+                                HomeBannerButton(
+                                    stringResource(R.string.protection_degraded_action),
+                                    onClick = { onFixCapability(capability) },
+                                )
+                            }
+                        },
+                    )
+                }
+
+                HomeBannerKind.CAMERA_LIMITED -> QalqonStatusBanner(
+                    text = stringResource(R.string.protection_after_boot_camera),
+                    severity = banner.severity,
+                )
+
+                HomeBannerKind.NOTIFICATIONS_DISABLED -> QalqonStatusBanner(
+                    text = stringResource(R.string.dashboard_notifications_disabled),
+                    severity = banner.severity,
+                    action = {
+                        HomeBannerButton(
+                            stringResource(R.string.home_banner_notifications_action),
+                            onClick = onEnableNotifications,
+                        )
+                    },
+                )
+
+                HomeBannerKind.PENDING_REQUESTS -> QalqonStatusBanner(
+                    text = stringResource(R.string.dashboard_requests_pending, banner.count ?: 0),
+                    severity = banner.severity,
+                    action = {
+                        HomeBannerButton(
+                            stringResource(R.string.home_banner_requests_action),
+                            onClick = onOpenRequests,
+                        )
+                    },
+                )
+
+                HomeBannerKind.CHILDREN_NEED_SETUP -> QalqonStatusBanner(
+                    text = stringResource(R.string.home_attention_children_setup),
+                    severity = banner.severity,
+                    action = {
+                        HomeBannerButton(
+                            stringResource(R.string.home_banner_children_action),
+                            onClick = onOpenChildren,
+                        )
+                    },
+                )
+            }
         }
     }
 }
 
-/** A compact semantic glyph for each attention condition; the message carries the meaning. */
+/** A real, tappable action inside a banner (meets the 48 dp touch target). */
 @Composable
-private fun AttentionIcon(kind: HomeAttentionKind) {
-    val tint = severityColor(QalqonAlertSeverity.WARNING)
-    Box(
-        modifier = Modifier
-            .size(QalqonDimens.icon.lg)
-            .background(color = tint.copy(alpha = 0.16f), shape = QalqonShapes.smallShape),
-        contentAlignment = Alignment.Center,
+private fun HomeBannerButton(label: String, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier.heightIn(min = QalqonDimens.sizes.touchTarget),
     ) {
-        Icon(
-            imageVector = homeAttentionIcon(kind),
-            contentDescription = null,
-            tint = tint,
-            modifier = Modifier.size(QalqonDimens.icon.xs),
-        )
+        Text(label)
     }
-}
-
-/** The glyph for each attention condition; decorative, the localized message carries it. */
-private fun homeAttentionIcon(kind: HomeAttentionKind): ImageVector = when (kind) {
-    HomeAttentionKind.PENDING_REQUESTS -> Icons.Filled.Notifications
-    HomeAttentionKind.CHILDREN_NEED_SETUP -> Icons.Filled.Person
-    HomeAttentionKind.NOTIFICATIONS_DISABLED -> Icons.Filled.Warning
 }
 
 /**
@@ -876,7 +923,6 @@ private fun ChildrenSection(
 private fun TodaySection(
     state: DashboardUiState,
     screenTime: ScreenTimeSummaryUiState,
-    onOpenProtection: () -> Unit,
     onOpenChildPolicy: (Long) -> Unit,
 ) {
     val metrics = homeTodayMetrics(state, screenTime)
@@ -904,7 +950,6 @@ private fun TodaySection(
                         metric = metric,
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                         onClick = when (metric.kind) {
-                            HomeTodayMetricKind.PROTECTION -> onOpenProtection
                             HomeTodayMetricKind.SCREEN_TIME -> screenTimeTarget
                             HomeTodayMetricKind.SCHEDULE,
                             HomeTodayMetricKind.EYE_SAFETY,
@@ -920,11 +965,10 @@ private fun TodaySection(
 
 /** The glyph for each metric; decorative, so the localized label carries the meaning. */
 private fun homeMetricIcon(kind: HomeTodayMetricKind): ImageVector = when (kind) {
-    // Reference mockup: a clock for screen time and a shield for protection.
+    // Reference mockup: a clock for screen time.
     HomeTodayMetricKind.SCREEN_TIME -> HomeClockIcon
     HomeTodayMetricKind.SCHEDULE -> Icons.Filled.Info
     HomeTodayMetricKind.EYE_SAFETY -> Icons.Filled.Warning
-    HomeTodayMetricKind.PROTECTION -> HomeShieldIcon
 }
 
 /**
@@ -1171,8 +1215,6 @@ private fun HomeMetricTile(
     val (iconContainer, iconTint) = when (metric.kind) {
         HomeTodayMetricKind.SCREEN_TIME ->
             MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.primary
-        HomeTodayMetricKind.PROTECTION ->
-            QalqonTheme.colors.successContainer to QalqonTheme.colors.success
         else ->
             accent.copy(alpha = 0.14f) to accent
     }
@@ -1227,30 +1269,7 @@ private fun HomeMetricTile(
             color = accent,
             // The full sentence is allowed to wrap; nothing here truncates it.
         )
-        // Real, state-derived nudge shown only while protection is inactive.
-        if (metric.kind == HomeTodayMetricKind.PROTECTION && metric.tone == QalqonStatusTone.INACTIVE) {
-            MetricActionBadge(label = stringResource(R.string.home_metric_activate))
-        }
     }
-}
-
-/**
- * The inactive-metric nudge. Reference mockup: a soft red/pink container with crimson
- * text on the 8 dp (small) rounded shape.
- */
-@Composable
-private fun MetricActionBadge(label: String, modifier: Modifier = Modifier) {
-    Text(
-        text = label,
-        style = MaterialTheme.typography.labelSmall,
-        color = QalqonTheme.colors.onDangerContainer,
-        modifier = modifier
-            .background(color = QalqonTheme.colors.dangerContainer, shape = QalqonShapes.smallShape)
-            .padding(
-                horizontal = QalqonDimens.spacing.sm,
-                vertical = QalqonDimens.spacing.xs,
-            ),
-    )
 }
 
 /**

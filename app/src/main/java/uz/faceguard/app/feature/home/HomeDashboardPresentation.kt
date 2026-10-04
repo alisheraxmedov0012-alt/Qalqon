@@ -7,6 +7,7 @@ import uz.faceguard.app.core.ui.qalqon.QalqonAlertSeverity
 import uz.faceguard.app.core.ui.qalqon.QalqonStatusTone
 import uz.faceguard.app.core.util.Validation
 import uz.faceguard.app.domain.model.RestrictionLevel
+import uz.faceguard.app.domain.protection.ProtectionCapability
 import uz.faceguard.app.domain.schedule.ScheduleResolution
 
 /**
@@ -115,59 +116,77 @@ fun homeProtectionHeroSurface(status: HomeProtectionStatus): HomeHeroSurface = w
     -> HomeHeroSurface.WARNING
 }
 
-// ----------------------------------------------------------------- attention
+// ------------------------------------------------------------------ banners
 
-/** The real, actionable conditions the attention section may surface. */
-enum class HomeAttentionKind { PENDING_REQUESTS, CHILDREN_NEED_SETUP, NOTIFICATIONS_DISABLED }
+/**
+ * The real, actionable conditions the single Home banner area may surface. The banner
+ * area is deliberately one list (not several stacked components) so the page has one
+ * place for "something needs you", ordered most severe first.
+ */
+enum class HomeBannerKind {
+    /** Protection lost a capability it needs (accessibility/overlay/usage/camera). */
+    PROTECTION_DEGRADED,
 
-data class HomeAttentionItem(
-    val kind: HomeAttentionKind,
-    @StringRes val messageRes: Int,
+    /** Restored after a reboot but the camera type is not claimed yet (limited until opened). */
+    CAMERA_LIMITED,
+
+    /** The OS would not deliver our notifications. */
+    NOTIFICATIONS_DISABLED,
+
+    /** A child asked for more time and the parent must decide. */
+    PENDING_REQUESTS,
+
+    /** A child profile still needs face enrollment. */
+    CHILDREN_NEED_SETUP,
+}
+
+/**
+ * One entry in the Home banner area. [count] is only ever a genuine count (pending
+ * requests); nothing is fabricated.
+ */
+data class HomeBanner(
+    val kind: HomeBannerKind,
     val severity: QalqonAlertSeverity,
-    /** Only set for counted conditions (pending requests); never fabricated. */
     val count: Int? = null,
 )
 
-/** The attention section is compact by design: at most this many items. */
-const val HOME_ATTENTION_MAX = 3
+/** The banner area is compact by design: at most this many entries. */
+const val HOME_BANNER_MAX = 3
 
 /**
- * The attention items to show, in priority order, or an empty list when the
- * dashboard is calm (the section is then hidden entirely — never an empty card).
+ * The Home banner area, most severe first, or an empty list when nothing needs the
+ * parent. Every condition comes from a real field / the protection runtime state.
  *
- * Every condition comes from a real field; nothing is invented, and a count is only
- * attached when the underlying value is a genuine count.
+ * This single list replaces the earlier separate "attention" and "degraded" cards, so
+ * the same condition can never be shown twice.
  */
-fun homeAttentionItems(state: DashboardUiState): List<HomeAttentionItem> = buildList {
+fun homeBanners(
+    state: DashboardUiState,
+    degradedCapabilities: Set<ProtectionCapability> = emptySet(),
+    cameraLimitedAfterBoot: Boolean = false,
+): List<HomeBanner> = buildList {
+    if (degradedCapabilities.isNotEmpty()) {
+        add(HomeBanner(HomeBannerKind.PROTECTION_DEGRADED, QalqonAlertSeverity.WARNING))
+    }
+    if (cameraLimitedAfterBoot) {
+        add(HomeBanner(HomeBannerKind.CAMERA_LIMITED, QalqonAlertSeverity.WARNING))
+    }
+    if (!state.notificationsEnabled) {
+        add(HomeBanner(HomeBannerKind.NOTIFICATIONS_DISABLED, QalqonAlertSeverity.WARNING))
+    }
     if (state.pendingRequestCount > 0) {
         add(
-            HomeAttentionItem(
-                kind = HomeAttentionKind.PENDING_REQUESTS,
-                messageRes = R.string.dashboard_requests_pending,
+            HomeBanner(
+                kind = HomeBannerKind.PENDING_REQUESTS,
                 severity = QalqonAlertSeverity.WARNING,
                 count = state.pendingRequestCount,
             ),
         )
     }
     if (state.children.any { !it.isFaceEnrolled }) {
-        add(
-            HomeAttentionItem(
-                kind = HomeAttentionKind.CHILDREN_NEED_SETUP,
-                messageRes = R.string.home_attention_children_setup,
-                severity = QalqonAlertSeverity.WARNING,
-            ),
-        )
+        add(HomeBanner(HomeBannerKind.CHILDREN_NEED_SETUP, QalqonAlertSeverity.WARNING))
     }
-    if (!state.notificationsEnabled) {
-        add(
-            HomeAttentionItem(
-                kind = HomeAttentionKind.NOTIFICATIONS_DISABLED,
-                messageRes = R.string.dashboard_notifications_disabled,
-                severity = QalqonAlertSeverity.WARNING,
-            ),
-        )
-    }
-}.take(HOME_ATTENTION_MAX)
+}.take(HOME_BANNER_MAX)
 
 // ------------------------------------------------------------------ children
 
@@ -200,7 +219,7 @@ fun homeChildSummaries(state: DashboardUiState): List<HomeChildSummary> =
 
 // --------------------------------------------------------------------- today
 
-enum class HomeTodayMetricKind { SCREEN_TIME, SCHEDULE, EYE_SAFETY, PROTECTION }
+enum class HomeTodayMetricKind { SCREEN_TIME, SCHEDULE, EYE_SAFETY }
 
 /**
  * A metric's value. [Duration] carries exact milliseconds and is rendered with the
@@ -227,11 +246,13 @@ data class HomeTodayMetric(
 )
 
 /**
- * The "Today" overview: screen time, schedule, eye safety and protection, using only
- * data the existing aggregator/evaluator already produced.
+ * The "Today" overview: screen time, schedule and eye safety, using only data the
+ * existing aggregator/evaluator already produced.
  *
- * A metric with no reliable data is rendered as its own honest state ("usage data
- * unavailable", "no screen-time child selected") — never as a fabricated zero.
+ * Protection status is deliberately NOT a Today tile: it appears exactly once, in the
+ * hero, so "Himoya o'chirilgan" can never be duplicated. A metric with no reliable data
+ * is rendered as its own honest state ("usage data unavailable", "no screen-time child
+ * selected") — never as a fabricated zero.
  */
 fun homeTodayMetrics(
     state: DashboardUiState,
@@ -240,7 +261,6 @@ fun homeTodayMetrics(
     screenTimeMetric(screenTime)?.let { add(it) }
     if (state.hasChild) add(scheduleMetric(state.scheduleResolution))
     state.eyeSafety?.let { add(eyeSafetyMetric(it, state.child?.name)) }
-    add(protectionMetric(state))
 }
 
 private fun screenTimeMetric(summary: ScreenTimeSummaryUiState): HomeTodayMetric? {
@@ -337,16 +357,6 @@ private fun eyeSafetyMetric(section: EyeSafetySection, childName: String?): Home
         value = HomeMetricValue.Text(value.first),
         caption = childName,
         tone = value.second,
-    )
-}
-
-private fun protectionMetric(state: DashboardUiState): HomeTodayMetric {
-    val status = homeProtectionStatus(state)
-    return HomeTodayMetric(
-        kind = HomeTodayMetricKind.PROTECTION,
-        labelRes = R.string.dashboard_protection_title,
-        value = HomeMetricValue.Text(homeProtectionLabelRes(status)),
-        tone = homeProtectionTone(status),
     )
 }
 

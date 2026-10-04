@@ -20,9 +20,9 @@ import uz.faceguard.app.feature.home.ChildSection
 import uz.faceguard.app.feature.home.DashboardStatus
 import uz.faceguard.app.feature.home.DashboardUiState
 import uz.faceguard.app.feature.home.EyeSafetySection
-import uz.faceguard.app.feature.home.HOME_ATTENTION_MAX
+import uz.faceguard.app.feature.home.HOME_BANNER_MAX
 import uz.faceguard.app.feature.home.HOME_QUICK_ACTIONS_MAX
-import uz.faceguard.app.feature.home.HomeAttentionKind
+import uz.faceguard.app.feature.home.HomeBannerKind
 import uz.faceguard.app.feature.home.HomeHeroSurface
 import uz.faceguard.app.feature.home.HomeMetricValue
 import uz.faceguard.app.feature.home.HomeProtectionStatus
@@ -32,8 +32,10 @@ import uz.faceguard.app.feature.home.PolicyCounts
 import uz.faceguard.app.feature.home.ScreenTimeInfoLabel
 import uz.faceguard.app.feature.home.ScreenTimeInfoRow
 import uz.faceguard.app.feature.home.ScreenTimeSummaryStatus
+import uz.faceguard.app.R
 import uz.faceguard.app.feature.home.ScreenTimeSummaryUiState
-import uz.faceguard.app.feature.home.homeAttentionItems
+import uz.faceguard.app.domain.protection.ProtectionCapability
+import uz.faceguard.app.feature.home.homeBanners
 import uz.faceguard.app.feature.home.homeChildSummaries
 import uz.faceguard.app.feature.home.homeProtectionLabelRes
 import uz.faceguard.app.feature.home.homeProtectionHeroSurface
@@ -119,45 +121,60 @@ class HomeDashboardPresentationTest {
         }
     }
 
-    // ------------------------------------------------------------- attention
+    // --------------------------------------------------------------- banners
 
     @Test
-    fun aCalmDashboardHasNoAttentionItems() {
-        assertTrue(homeAttentionItems(readyState()).isEmpty())
+    fun aCalmDashboardHasNoBanners() {
+        assertTrue(homeBanners(readyState()).isEmpty())
     }
 
     @Test
     fun pendingRequestsSurfaceWithTheirRealCount() {
-        val items = homeAttentionItems(readyState(pendingRequests = 3))
-        assertEquals(1, items.size)
-        assertEquals(HomeAttentionKind.PENDING_REQUESTS, items.first().kind)
-        assertEquals(3, items.first().count)
+        val banners = homeBanners(readyState(pendingRequests = 3))
+        assertEquals(1, banners.size)
+        assertEquals(HomeBannerKind.PENDING_REQUESTS, banners.first().kind)
+        assertEquals(3, banners.first().count)
     }
 
     @Test
     fun aChildWithoutAFaceSurfacesAsSetupNeeded() {
-        val items = homeAttentionItems(readyState(children = listOf(childProfile(1), childProfile(2, enrolled = false))))
-        assertEquals(HomeAttentionKind.CHILDREN_NEED_SETUP, items.single().kind)
-        assertNull("setup-needed is not a counted condition", items.single().count)
+        val banners = homeBanners(
+            readyState(children = listOf(childProfile(1), childProfile(2, enrolled = false))),
+        )
+        assertEquals(HomeBannerKind.CHILDREN_NEED_SETUP, banners.single().kind)
+        assertNull("setup-needed is not a counted condition", banners.single().count)
     }
 
     @Test
-    fun disabledNotificationsSurfaceAsAttention() {
-        val items = homeAttentionItems(readyState(notificationsEnabled = false))
-        assertEquals(HomeAttentionKind.NOTIFICATIONS_DISABLED, items.single().kind)
+    fun disabledNotificationsSurface() {
+        val banners = homeBanners(readyState(notificationsEnabled = false))
+        assertEquals(HomeBannerKind.NOTIFICATIONS_DISABLED, banners.single().kind)
     }
 
     @Test
-    fun theAttentionSectionIsBounded() {
-        val items = homeAttentionItems(
-            readyState(
+    fun degradedProtectionIsTheMostSevereBanner() {
+        val banners = homeBanners(
+            state = readyState(pendingRequests = 1),
+            degradedCapabilities = setOf(ProtectionCapability.ACCESSIBILITY),
+        )
+        assertEquals(HomeBannerKind.PROTECTION_DEGRADED, banners.first().kind)
+    }
+
+    @Test
+    fun theBannerAreaIsOneListAndBounded() {
+        val banners = homeBanners(
+            state = readyState(
                 pendingRequests = 2,
                 children = listOf(childProfile(1, enrolled = false)),
                 notificationsEnabled = false,
             ),
+            degradedCapabilities = setOf(ProtectionCapability.CAMERA),
+            cameraLimitedAfterBoot = true,
         )
-        assertTrue(items.size <= HOME_ATTENTION_MAX)
-        assertEquals(3, items.size)
+        assertTrue(banners.size <= HOME_BANNER_MAX)
+        assertEquals(HOME_BANNER_MAX, banners.size)
+        // No condition is duplicated: the banner kinds are distinct.
+        assertEquals(banners.map { it.kind }.distinct(), banners.map { it.kind })
     }
 
     // -------------------------------------------------------------- children
@@ -215,7 +232,6 @@ class HomeDashboardPresentationTest {
                 HomeTodayMetricKind.SCREEN_TIME,
                 HomeTodayMetricKind.SCHEDULE,
                 HomeTodayMetricKind.EYE_SAFETY,
-                HomeTodayMetricKind.PROTECTION,
             ),
             metrics.map { it.kind },
         )
@@ -247,7 +263,9 @@ class HomeDashboardPresentationTest {
         val noChild = homeTodayMetrics(readyState(), summary(status = ScreenTimeSummaryStatus.NO_TARGET))
         assertTrue(noChild.none { it.kind == HomeTodayMetricKind.SCHEDULE })
         assertTrue(noChild.none { it.kind == HomeTodayMetricKind.EYE_SAFETY })
-        assertTrue(noChild.any { it.kind == HomeTodayMetricKind.PROTECTION })
+        // Protection is deliberately NOT a Today tile: it appears only in the hero, so
+        // "Himoya o'chirilgan" is never duplicated.
+        assertTrue(noChild.none { it.labelRes == R.string.dashboard_protection_title })
     }
 
     @Test

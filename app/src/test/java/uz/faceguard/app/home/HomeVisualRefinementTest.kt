@@ -62,9 +62,10 @@ class HomeVisualRefinementTest {
 
     @Test
     fun theRefinementIntroducedNoNewMetricKinds() {
-        // The metrics stay exactly the four derivable from existing data.
+        // Protection is deliberately NOT a Today tile (it lives only in the hero), so
+        // the metrics are the three derivable from existing data.
         assertEquals(
-            listOf("SCREEN_TIME", "SCHEDULE", "EYE_SAFETY", "PROTECTION"),
+            listOf("SCREEN_TIME", "SCHEDULE", "EYE_SAFETY"),
             HomeTodayMetricKind.entries.map { it.name },
         )
     }

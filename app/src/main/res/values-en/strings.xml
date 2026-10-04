@@ -363,6 +363,9 @@
     <string name="dashboard_requests_none">No pending requests</string>
     <string name="dashboard_requests_open">Open requests</string>
     <string name="dashboard_notifications_disabled">Notifications are off — no alert is delivered</string>
+    <string name="home_banner_notifications_action">Turn on notifications</string>
+    <string name="home_banner_requests_action">Review requests</string>
+    <string name="home_banner_children_action">Set up child</string>
     <string name="notification_channel_protection_name">Protection events</string>
     <string name="notification_channel_protection_description">Important messages about blocking and releasing</string>
     <string name="notification_channel_requests_name">Parent requests</string>
@@ -623,7 +626,6 @@
     <string name="home_children_subtitle">Your children at a glance</string>
     <string name="home_quick_actions_title">Quick actions</string>
     <string name="home_quick_actions_subtitle">Quick settings and controls</string>
-    <string name="home_metric_activate">Activate</string>
     <string name="home_action_manage_children">Manage children</string>
     <string name="home_action_manage_children_desc">View and manage child profiles</string>
     <string name="home_action_protection_desc">Protection status and permissions</string>

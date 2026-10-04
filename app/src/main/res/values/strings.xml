@@ -364,6 +364,9 @@
     <string name="dashboard_requests_none">Kutilayotgan so\'rov yo\'q</string>
     <string name="dashboard_requests_open">So\'rovlarni ochish</string>
     <string name="dashboard_notifications_disabled">Bildirishnomalar o\'chirilgan — xabar yuborilmaydi</string>
+    <string name="home_banner_notifications_action">Bildirishnomalarni yoqish</string>
+    <string name="home_banner_requests_action">So\'rovlarni ko\'rish</string>
+    <string name="home_banner_children_action">Bolani sozlash</string>
     <string name="notification_channel_protection_name">Himoya hodisalari</string>
     <string name="notification_channel_protection_description">Bloklash va tiklash haqida muhim xabarlar</string>
     <string name="notification_channel_requests_name">Ota-ona so\'rovlari</string>
@@ -624,7 +627,6 @@
     <string name="home_children_subtitle">Farzandlar holati bir joyda</string>
     <string name="home_quick_actions_title">Tezkor amallar</string>
     <string name="home_quick_actions_subtitle">Tezkor sozlamalar va boshqaruv</string>
-    <string name="home_metric_activate">Faollashtiring</string>
     <string name="home_action_manage_children">Bolalarni boshqarish</string>
     <string name="home_action_manage_children_desc">Farzand profillarini ko‘rish va boshqarish</string>
     <string name="home_action_protection_desc">Himoya holati va ruxsatlarni sozlash</string>

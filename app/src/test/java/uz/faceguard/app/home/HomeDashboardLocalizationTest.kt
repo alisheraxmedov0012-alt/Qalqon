@@ -93,10 +93,12 @@ class HomeDashboardLocalizationTest {
     @Test
     fun theDashboardUsesQalqonComponents() {
         val screen = read("feature/home/HomeScreen.kt")
+        // The banner area reuses the shared QalqonStatusBanner (superseding the earlier
+        // QalqonAlertRow rows now that attention + degraded are one banner list).
         listOf(
             "QalqonSectionHeader(",
             "QalqonChildCard(",
-            "QalqonAlertRow(",
+            "QalqonStatusBanner(",
             "QalqonEmptyState(",
             "QalqonErrorState(",
             "QalqonLoadingState(",

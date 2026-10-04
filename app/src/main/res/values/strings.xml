@@ -213,6 +213,7 @@
     <string name="protection_degraded_title">Himoya to\'liq ishlamayapti</string>
     <string name="protection_degraded_body">Quyidagilar kerak: %1$s</string>
     <string name="protection_degraded_action">Sozlamalarga o\'tish</string>
+    <string name="protection_after_boot_camera">Himoya qayta ishga tushdi, kamera ochilmaguncha cheklangan</string>
     <string name="protection_capability_accessibility">Maxsus imkoniyatlar xizmati</string>
     <string name="protection_capability_overlay">Boshqa ilovalar ustida ko\'rsatish</string>
     <string name="protection_capability_usage_access">Foydalanish statistikasi</string>

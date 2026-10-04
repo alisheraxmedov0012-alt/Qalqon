@@ -92,6 +92,13 @@ data class ProtectionRuntimeState(
      * fail-closed no-face policy still protects without a frame.
      */
     val cameraGranted: Boolean = false,
+    /**
+     * True while the service is running without the camera foreground type (it was
+     * started in the background, e.g. restored after a reboot, and the camera type
+     * has not been claimed in a legal foreground moment yet). Defaults to true so a
+     * fresh session is never reported as limited before the service says otherwise.
+     */
+    val cameraForegroundReady: Boolean = true,
     /** True when the user has explicitly enabled QALQON's accessibility service. */
     val accessibilityEnabled: Boolean = false,
     /**
@@ -161,6 +168,16 @@ data class ProtectionRuntimeState(
 
     /** True when protection is requested but only partially effective. */
     val degraded: Boolean get() = degradedCapabilities.isNotEmpty()
+
+    /**
+     * True after a background (e.g. post-reboot) restore while the camera foreground
+     * type has not been claimed yet, so the camera — and therefore recognition — is
+     * limited until the app is next opened. Distinct from a missing camera
+     * *permission* ([cameraGranted]): here the permission is held, the type simply
+     * could not be claimed from a non-foreground context.
+     */
+    val cameraLimitedAfterBoot: Boolean
+        get() = enabled && active && cameraGranted && !cameraForegroundReady
 }
 
 /**
@@ -712,6 +729,20 @@ class ProtectionRuntime @Inject constructor(
     /** Phase 7.1: the UI is no longer visible. The camera session stays latched. */
     fun onUiBackground() {
         _uiForeground.value = false
+    }
+
+    /**
+     * Reports whether the foreground service currently holds the camera foreground
+     * type. The service owns the claim (it is the only component that may start the
+     * camera session); the runtime only mirrors it so the parent can be told that
+     * recognition is limited until the app is opened again.
+     *
+     * Called with `false` when the service starts in the background (e.g. after a
+     * reboot) where the camera type cannot be claimed, and with `true` once the
+     * claim succeeds in a legal foreground moment.
+     */
+    fun setCameraForegroundReady(ready: Boolean) {
+        _state.update { it.copy(cameraForegroundReady = ready) }
     }
 
     /**

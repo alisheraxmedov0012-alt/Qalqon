@@ -212,6 +212,7 @@
     <string name="protection_degraded_title">Protection is not fully working</string>
     <string name="protection_degraded_body">Needed: %1$s</string>
     <string name="protection_degraded_action">Open settings</string>
+    <string name="protection_after_boot_camera">Protection restarted; limited until the camera opens</string>
     <string name="protection_capability_accessibility">Accessibility service</string>
     <string name="protection_capability_overlay">Display over other apps</string>
     <string name="protection_capability_usage_access">Usage access</string>

@@ -395,6 +395,7 @@ fun HomeScreen(
                         onFix = { capability ->
                             context.startActivity(viewModel.capabilitySettingsIntent(capability))
                         },
+                        cameraLimitedAfterBoot = protectionState.cameraLimitedAfterBoot,
                     )
                 }
 

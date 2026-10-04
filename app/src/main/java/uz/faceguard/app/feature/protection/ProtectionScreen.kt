@@ -189,6 +189,7 @@ fun ProtectionScreen(
                 onFix = { capability ->
                     context.startActivity(viewModel.capabilitySettingsIntent(capability))
                 },
+                cameraLimitedAfterBoot = state.cameraLimitedAfterBoot,
             )
 
             StatusCard(state)

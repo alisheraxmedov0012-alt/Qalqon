@@ -212,6 +212,7 @@
     <string name="protection_degraded_title">Защита работает не полностью</string>
     <string name="protection_degraded_body">Требуется: %1$s</string>
     <string name="protection_degraded_action">Открыть настройки</string>
+    <string name="protection_after_boot_camera">Защита перезапущена; ограничено, пока камера не откроется</string>
     <string name="protection_capability_accessibility">Служба спец. возможностей</string>
     <string name="protection_capability_overlay">Поверх других приложений</string>
     <string name="protection_capability_usage_access">Доступ к статистике</string>

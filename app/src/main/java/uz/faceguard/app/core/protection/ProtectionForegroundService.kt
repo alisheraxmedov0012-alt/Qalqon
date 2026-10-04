@@ -71,6 +71,11 @@ class ProtectionForegroundService : Service() {
         startForegroundCompat(includeCamera = false)
         _running.value = true
         runtime.start()
+        // A background start (e.g. the post-boot restore) cannot claim the camera
+        // foreground type until a legal while-in-use moment, so recognition is limited
+        // until the app is next opened. Report that honestly; a foreground start
+        // leaves readiness untouched so the UI never flashes a false warning.
+        if (!runtime.uiForeground.value) runtime.setCameraForegroundReady(false)
         observeCameraSession()
     }
 
@@ -142,6 +147,9 @@ class ProtectionForegroundService : Service() {
         runCatching {
             startForegroundCompat(includeCamera = true)
             cameraTypeClaimed = true
+        }.onSuccess {
+            // The camera type is held now, so recognition is no longer limited.
+            runtime.setCameraForegroundReady(true)
         }.onFailure { Log.w(TAG, "camera foreground type could not be claimed", it) }
     }
 

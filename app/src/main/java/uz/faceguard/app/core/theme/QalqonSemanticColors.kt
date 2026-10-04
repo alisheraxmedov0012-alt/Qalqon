@@ -64,7 +64,9 @@ val LightQalqonSemanticColors = QalqonSemanticColors(
     success = Color(0xFF2E7D32),
     onSuccess = Color(0xFFFFFFFF),
     successContainer = Color(0xFFDCEFDC),
-    warning = Color(0xFFB26A00),
+    // AA-compliant amber: >= 4.5:1 on the light surface, so a warning dot/border/icon
+    // and any warning-tinted text stay readable.
+    warning = Color(0xFFA65E00),
     onWarning = Color(0xFFFFFFFF),
     warningContainer = Color(0xFFFFEFD4),
     info = Color(0xFF1E5B9E),
@@ -74,7 +76,7 @@ val LightQalqonSemanticColors = QalqonSemanticColors(
     protectionActive = Color(0xFF2E7D32),
     protectionInactive = Color(0xFF6B7280),
     protectionBlocking = Color(0xFFC62828),
-    protectionWarning = Color(0xFFB26A00),
+    protectionWarning = Color(0xFFA65E00),
 
     capabilityGranted = Color(0xFF2E7D32),
     capabilityMissing = Color(0xFFC62828),
@@ -92,7 +94,7 @@ val LightQalqonSemanticColors = QalqonSemanticColors(
     cta = Color(0xFF1D61E0),
     onCta = Color(0xFFFFFFFF),
     dangerContainer = Color(0xFFFEE2E2),
-    onDangerContainer = Color(0xFFDC2626),
+    onDangerContainer = Color(0xFFC81E1E),
 )
 
 /** Dark-theme semantic mapping (lighter, less saturated for dark surfaces). */

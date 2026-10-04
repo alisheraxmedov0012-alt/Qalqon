@@ -102,6 +102,70 @@ class QalqonSemanticColorsTest {
         assertNotEquals(LightQalqonSemanticColors.protectionBlocking, LightQalqonSemanticColors.protectionActive)
     }
 
+    // --------------------------------------------------------------- contrast
+
+    /** WCAG 2.x relative luminance of an sRGB colour. */
+    private fun luminance(c: androidx.compose.ui.graphics.Color): Double {
+        fun channel(v: Float): Double {
+            val s = v.toDouble()
+            return if (s <= 0.03928) s / 12.92 else Math.pow((s + 0.055) / 1.055, 2.4)
+        }
+        return 0.2126 * channel(c.red) + 0.7152 * channel(c.green) + 0.0722 * channel(c.blue)
+    }
+
+    /** WCAG contrast ratio between two opaque colours (>= 1.0). */
+    private fun contrast(
+        a: androidx.compose.ui.graphics.Color,
+        b: androidx.compose.ui.graphics.Color,
+    ): Double {
+        val la = luminance(a)
+        val lb = luminance(b)
+        val hi = maxOf(la, lb)
+        val lo = minOf(la, lb)
+        return (hi + 0.05) / (lo + 0.05)
+    }
+
+    @Test
+    fun theWarningTokenMeetsAaContrastOnTheCardSurface() {
+        // The degraded/attention banners draw their dot/icon/border in `warning` on a
+        // card surface; the warning meaning must stay legible in both themes.
+        val light = contrast(LightQalqonSemanticColors.warning, androidx.compose.ui.graphics.Color.White)
+        val dark = contrast(
+            DarkQalqonSemanticColors.warning,
+            androidx.compose.ui.graphics.Color(0xFF1B1E22),
+        )
+        assertTrue("light warning on surface was $light", light >= 4.5)
+        assertTrue("dark warning on surface was $dark", dark >= 4.5)
+    }
+
+    @Test
+    fun bodyTextOnTheWarningContainerMeetsAaContrast() {
+        val light = contrast(
+            androidx.compose.ui.graphics.Color(0xFF1A1C1E),
+            LightQalqonSemanticColors.warningContainer,
+        )
+        val dark = contrast(
+            androidx.compose.ui.graphics.Color(0xFFE2E2E5),
+            DarkQalqonSemanticColors.warningContainer,
+        )
+        assertTrue("light onWarningContainer was $light", light >= 4.5)
+        assertTrue("dark onWarningContainer was $dark", dark >= 4.5)
+    }
+
+    @Test
+    fun theDangerNudgeTextMeetsAaContrastOnItsContainer() {
+        val light = contrast(
+            LightQalqonSemanticColors.onDangerContainer,
+            LightQalqonSemanticColors.dangerContainer,
+        )
+        val dark = contrast(
+            DarkQalqonSemanticColors.onDangerContainer,
+            DarkQalqonSemanticColors.dangerContainer,
+        )
+        assertTrue("light danger text was $light", light >= 4.5)
+        assertTrue("dark danger text was $dark", dark >= 4.5)
+    }
+
     // ------------------------------------------------------------- typography
 
     @Test

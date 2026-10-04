@@ -371,45 +371,39 @@ private fun eyeSafetyMetric(section: EyeSafetySection, childName: String?): Home
 
 // -------------------------------------------------------------- quick actions
 
-enum class HomeQuickAction { MANAGE_CHILDREN, PROTECTION_SETTINGS, PROTECTED_APPS, REVIEW_REQUESTS }
+/**
+ * The useful quick actions. Deliberately excludes "manage children" (it duplicates the
+ * bottom-navigation Children tab) and the contextual extras that are now surfaced by the
+ * banner area; the three everyday destinations remain.
+ */
+enum class HomeQuickAction { PROTECTED_APPS, SCREEN_TIME, RULES }
 
 /** The quick-actions section never shows more than this many actions. */
 const val HOME_QUICK_ACTIONS_MAX = 3
 
 @StringRes
 fun homeQuickActionLabelRes(action: HomeQuickAction): Int = when (action) {
-    HomeQuickAction.MANAGE_CHILDREN -> R.string.home_action_manage_children
-    HomeQuickAction.PROTECTION_SETTINGS -> R.string.protection_title
     HomeQuickAction.PROTECTED_APPS -> R.string.home_menu_protected_apps
-    HomeQuickAction.REVIEW_REQUESTS -> R.string.requests_title
+    HomeQuickAction.SCREEN_TIME -> R.string.home_action_screen_time
+    HomeQuickAction.RULES -> R.string.home_action_rules
 }
 
 /** The one-line supporting description under each quick action's title. */
 @StringRes
 fun homeQuickActionDescriptionRes(action: HomeQuickAction): Int = when (action) {
-    HomeQuickAction.MANAGE_CHILDREN -> R.string.home_action_manage_children_desc
-    HomeQuickAction.PROTECTION_SETTINGS -> R.string.home_action_protection_desc
     HomeQuickAction.PROTECTED_APPS -> R.string.home_action_protected_apps_desc
-    HomeQuickAction.REVIEW_REQUESTS -> R.string.home_action_requests_desc
+    HomeQuickAction.SCREEN_TIME -> R.string.home_action_screen_time_desc
+    HomeQuickAction.RULES -> R.string.home_action_rules_desc
 }
 
 /**
- * The contextual quick actions: at most [HOME_QUICK_ACTIONS_MAX], chosen from the
- * existing state rather than always showing every option. Every action maps to an
- * existing, protected route.
+ * The quick actions: the three everyday destinations, always in the same order, every
+ * one mapping to an existing, protected route. "Manage children" is intentionally absent
+ * because the bottom-navigation Children tab already owns it.
  */
-fun homeQuickActions(state: DashboardUiState): List<HomeQuickAction> = buildList {
-    if (state.pendingRequestCount > 0) add(HomeQuickAction.REVIEW_REQUESTS)
-    if (state.children.isEmpty() || state.children.any { !it.isFaceEnrolled }) {
-        add(HomeQuickAction.MANAGE_CHILDREN)
-    }
-    if (state.protectionEnabled && !state.enforcementReady) add(HomeQuickAction.PROTECTION_SETTINGS)
-    if (state.protectedAppsCount == 0) add(HomeQuickAction.PROTECTED_APPS)
-
-    // Nothing needs attention: offer the three everyday management shortcuts.
-    if (isEmpty()) {
-        add(HomeQuickAction.MANAGE_CHILDREN)
-        add(HomeQuickAction.PROTECTION_SETTINGS)
-        add(HomeQuickAction.PROTECTED_APPS)
-    }
-}.distinct().take(HOME_QUICK_ACTIONS_MAX)
+fun homeQuickActions(@Suppress("UNUSED_PARAMETER") state: DashboardUiState): List<HomeQuickAction> =
+    listOf(
+        HomeQuickAction.PROTECTED_APPS,
+        HomeQuickAction.SCREEN_TIME,
+        HomeQuickAction.RULES,
+    )

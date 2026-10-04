@@ -1,7 +1,6 @@
 package uz.faceguard.app.feature.home
 
 import android.content.Intent
-import android.provider.Settings
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -31,6 +30,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -324,6 +324,13 @@ fun HomeScreen(
     val parentProfile by viewModel.parentProfile.collectAsStateWithLifecycle()
     val protectionState by viewModel.protectionState.collectAsStateWithLifecycle()
 
+    // "Ekran vaqti" opens the selected child's screen-time (via the child hub); with no
+    // child selected it opens the Children screen so the parent can add one first.
+    val screenTimeAction: () -> Unit = {
+        val childId = screenTimeSummary.childId
+        if (childId != null) onOpenChildPolicy(childId) else onOpenChildren()
+    }
+
     // Re-probe capabilities whenever Home resumes, so a permission revoked in system
     // settings surfaces as a degraded banner as soon as the parent comes back.
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -420,10 +427,9 @@ fun HomeScreen(
                 item {
                     QuickActionsSection(
                         state = dashboard,
-                        onOpenChildren = onOpenChildren,
-                        onOpenProtection = onOpenProtection,
                         onOpenProtectedApps = onOpenProtectedApps,
-                        onOpenRequests = onOpenRequests,
+                        onOpenScreenTime = screenTimeAction,
+                        onOpenRules = onOpenSettings,
                     )
                 }
             }
@@ -554,8 +560,8 @@ private const val HERO_COLOR_ANIM_MS = 300
  * app's own notification settings, so the banner's action lands on the right screen.
  */
 private fun notificationSettingsIntent(context: android.content.Context): Intent =
-    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+    Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+        .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
 /**
@@ -1053,32 +1059,6 @@ private val HomeShieldIcon: ImageVector by lazy {
     }
 }
 
-/** A group of people (manage children). */
-private val HomeGroupIcon: ImageVector by lazy {
-    homeIcon("HomeGroup") {
-        path(fill = SolidColor(Color.Black)) {
-            // Two heads.
-            moveTo(9f, 5.2f)
-            arcTo(3.1f, 3.1f, 0f, isMoreThanHalf = true, isPositiveArc = true, x1 = 9f, y1 = 11.4f)
-            arcTo(3.1f, 3.1f, 0f, isMoreThanHalf = true, isPositiveArc = true, x1 = 9f, y1 = 5.2f)
-            close()
-            moveTo(16.7f, 6.1f)
-            arcTo(2.6f, 2.6f, 0f, isMoreThanHalf = true, isPositiveArc = true, x1 = 16.7f, y1 = 11.3f)
-            arcTo(2.6f, 2.6f, 0f, isMoreThanHalf = true, isPositiveArc = true, x1 = 16.7f, y1 = 6.1f)
-            close()
-            // Two shoulders.
-            moveTo(3.4f, 19f)
-            curveTo(3.4f, 14.6f, 5.9f, 12.6f, 9f, 12.6f)
-            curveTo(12.1f, 12.6f, 14.6f, 14.6f, 14.6f, 19f)
-            close()
-            moveTo(15.2f, 18.9f)
-            curveTo(15.2f, 15.8f, 16.7f, 14.3f, 18.6f, 14.3f)
-            curveTo(20.5f, 14.3f, 22.1f, 15.9f, 22.1f, 18.9f)
-            close()
-        }
-    }
-}
-
 /**
  * A Compose-drawn lightning bolt marking the Quick actions section.
  *
@@ -1311,10 +1291,9 @@ private fun HomeMetricTile(
 @Composable
 private fun QuickActionsSection(
     state: DashboardUiState,
-    onOpenChildren: () -> Unit,
-    onOpenProtection: () -> Unit,
     onOpenProtectedApps: () -> Unit,
-    onOpenRequests: () -> Unit,
+    onOpenScreenTime: () -> Unit,
+    onOpenRules: () -> Unit,
 ) {
     val actions = homeQuickActions(state)
     if (actions.isEmpty()) return
@@ -1327,10 +1306,9 @@ private fun QuickActionsSection(
         )
         actions.forEach { action ->
             val onClick = when (action) {
-                HomeQuickAction.MANAGE_CHILDREN -> onOpenChildren
-                HomeQuickAction.PROTECTION_SETTINGS -> onOpenProtection
                 HomeQuickAction.PROTECTED_APPS -> onOpenProtectedApps
-                HomeQuickAction.REVIEW_REQUESTS -> onOpenRequests
+                HomeQuickAction.SCREEN_TIME -> onOpenScreenTime
+                HomeQuickAction.RULES -> onOpenRules
             }
             val (iconContainer, iconTint) = quickActionIconColors(action)
             QalqonCard(
@@ -1388,20 +1366,17 @@ private fun QuickActionsSection(
  */
 @Composable
 private fun quickActionIconColors(action: HomeQuickAction): Pair<Color, Color> = when (action) {
-    HomeQuickAction.MANAGE_CHILDREN ->
+    HomeQuickAction.SCREEN_TIME ->
         MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.primary
     HomeQuickAction.PROTECTED_APPS ->
         MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.tertiary
-    HomeQuickAction.PROTECTION_SETTINGS,
-    HomeQuickAction.REVIEW_REQUESTS,
-    -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
+    HomeQuickAction.RULES ->
+        MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
 }
 
 /** The glyph for each quick action; decorative, the label carries the meaning. */
 private fun homeQuickActionIcon(action: HomeQuickAction): ImageVector = when (action) {
-    // Reference mockup: a group for children, a shield for protected apps.
-    HomeQuickAction.MANAGE_CHILDREN -> HomeGroupIcon
-    HomeQuickAction.PROTECTION_SETTINGS -> Icons.Filled.Lock
     HomeQuickAction.PROTECTED_APPS -> HomeShieldIcon
-    HomeQuickAction.REVIEW_REQUESTS -> Icons.Filled.Notifications
+    HomeQuickAction.SCREEN_TIME -> HomeClockIcon
+    HomeQuickAction.RULES -> Icons.Filled.Settings
 }

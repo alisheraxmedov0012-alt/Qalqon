@@ -628,11 +628,11 @@
     <string name="home_children_subtitle">Farzandlar holati bir joyda</string>
     <string name="home_quick_actions_title">Tezkor amallar</string>
     <string name="home_quick_actions_subtitle">Tezkor sozlamalar va boshqaruv</string>
-    <string name="home_action_manage_children">Bolalarni boshqarish</string>
-    <string name="home_action_manage_children_desc">Farzand profillarini ko‘rish va boshqarish</string>
-    <string name="home_action_protection_desc">Himoya holati va ruxsatlarni sozlash</string>
     <string name="home_action_protected_apps_desc">Ilovalarni himoyalash sozlamalari</string>
-    <string name="home_action_requests_desc">Boladan kelgan so‘rovlarni ko‘rish</string>
+    <string name="home_action_screen_time">Ekran vaqti</string>
+    <string name="home_action_screen_time_desc">Kunlik ekran vaqtini nazorat qilish</string>
+    <string name="home_action_rules">Qoidalar</string>
+    <string name="home_action_rules_desc">Himoya qoidalarini sozlash</string>
     <string name="home_status_off_hint">Bolangiz qurilmasi hozir himoyasiz</string>
     <string name="home_protection_needs_child">Himoyani yoqish uchun avval bola qo\'shing</string>
     <string name="home_status_active_hint">Himoya faol va ishlayapti</string>

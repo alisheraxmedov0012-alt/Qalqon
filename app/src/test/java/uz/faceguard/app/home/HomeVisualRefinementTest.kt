@@ -73,7 +73,7 @@ class HomeVisualRefinementTest {
     @Test
     fun theQuickActionsStayExactlyTheExistingDestinations() {
         assertEquals(
-            listOf("MANAGE_CHILDREN", "PROTECTION_SETTINGS", "PROTECTED_APPS", "REVIEW_REQUESTS"),
+            listOf("PROTECTED_APPS", "SCREEN_TIME", "RULES"),
             HomeQuickAction.entries.map { it.name },
         )
         HomeQuickAction.entries.forEach { action ->

@@ -306,43 +306,33 @@ class HomeDashboardPresentationTest {
     // --------------------------------------------------------- quick actions
 
     @Test
-    fun quickActionsNeverExceedThree() {
-        val state = readyState(
-            pendingRequests = 1,
-            children = listOf(childProfile(1, enrolled = false)),
-            protectionEnabled = true,
-            protectionState = ProtectionState.UNPROTECTED,
-            protectedAppsCount = 0,
+    fun quickActionsAreExactlyTheThreeEverydayDestinations() {
+        // "Manage children" is deliberately absent: the bottom-navigation Children tab owns it.
+        val actions = homeQuickActions(
+            readyState(
+                pendingRequests = 1,
+                children = listOf(childProfile(1, enrolled = false)),
+                protectionEnabled = true,
+                protectedAppsCount = 0,
+            ),
         )
-        val actions = homeQuickActions(state)
+        assertEquals(
+            listOf(
+                HomeQuickAction.PROTECTED_APPS,
+                HomeQuickAction.SCREEN_TIME,
+                HomeQuickAction.RULES,
+            ),
+            actions,
+        )
         assertTrue("was ${actions.size}", actions.size <= HOME_QUICK_ACTIONS_MAX)
     }
 
     @Test
-    fun aRequestInNeedOfReviewComesFirst() {
-        val actions = homeQuickActions(
-            readyState(
-                pendingRequests = 1,
-                protectedAppsCount = 5,
-                children = listOf(childProfile(1, enrolled = true)),
-            ),
-        )
-        assertEquals(HomeQuickAction.REVIEW_REQUESTS, actions.first())
-    }
-
-    @Test
-    fun aCalmDashboardOffersTheEverydayShortcuts() {
-        val actions = homeQuickActions(
-            readyState(children = listOf(childProfile(1, enrolled = true)), protectedAppsCount = 10),
-        )
-        assertEquals(
-            listOf(
-                HomeQuickAction.MANAGE_CHILDREN,
-                HomeQuickAction.PROTECTION_SETTINGS,
-                HomeQuickAction.PROTECTED_APPS,
-            ),
-            actions,
-        )
+    fun quickActionsNeverIncludeManageChildren() {
+        // Regression: the duplicate of the bottom tab must never come back.
+        HomeQuickAction.entries.forEach { action ->
+            assertFalse(action.name.contains("MANAGE_CHILDREN"))
+        }
     }
 
     @Test

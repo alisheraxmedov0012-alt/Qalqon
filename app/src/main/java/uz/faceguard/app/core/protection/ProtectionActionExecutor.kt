@@ -41,10 +41,10 @@ class OverlayProtectionActionExecutor(
         when (action) {
             ProtectionAction.ALLOW -> clear()
 
-            ProtectionAction.SOFT_BLOCK -> overlay.show()
+            ProtectionAction.SOFT_BLOCK -> safeOverlay { overlay.show() }
 
             ProtectionAction.HARD_BLOCK -> {
-                overlay.show()
+                safeOverlay { overlay.show() }
                 mute()
             }
 
@@ -61,8 +61,20 @@ class OverlayProtectionActionExecutor(
     }
 
     override fun clear() {
-        overlay.hide()
+        // Same isolation as mute/unmute below: a failing overlay teardown must not
+        // crash the evaluation loop that calls this.
+        safeOverlay { overlay.hide() }
         unmute()
+    }
+
+    /**
+     * A blocking-window failure is a runtime condition (an invalid window token, a
+     * window already gone), not a programming error: it is isolated and reported,
+     * so it can never take the protection engine — and therefore the whole app —
+     * down with it.
+     */
+    private inline fun safeOverlay(block: () -> Unit) {
+        runCatching { block() }.onFailure { Log.w(TAG, "overlay action failed", it) }
     }
 
     override fun mute() {

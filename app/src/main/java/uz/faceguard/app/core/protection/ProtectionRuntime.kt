@@ -466,6 +466,13 @@ class ProtectionRuntime @Inject constructor(
         // resume. Probes are kept out of the hot syncActive() path because they
         // read system state and run on the main dispatcher.
         refreshPermissions()
+        // A failed recognition call or protection side effect (overlay/audio) is a
+        // runtime condition, not a crash: the engine isolates it and reports it here.
+        // It is logged only — no face image, embedding, PIN or personal data is ever
+        // involved — so a degraded block is diagnosable without weakening privacy.
+        engine.onEngineError = { error ->
+            Log.w(TAG, "protection side effect failed", error)
+        }
         engine.onEvent = { type, detail ->
             // Activity logging is secondary observability: it must never
             // interrupt protection, so a write failure is swallowed (and only

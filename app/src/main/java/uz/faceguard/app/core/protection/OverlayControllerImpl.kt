@@ -3,6 +3,7 @@ package uz.faceguard.app.core.protection
 import android.content.Context
 import android.graphics.PixelFormat
 import android.os.Build
+import android.util.Log
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
@@ -117,13 +118,27 @@ class OverlayControllerImpl(
                 WindowManager.LayoutParams.FLAG_SECURE,
             PixelFormat.TRANSLUCENT,
         ).apply { gravity = Gravity.TOP or Gravity.START }
-        windowManager.addView(view, params)
-        overlayView = view
+        // A WindowManager failure (an invalid window token after a process/overlay
+        // reconnect, or a window already gone) must never crash the caller and must
+        // never leave a stale reference: a non-null `overlayView` whose view is not
+        // actually attached would make every later show() a silent no-op and
+        // permanently disable the block for the rest of the process.
+        runCatching { windowManager.addView(view, params) }
+            .onSuccess { overlayView = view }
+            .onFailure { Log.w(TAG, "legacy blocking overlay could not be shown", it) }
     }
 
     private fun hideLegacy() {
-        overlayView?.let { windowManager.removeView(it) }
+        val view = overlayView ?: return
+        // Clear the reference first, so a failing removeView cannot leave the stale
+        // reference behind (which would block every future show()).
         overlayView = null
+        runCatching { windowManager.removeView(view) }
+            .onFailure { Log.w(TAG, "legacy blocking overlay could not be removed", it) }
+    }
+
+    private companion object {
+        const val TAG = "OverlayController"
     }
 }
 

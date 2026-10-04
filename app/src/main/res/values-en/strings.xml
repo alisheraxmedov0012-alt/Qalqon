@@ -209,6 +209,15 @@
     <string name="protection_status_state">Status: %1$s</string>
     <string name="protection_requirements_title">For protection to work</string>
     <string name="protection_req_camera">Camera permission</string>
+    <string name="protection_degraded_title">Protection is not fully working</string>
+    <string name="protection_degraded_body">Needed: %1$s</string>
+    <string name="protection_degraded_action">Open settings</string>
+    <string name="protection_capability_accessibility">Accessibility service</string>
+    <string name="protection_capability_overlay">Display over other apps</string>
+    <string name="protection_capability_usage_access">Usage access</string>
+    <string name="protection_capability_camera">Camera</string>
+    <string name="notification_protection_degraded_title">Protection is limited</string>
+    <string name="notification_protection_degraded_body">Needed: %1$s</string>
     <string name="protection_req_usage">Usage access permission</string>
     <string name="protection_req_overlay">Draw-over-other-apps permission</string>
     <string name="protection_req_parent_face">Parent face enrolled</string>

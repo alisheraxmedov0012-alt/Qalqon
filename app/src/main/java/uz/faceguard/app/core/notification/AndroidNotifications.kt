@@ -11,6 +11,7 @@ import uz.faceguard.app.MainActivity
 import uz.faceguard.app.R
 import uz.faceguard.app.core.i18n.AppLanguage
 import uz.faceguard.app.core.i18n.AppLocale
+import uz.faceguard.app.core.ui.protectionCapabilityLabelRes
 import uz.faceguard.app.domain.notification.AppNotificationDispatcher
 import uz.faceguard.app.domain.notification.AppNotificationEvent
 import uz.faceguard.app.domain.notification.DeliveryOutcome
@@ -20,6 +21,7 @@ import uz.faceguard.app.domain.notification.NotificationContentFactory
 import uz.faceguard.app.domain.notification.NotificationDecision
 import uz.faceguard.app.domain.notification.NotificationDestination
 import uz.faceguard.app.domain.notification.NotificationType
+import uz.faceguard.app.domain.protection.PROTECTION_CAPABILITY_PRIORITY
 
 /**
  * Phase 11 Android notification infrastructure.
@@ -216,6 +218,17 @@ class AndroidNotificationContentFactory(
                         appLabels.labelFor(request?.targetPackageName),
                         request?.requestedDurationMinutes ?: 0,
                     ),
+                )
+            }
+
+            NotificationType.PROTECTION_DEGRADED -> {
+                val missing = (event as? AppNotificationEvent.ProtectionDegraded)?.missing.orEmpty()
+                val names = PROTECTION_CAPABILITY_PRIORITY
+                    .filter { it in missing }
+                    .joinToString(", ") { strings.getString(protectionCapabilityLabelRes(it)) }
+                NotificationContent(
+                    title = strings.getString(R.string.notification_protection_degraded_title),
+                    body = strings.getString(R.string.notification_protection_degraded_body, names),
                 )
             }
         }

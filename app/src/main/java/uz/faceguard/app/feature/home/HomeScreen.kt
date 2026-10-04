@@ -1,5 +1,6 @@
 package uz.faceguard.app.feature.home
 
+import android.content.Intent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -39,6 +40,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,11 +57,15 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -80,6 +86,7 @@ import java.time.ZoneId
 import uz.faceguard.app.R
 import uz.faceguard.app.core.debug.DebugFlags
 import uz.faceguard.app.core.protection.ProtectionRuntime
+import uz.faceguard.app.core.protection.ProtectionRuntimeState
 import uz.faceguard.app.core.theme.QalqonDimens
 import uz.faceguard.app.core.theme.QalqonShapes
 import uz.faceguard.app.core.theme.QalqonTheme
@@ -90,6 +97,7 @@ import uz.faceguard.app.core.ui.qalqon.QalqonChildCard
 import uz.faceguard.app.core.ui.qalqon.QalqonDivider
 import uz.faceguard.app.core.ui.qalqon.QalqonEmptyState
 import uz.faceguard.app.core.ui.qalqon.QalqonErrorState
+import uz.faceguard.app.core.ui.qalqon.ProtectionDegradedBanner
 import uz.faceguard.app.core.ui.qalqon.QalqonLoadingState
 import uz.faceguard.app.core.ui.qalqon.QalqonSectionHeader
 import uz.faceguard.app.core.ui.qalqon.QalqonStatusBadge
@@ -101,6 +109,7 @@ import uz.faceguard.app.domain.model.AppSettings
 import uz.faceguard.app.domain.model.ParentProfile
 import uz.faceguard.app.domain.model.UserAccount
 import uz.faceguard.app.domain.policy.ChildAppPolicyRepository
+import uz.faceguard.app.domain.protection.ProtectionCapability
 import uz.faceguard.app.domain.repository.AccountRepository
 import uz.faceguard.app.domain.repository.ActivityLogRepository
 import uz.faceguard.app.domain.repository.ChildProfileRepository
@@ -138,7 +147,7 @@ class HomeViewModel @Inject constructor(
     screenTimeLimitEvaluator: ScreenTimeLimitEvaluator,
     private val zone: ZoneId = ZoneId.systemDefault(),
     private val clock: () -> Long = System::currentTimeMillis,
-    runtime: ProtectionRuntime,
+    private val runtime: ProtectionRuntime,
 ) : ViewModel() {
 
     private val aggregator = DashboardAggregator(
@@ -154,6 +163,20 @@ class HomeViewModel @Inject constructor(
     )
 
     val dashboard: StateFlow<DashboardUiState> = aggregator.observe(viewModelScope)
+
+    /**
+     * Live protection health, so Home can warn when a capability was revoked. Read
+     * straight from the app-scoped runtime (the single source of truth), never
+     * recomputed here.
+     */
+    val protectionState: StateFlow<ProtectionRuntimeState> = runtime.state
+
+    /** Re-probes capabilities (called when Home resumes) so a revoked one surfaces at once. */
+    fun refreshProtectionCapabilities() = runtime.refreshPermissions()
+
+    /** The system settings page that fixes [capability], for the degraded banner's action. */
+    fun capabilitySettingsIntent(capability: ProtectionCapability): Intent =
+        runtime.capabilitySettingsIntent(capability)
 
     val settings: StateFlow<AppSettings> = settingsRepository.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppSettings())
@@ -290,6 +313,19 @@ fun HomeScreen(
     val dashboard by viewModel.dashboard.collectAsStateWithLifecycle()
     val screenTimeSummary by viewModel.screenTimeSummary.collectAsStateWithLifecycle()
     val parentProfile by viewModel.parentProfile.collectAsStateWithLifecycle()
+    val protectionState by viewModel.protectionState.collectAsStateWithLifecycle()
+
+    // Re-probe capabilities whenever Home resumes, so a permission revoked in system
+    // settings surfaces as a degraded banner as soon as the parent comes back.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val context = LocalContext.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshProtectionCapabilities()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Scaffold(
         // The light-blue canvas is what makes the white cards read as premium,
@@ -349,6 +385,18 @@ fun HomeScreen(
                 // Priority order: the protection verdict, then anything that needs the
                 // parent's attention, then today's states, the children and the actions.
                 item { ProtectionStatusSection(dashboard, onOpenProtection) }
+
+                // Degraded protection: a persistent warning whenever a capability the
+                // parent relies on is missing, with a one-tap jump to the right settings
+                // page. Renders nothing while protection is healthy.
+                item {
+                    ProtectionDegradedBanner(
+                        missing = protectionState.degradedCapabilities,
+                        onFix = { capability ->
+                            context.startActivity(viewModel.capabilitySettingsIntent(capability))
+                        },
+                    )
+                }
 
                 // The attention section is hidden entirely when the dashboard is calm.
                 val attention = homeAttentionItems(dashboard)

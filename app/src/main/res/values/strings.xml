@@ -210,6 +210,15 @@
     <string name="protection_status_state">Holat: %1$s</string>
     <string name="protection_requirements_title">Himoya ishlashi uchun</string>
     <string name="protection_req_camera">Kamera ruxsati</string>
+    <string name="protection_degraded_title">Himoya to\'liq ishlamayapti</string>
+    <string name="protection_degraded_body">Quyidagilar kerak: %1$s</string>
+    <string name="protection_degraded_action">Sozlamalarga o\'tish</string>
+    <string name="protection_capability_accessibility">Maxsus imkoniyatlar xizmati</string>
+    <string name="protection_capability_overlay">Boshqa ilovalar ustida ko\'rsatish</string>
+    <string name="protection_capability_usage_access">Foydalanish statistikasi</string>
+    <string name="protection_capability_camera">Kamera</string>
+    <string name="notification_protection_degraded_title">Himoya cheklangan</string>
+    <string name="notification_protection_degraded_body">Quyidagilar kerak: %1$s</string>
     <string name="protection_req_usage">Foydalanish statistikasi ruxsati</string>
     <string name="protection_req_overlay">Boshqa ilovalar ustida ko\'rsatish ruxsati</string>
     <string name="protection_req_parent_face">Ota-ona yuzi kiritilgan</string>

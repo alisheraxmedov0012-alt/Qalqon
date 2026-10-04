@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.AudioManager
+import android.net.Uri
+import android.provider.Settings
 import android.util.Log
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -20,6 +22,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -46,6 +49,8 @@ import uz.faceguard.app.domain.model.ChildProfile
 import uz.faceguard.app.domain.model.ParentProfile
 import uz.faceguard.app.domain.model.ScanMode
 import uz.faceguard.app.domain.policy.AppPolicy
+import uz.faceguard.app.domain.protection.ProtectionCapability
+import uz.faceguard.app.domain.protection.missingProtectionCapabilities
 import uz.faceguard.app.domain.policy.ChildAppPolicyRepository
 import uz.faceguard.app.domain.notification.AppNotificationDispatcher
 import uz.faceguard.app.domain.notification.AppNotificationEvent
@@ -136,6 +141,26 @@ data class ProtectionRuntimeState(
     /** All prerequisites for protection to actually block are satisfied. */
     val ready: Boolean
         get() = active && parentFaceEnrolled && protectedCount > 0 && usageAccessGranted && overlayGranted
+
+    /**
+     * The capabilities protection needs but that are currently missing, or empty
+     * when protection is switched off. A switched-off device is not "degraded" — it
+     * simply is not protecting, and must not be nagged about.
+     */
+    val degradedCapabilities: Set<ProtectionCapability>
+        get() = if (!enabled) {
+            emptySet()
+        } else {
+            missingProtectionCapabilities(
+                accessibilityEnabled = accessibilityEnabled,
+                overlayGranted = overlayGranted,
+                usageAccessGranted = usageAccessGranted,
+                cameraGranted = cameraGranted,
+            )
+        }
+
+    /** True when protection is requested but only partially effective. */
+    val degraded: Boolean get() = degradedCapabilities.isNotEmpty()
 }
 
 /**
@@ -572,6 +597,24 @@ class ProtectionRuntime @Inject constructor(
         scope.launch {
             scheduler.lastEvent.collect { value -> _state.update { it.copy(lastTrigger = value?.trigger?.name ?: "") } }
         }
+        // Degraded protection: whenever the set of missing capabilities changes while
+        // protection is requested, tell the parent once per distinct set. The
+        // coordinator's dedup key (the set itself) collapses repeats, so a steady
+        // degraded state never spams and a newly lost/restored capability notifies.
+        scope.launch {
+            _state
+                .map { it.degradedCapabilities }
+                .distinctUntilChanged()
+                .collect { missing ->
+                    val owner = accountId ?: return@collect
+                    if (missing.isEmpty()) return@collect
+                    runCatching {
+                        notificationCoordinator.onEvent(
+                            AppNotificationEvent.ProtectionDegraded(owner, missing, clock()),
+                        )
+                    }
+                }
+        }
     }
 
     private fun syncContext() {
@@ -836,6 +879,24 @@ class ProtectionRuntime @Inject constructor(
     fun overlayPermissionIntent(): Intent = overlay.permissionIntent()
 
     fun accessibilitySettingsIntent(): Intent = AccessibilityCapability.settingsIntent()
+
+    /**
+     * The system settings page that fixes [capability], so both the Home and the
+     * Protection degraded banner can point at exactly the right screen.
+     *
+     * Camera has no dedicated settings page of its own, so it opens the app's
+     * details page (where the permission can be re-granted) — uniform across both
+     * screens and available without an Activity-scoped permission API.
+     */
+    fun capabilitySettingsIntent(capability: ProtectionCapability): Intent = when (capability) {
+        ProtectionCapability.ACCESSIBILITY -> accessibilitySettingsIntent()
+        ProtectionCapability.OVERLAY -> overlayPermissionIntent()
+        ProtectionCapability.USAGE_ACCESS -> usageAccessIntent()
+        ProtectionCapability.CAMERA -> Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", context.packageName, null)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+    }
 
     private companion object {
         const val TAG = "ProtectionRuntime"

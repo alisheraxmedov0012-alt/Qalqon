@@ -20,6 +20,7 @@ import uz.faceguard.app.domain.notification.NotificationDestination
 import uz.faceguard.app.domain.notification.NotificationPolicy
 import uz.faceguard.app.domain.notification.NotificationRepository
 import uz.faceguard.app.domain.notification.NotificationType
+import uz.faceguard.app.domain.protection.ProtectionCapability
 
 /**
  * Phase 11: the notification policy and the event -> dedup -> delivery
@@ -37,9 +38,61 @@ class NotificationPolicyTest {
 
     @Test
     fun onlyGenuineSourcesAreModelled() {
-        // LIMIT_REACHED cannot exist without a real limit source (Phase 4).
-        assertEquals(3, NotificationType.entries.size)
+        // LIMIT_REACHED cannot exist without a real limit source (Phase 4). The
+        // fourth type is the degraded-protection alert, whose source (the runtime's
+        // missing-capability set) genuinely exists.
+        assertEquals(4, NotificationType.entries.size)
         assertTrue(NotificationType.entries.none { it.name.contains("LIMIT") })
+        assertTrue(NotificationType.entries.contains(NotificationType.PROTECTION_DEGRADED))
+    }
+
+    @Test
+    fun protectionDegradedProducesAPersistentAlertKeyedByTheMissingSet() {
+        val accessibility = policy.decide(
+            AppNotificationEvent.ProtectionDegraded(
+                accountId = 1L,
+                missing = setOf(ProtectionCapability.ACCESSIBILITY),
+                at = 1_000L,
+            ),
+        )!!
+        assertEquals(NotificationType.PROTECTION_DEGRADED, accessibility.type)
+        assertEquals(NotificationChannelKind.PROTECTION_ALERTS, accessibility.channel)
+        assertEquals(NotificationDestination.DASHBOARD, accessibility.destination)
+        assertEquals(DefaultNotificationPolicy.PROTECTION_DEGRADED_ID, accessibility.notificationId)
+        assertFalse("degradation is a persistent state, not a one-shot", accessibility.oneShot)
+
+        // The same set yields the same dedup key (no repeat notification) …
+        val sameAgain = policy.decide(
+            AppNotificationEvent.ProtectionDegraded(
+                accountId = 1L,
+                missing = setOf(ProtectionCapability.ACCESSIBILITY),
+                at = 99_000L,
+            ),
+        )!!
+        assertEquals(accessibility.deduplicationKey, sameAgain.deduplicationKey)
+
+        // … while a *changed* set yields a different key (a new loss notifies again).
+        val changed = policy.decide(
+            AppNotificationEvent.ProtectionDegraded(
+                accountId = 1L,
+                missing = setOf(ProtectionCapability.ACCESSIBILITY, ProtectionCapability.CAMERA),
+                at = 1_000L,
+            ),
+        )!!
+        assertTrue(accessibility.deduplicationKey != changed.deduplicationKey)
+    }
+
+    @Test
+    fun anEmptyDegradedSetNeverNotifies() {
+        assertNull(
+            policy.decide(
+                AppNotificationEvent.ProtectionDegraded(
+                    accountId = 1L,
+                    missing = emptySet(),
+                    at = 1_000L,
+                ),
+            ),
+        )
     }
 
     @Test

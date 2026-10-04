@@ -59,8 +59,10 @@ import uz.faceguard.app.core.protection.ProtectionRuntime
 import uz.faceguard.app.core.protection.ProtectionRuntimeState
 import uz.faceguard.app.core.protection.ProtectionState
 import uz.faceguard.app.core.security.SecurityState
+import uz.faceguard.app.core.ui.qalqon.ProtectionDegradedBanner
 import uz.faceguard.app.domain.model.AppSettings
 import uz.faceguard.app.domain.model.ScanMode
+import uz.faceguard.app.domain.protection.ProtectionCapability
 import uz.faceguard.app.domain.repository.SettingsRepository
 import uz.faceguard.app.domain.security.PinVerification
 import uz.faceguard.app.domain.security.formatLockoutRemaining
@@ -116,6 +118,10 @@ class ProtectionViewModel @Inject constructor(
     fun overlayPermissionIntent(): Intent = runtime.overlayPermissionIntent()
 
     fun accessibilitySettingsIntent(): Intent = runtime.accessibilitySettingsIntent()
+
+    /** The system settings page that fixes [capability], for the degraded banner action. */
+    fun capabilitySettingsIntent(capability: ProtectionCapability): Intent =
+        runtime.capabilitySettingsIntent(capability)
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
@@ -175,6 +181,14 @@ fun ProtectionScreen(
             MasterToggleCard(
                 enabled = settings.protectionEnabled,
                 onToggle = viewModel::setProtectionEnabled,
+            )
+
+            // Persistent degraded warning with a one-tap jump to the right settings page.
+            ProtectionDegradedBanner(
+                missing = state.degradedCapabilities,
+                onFix = { capability ->
+                    context.startActivity(viewModel.capabilitySettingsIntent(capability))
+                },
             )
 
             StatusCard(state)

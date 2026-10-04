@@ -1,5 +1,8 @@
 package uz.faceguard.app.domain.notification
 
+import uz.faceguard.app.domain.protection.ProtectionCapability
+import uz.faceguard.app.domain.protection.degradationKey
+
 /**
  * Phase 11: notification domain.
  *
@@ -23,6 +26,12 @@ enum class NotificationType {
 
     /** A child asked for extra time and the parent must decide. */
     PARENT_REQUEST_CREATED,
+
+    /**
+     * Protection lost a capability it needs (accessibility/overlay/usage access or
+     * camera) and is only partially effective until it is restored.
+     */
+    PROTECTION_DEGRADED,
 }
 
 /** Notification categories — never one channel per event. */
@@ -60,6 +69,16 @@ sealed interface AppNotificationEvent {
         val childId: Long,
         val targetPackageName: String,
         val requestedDurationMinutes: Int,
+        override val at: Long,
+    ) : AppNotificationEvent
+
+    /**
+     * Protection lost one or more capabilities. [missing] is the exact set, so the
+     * policy can collapse repeats of the same set while a *changed* set notifies.
+     */
+    data class ProtectionDegraded(
+        override val accountId: Long,
+        val missing: Set<ProtectionCapability>,
         override val at: Long,
     ) : AppNotificationEvent
 }
@@ -139,6 +158,23 @@ class DefaultNotificationPolicy(
             accountId = event.accountId,
             at = event.at,
         )
+
+        is AppNotificationEvent.ProtectionDegraded -> {
+            // A degraded set with nothing in it is not a degradation: do not notify.
+            if (event.missing.isEmpty()) return null
+            NotificationDecision(
+                type = NotificationType.PROTECTION_DEGRADED,
+                channel = NotificationChannelKind.PROTECTION_ALERTS,
+                destination = NotificationDestination.DASHBOARD,
+                notificationId = PROTECTION_DEGRADED_ID,
+                // Keyed by the *set*, so the same degradation notifies once while a
+                // newly lost (or newly restored) capability notifies again.
+                deduplicationKey = "degraded:${event.accountId}:${event.missing.degradationKey()}",
+                oneShot = false,
+                accountId = event.accountId,
+                at = event.at,
+            )
+        }
     }
 
     companion object {
@@ -147,6 +183,9 @@ class DefaultNotificationPolicy(
 
         const val PROTECTION_BLOCKED_ID = 2001
         const val PROTECTION_RELEASED_ID = 2002
+
+        /** One stable id for the degraded-protection alert (it is a persistent state). */
+        const val PROTECTION_DEGRADED_ID = 2003
         private const val REQUEST_ID_BASE = 2100
         private const val REQUEST_ID_RANGE = 500
 

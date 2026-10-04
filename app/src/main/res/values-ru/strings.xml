@@ -209,6 +209,15 @@
     <string name="protection_status_state">Статус: %1$s</string>
     <string name="protection_requirements_title">Чтобы защита работала</string>
     <string name="protection_req_camera">Разрешение на камеру</string>
+    <string name="protection_degraded_title">Защита работает не полностью</string>
+    <string name="protection_degraded_body">Требуется: %1$s</string>
+    <string name="protection_degraded_action">Открыть настройки</string>
+    <string name="protection_capability_accessibility">Служба спец. возможностей</string>
+    <string name="protection_capability_overlay">Поверх других приложений</string>
+    <string name="protection_capability_usage_access">Доступ к статистике</string>
+    <string name="protection_capability_camera">Камера</string>
+    <string name="notification_protection_degraded_title">Защита ограничена</string>
+    <string name="notification_protection_degraded_body">Требуется: %1$s</string>
     <string name="protection_req_usage">Доступ к статистике использования</string>
     <string name="protection_req_overlay">Разрешение на показ поверх приложений</string>
     <string name="protection_req_parent_face">Лицо родителя добавлено</string>

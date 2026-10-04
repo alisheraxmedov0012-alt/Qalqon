@@ -13,6 +13,10 @@ accompanist = "0.36.0"
 datastore = "1.1.1"
 hiltNavigation = "1.2.0"
 tensorflowLite = "2.16.1"
+# Google Play Billing Library. v7's new-app/update deadline (2026-08-31) has passed,
+# so v8.x/v9.x is required; v9 (target SDK 35, AndroidX Core >=1.15) matches this
+# project. v9 is supported for new apps/updates until 2028-08-31.
+billing = "9.1.0"
 # ML Kit GenAI Prompt API (Gemini Nano, on-device). Phase A1: capability detection only —
 # no generation is wired into the assistant. Current official release per ML Kit
 # release notes (https://developers.google.com/ml-kit/release-notes).
@@ -54,6 +58,7 @@ camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", versi
 camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camera" }
 accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanist" }
 tensorflow-lite = { group = "org.tensorflow", name = "tensorflow-lite", version.ref = "tensorflowLite" }
+billing = { group = "com.android.billingclient", name = "billing", version.ref = "billing" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestJunit" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }

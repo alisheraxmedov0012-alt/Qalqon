@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import uz.faceguard.app.core.billing.SubscriptionManager
 import uz.faceguard.app.core.protection.ProtectionRuntime
 import uz.faceguard.app.data.repository.BiometricMigrationService
 
@@ -23,6 +24,10 @@ class FaceGuardApp : Application(), CameraXConfig.Provider {
 
     @Inject
     lateinit var protectionRuntime: ProtectionRuntime
+
+    /** App-scoped subscription brain: re-verifies entitlement and consumes Play updates. */
+    @Inject
+    lateinit var subscriptionManager: SubscriptionManager
 
     @Inject
     lateinit var biometricMigration: BiometricMigrationService
@@ -42,6 +47,13 @@ class FaceGuardApp : Application(), CameraXConfig.Provider {
     override fun onCreate() {
         super.onCreate()
         protectionRuntime.start()
+        // Stage 7: start the subscription brain (observe the signed-in account and Play
+        // purchase updates). Entitlement verification is best-effort and never blocks
+        // startup; being offline keeps the cached entitlement.
+        runCatching {
+            subscriptionManager.start()
+            subscriptionManager.observePurchaseUpdates()
+        }
         // Phase 12: encrypt any pre-existing plaintext biometric rows. Idempotent,
         // off the main thread, and a failure never blocks the app (the security state
         // reports RECOVERY_REQUIRED instead).

@@ -35,6 +35,7 @@ import uz.faceguard.app.feature.privacy.PrivacyScreen
 import uz.faceguard.app.feature.parent.ParentProfileScreen
 import uz.faceguard.app.feature.policy.ChildPolicyScreen
 import uz.faceguard.app.feature.protection.ProtectionScreen
+import uz.faceguard.app.feature.subscription.SubscriptionScreen
 import uz.faceguard.app.feature.schedule.ScheduleArgs
 import uz.faceguard.app.feature.schedule.ScheduleEditorScreen
 import uz.faceguard.app.feature.schedule.ScheduleListScreen
@@ -82,6 +83,8 @@ object Routes {
     const val SETTINGS_NOTIFICATIONS = "settings_notifications"
     const val SETTINGS_PRIVACY = "settings_privacy"
     const val SETTINGS_SUPPORT = "settings_support"
+    /** Stage 7: the subscription / 3-day trial management screen. */
+    const val SETTINGS_SUBSCRIPTION = "settings_subscription"
     const val SETTINGS_DEVELOPER = "settings_developer"
     const val RECOGNITION_DEBUG = "recognition_debug"
     const val PROTECTION = "protection"
@@ -171,6 +174,7 @@ private val PROTECTED_ROUTE_PREFIXES = listOf(
     Routes.SETTINGS_NOTIFICATIONS,
     Routes.SETTINGS_PRIVACY,
     Routes.SETTINGS_SUPPORT,
+    Routes.SETTINGS_SUBSCRIPTION,
     Routes.SETTINGS_DEVELOPER,
     Routes.PROTECTION,
     Routes.PRIVACY,
@@ -623,6 +627,9 @@ private fun QalqonNavHost(
                 onBack = { navController.popBackStack() },
                 onOpenHelp = { navController.navigate(Routes.HELP) },
             )
+        }
+        composable(Routes.SETTINGS_SUBSCRIPTION) {
+            SubscriptionScreen(onBack = { navController.popBackStack() })
         }
         if (DebugFlags.DEBUG_SCREENS_ENABLED) {
             composable(Routes.SETTINGS_DEVELOPER) {

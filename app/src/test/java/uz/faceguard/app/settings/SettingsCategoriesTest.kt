@@ -28,6 +28,7 @@ class SettingsCategoriesTest {
                 "NOTIFICATIONS",
                 "PRIVACY",
                 "SUPPORT",
+                "SUBSCRIPTION",
                 "DEVELOPER",
             ),
             SettingsCategory.entries.map { it.name },
@@ -38,14 +39,14 @@ class SettingsCategoriesTest {
     fun aReleaseBuildNeverShowsTheDeveloperCategory() {
         val release = settingsCategories(debugScreensEnabled = false)
         assertFalse(release.any { it == SettingsCategory.DEVELOPER })
-        assertEquals(7, release.size)
+        assertEquals(8, release.size)
     }
 
     @Test
     fun aDebugBuildShowsTheDeveloperCategory() {
         val debug = settingsCategories(debugScreensEnabled = true)
         assertTrue(debug.contains(SettingsCategory.DEVELOPER))
-        assertEquals(8, debug.size)
+        assertEquals(9, debug.size)
     }
 
     @Test
@@ -77,6 +78,7 @@ class SettingsCategoriesTest {
         assertEquals(Routes.SETTINGS_NOTIFICATIONS, SettingsCategory.NOTIFICATIONS.route)
         assertEquals(Routes.SETTINGS_PRIVACY, SettingsCategory.PRIVACY.route)
         assertEquals(Routes.SETTINGS_SUPPORT, SettingsCategory.SUPPORT.route)
+        assertEquals(Routes.SETTINGS_SUBSCRIPTION, SettingsCategory.SUBSCRIPTION.route)
         assertEquals(Routes.SETTINGS_DEVELOPER, SettingsCategory.DEVELOPER.route)
     }
 

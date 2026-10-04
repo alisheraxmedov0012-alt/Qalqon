@@ -114,6 +114,13 @@ android {
         // TFLite models must stay uncompressed so the Interpreter can mmap them.
         noCompress += "tflite"
     }
+    testOptions {
+        // Stage 7: the billing layer logs recoverable failures (e.g. a deferred
+        // acknowledgement) via android.util.Log. Unit tests run on the JVM where the
+        // Android framework is stubbed; return defaults so a Log call does not throw
+        // "Method w in android.util.Log not mocked". No test asserts on Log output.
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
@@ -144,6 +151,10 @@ dependencies {
     // no INTERNET permission and no cloud client are introduced by this dependency.
     implementation(libs.mlkit.genai.prompt)
     implementation(libs.tensorflow.lite)
+    // Google Play Billing (subscriptions + 3-day trial). Talks to the Play Store over
+    // IPC; the offline-first contract is preserved by stripping the INTERNET/transport
+    // the library injects (see AndroidManifest.xml).
+    implementation(libs.billing)
     implementation(libs.accompanist.permissions)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

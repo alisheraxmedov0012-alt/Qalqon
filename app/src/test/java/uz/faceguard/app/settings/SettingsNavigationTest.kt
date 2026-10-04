@@ -55,6 +55,7 @@ class SettingsNavigationTest {
             "Routes.SETTINGS_NOTIFICATIONS",
             "Routes.SETTINGS_PRIVACY",
             "Routes.SETTINGS_SUPPORT",
+            "Routes.SETTINGS_SUBSCRIPTION",
             "Routes.SETTINGS_DEVELOPER",
         ).forEach { route ->
             assertTrue("the hub graph is missing $route", navGraph.contains(route))

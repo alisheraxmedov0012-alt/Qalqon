@@ -465,3 +465,24 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   audit only (no TalkBack), real-device QA deferred to Stage 10. No security,
   schema, dependency, network or legacy-name change. JVM total 1852 -> 1858.
 
+
+- Stage 7 (Subscription & 3-Day Trial) deliverable:
+  `docs/STAGE7_SUBSCRIPTION_BILLING.md`. Architecture: CLIENT-ONLY Google Play Billing
+  (`com.android.billingclient:billing:9.1.0`) + an account-scoped entitlement cache,
+  behind `BillingGateway`/`EntitlementStore` seams. Billing talks to Play over IPC, so
+  the offline-first/no-INTERNET contract is preserved: the merged manifest still removes
+  INTERNET/ACCESS_NETWORK_STATE and adds only `com.android.vending.BILLING`
+  (no location permission injected). Product `qalqon_premium` / base plan `monthly` /
+  offer `trial-3-day` (`ProductCatalog`); prices come from `ProductDetails`, never
+  hardcoded. `PremiumEntitlement`/`EntitlementState` (11 states), `PremiumAccessEvaluator`
+  (central gate; core protection stays free), `OfflineEntitlementPolicy` (72h staleness;
+  a failed query never downgrades a paying user). `SubscriptionManager` is the single
+  entitlement writer (account-scoped, idempotent acknowledge, no purchase-token logging).
+  UI: `feature/subscription/SubscriptionScreen` + ViewModel, Settings category
+  `SUBSCRIPTION`, route `SETTINGS_SUBSCRIPTION` (PIN-gated), strings x3 locales.
+  Client-only limitations (documented): no server verification; expiry/grace/hold/revoke
+  not client-derivable; Play entitlements are per Google account. Real Google Play
+  purchase/renewal/refund/restore = NOT TESTED (mock-verified lifecycle only). New tests:
+  `billing/*` (33). `testOptions.unitTests.isReturnDefaultValues = true` added so the
+  deferred-ack `Log.w` path does not throw in JVM tests. JVM total 1858 -> 1891.
+

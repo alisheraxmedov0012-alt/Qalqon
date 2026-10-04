@@ -411,7 +411,7 @@
     <string name="app_category_social">Соцсети</string>
     <string name="app_category_other">Другое</string>
     <string name="screentime_summary_today">Экранное время за сегодня</string>
-    <string name="screentime_summary_no_target">Ребёнок для экранного времени не выбран</string>
+    <string name="screentime_summary_no_target">Ребёнок не выбран</string>
     <string name="home_screentime_select_child_action">Выбрать ребёнка</string>
     <string name="screentime_summary_unavailable">Данные об использовании недоступны</string>
     <string name="screentime_summary_error">Не удалось загрузить данные экранного времени</string>

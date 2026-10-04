@@ -1207,10 +1207,10 @@ private fun HomeMetricTile(
     // title style, never as plain secondary body copy.
     val (valueText, valueStyle) = when (val value = metric.value) {
         is HomeMetricValue.Duration ->
-            durationLabel(value.ms) to MaterialTheme.typography.titleLarge
+            durationLabel(value.ms) to MaterialTheme.typography.titleMedium
         is HomeMetricValue.Text ->
             (if (value.arg != null) stringResource(value.res, value.arg) else stringResource(value.res)) to
-                MaterialTheme.typography.titleMedium
+                MaterialTheme.typography.bodyMedium
     }
     // Colour-coded circular icon container, so the Today grid reads at a glance.
     val (iconContainer, iconTint) = when (metric.kind) {
@@ -1254,7 +1254,7 @@ private fun HomeMetricTile(
         }
         Text(
             text = stringResource(metric.labelRes),
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         metric.caption?.let { caption ->

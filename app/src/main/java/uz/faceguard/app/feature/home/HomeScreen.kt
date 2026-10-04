@@ -131,6 +131,7 @@ import uz.faceguard.app.domain.screentime.ScreenTimeUsageRepository
  * shown as a fabricated figure.
  */
 @HiltViewModel
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class HomeViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
     private val parentProfileRepository: ParentProfileRepository,
@@ -806,14 +807,17 @@ private fun ChildrenSection(
                     )
                     // The card line is shown only for the child the existing screen-time
                     // summary actually belongs to — real data, never a stand-in figure.
+                    // A captured local makes the non-null case explicit for the compiler
+                    // (no `!!`), while the guard above still decides whether it is shown.
+                    val total = screenTime.total
                     val todayScreenTime: String? = if (
                         screenTime.status == ScreenTimeSummaryStatus.READY &&
                         screenTime.childId == child.childId &&
-                        screenTime.total != null
+                        total != null
                     ) {
                         stringResource(
                             R.string.home_child_screen_time,
-                            durationLabel(screenTime.total!!.usedMs),
+                            durationLabel(total.usedMs),
                         )
                     } else {
                         null
@@ -1036,8 +1040,8 @@ private fun QalqonProtectionMotif(modifier: Modifier = Modifier) {
                     moveTo(x(0.5f), y(0.02f))
                     lineTo(x(0.94f), y(0.20f))
                     lineTo(x(0.94f), y(0.52f))
-                    quadraticBezierTo(x(0.94f), y(0.86f), x(0.5f), y(0.99f))
-                    quadraticBezierTo(x(0.06f), y(0.86f), x(0.06f), y(0.52f))
+                    quadraticTo(x(0.94f), y(0.86f), x(0.5f), y(0.99f))
+                    quadraticTo(x(0.06f), y(0.86f), x(0.06f), y(0.52f))
                     lineTo(x(0.06f), y(0.20f))
                     close()
                 }

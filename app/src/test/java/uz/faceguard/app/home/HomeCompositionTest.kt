@@ -122,6 +122,13 @@ class HomeCompositionTest {
         assertTrue("the hero must show the real count as a badge", hero.contains("QalqonStatusBadge("))
     }
 
+    @Test
+    fun theHomeSourceAvoidsTheDeprecatedPathApi() {
+        // quadraticBezierTo is deprecated in favour of quadraticTo; the hero motif
+        // must use the non-deprecated call so the Home path compiles warning-free.
+        assertFalse("use quadraticTo, not the deprecated quadraticBezierTo", home.contains("quadraticBezierTo("))
+    }
+
     private fun read(relativePath: String): String =
         File(repoRoot(), "app/src/main/java/uz/faceguard/app/$relativePath").readText()
 

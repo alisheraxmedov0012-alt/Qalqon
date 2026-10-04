@@ -79,6 +79,17 @@ tests via a deterministic per-frame model score), so photo/screen/replay
 resilience is *architecturally implemented and tested*, not proven against real
 attacks.
 
+**Stage 5 (Anti-Spoofing / Liveness) assessment:** the current subsystem is
+**Level 1 — heuristic anti-spoof signals**, and it is *decision-inert*: `SPOOF`
+is unreachable without a model, so liveness never changes a block/allow decision
+today. Photo, screen and video-replay attacks are **not** stopped. No
+FAR/FRR/APCER/BPCER was measured, so none is claimed. The dashboard's liveness
+label is now **source-gated**: a `LIVE` verdict is only shown when a real
+`AntiSpoofModel` produced it, never for the motion heuristic (which a replay also
+satisfies). Full audit, taxonomy, strategy and model requirements:
+[`docs/STAGE5_ANTI_SPOOFING_LIVENESS.md`](docs/STAGE5_ANTI_SPOOFING_LIVENESS.md).
+
+
 ### Protected app selection reliability
 
 Refresh no longer resets protection choices. `refreshFromDevice()` merges the

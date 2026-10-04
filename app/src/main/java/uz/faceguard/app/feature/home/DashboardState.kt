@@ -1,6 +1,7 @@
 package uz.faceguard.app.feature.home
 
 import uz.faceguard.app.R
+import uz.faceguard.app.core.liveness.LivenessSource
 import uz.faceguard.app.core.protection.ProtectionState
 import uz.faceguard.app.domain.model.ActivityEvent
 import uz.faceguard.app.domain.model.ActivityEventType
@@ -83,6 +84,12 @@ data class DashboardUiState(
     val protectionState: ProtectionState = ProtectionState.UNPROTECTED,
     val identity: UserIdentity? = null,
     val liveness: LivenessState? = null,
+    /**
+     * Stage 5: which signal produced [liveness]. A verdict is only rendered when a
+     * real anti-spoofing model produced it; the passive motion heuristic must not be
+     * presented as a liveness claim. See [livenessLabelRes].
+     */
+    val livenessSource: LivenessSource? = null,
     val blockedApp: String? = null,
     /**
      * Phase 5/10: the *effective* schedule for the current protection context — the
@@ -148,13 +155,25 @@ fun protectionStateLabelRes(state: ProtectionState): Int = when (state) {
 }
 
 /**
- * Only states the parent can act on are surfaced. `UNKNOWN`/`NO_FACE`/`UNSTABLE`
- * are not shown as a "liveness" verdict (they are already represented by the
- * identity line), and no internal probability is ever exposed.
+ * Stage 5: a liveness verdict is only surfaced when a real anti-spoofing model
+ * produced it (`LivenessSource.MODEL`).
+ *
+ * The passive motion heuristic ([LivenessSource.HEURISTIC]) is a weak signal: a
+ * hand-shaken photo or a phone-screen video replay satisfies it just as a real
+ * face does, so presenting its `LIVE` as "a real face" would be a claim the
+ * signal cannot support. This build bundles no anti-spoofing model, so `LIVE`
+ * from the heuristic now maps to nothing instead of to that claim. `SPOOF` is
+ * still surfaced because only a model can emit it. `UNKNOWN`/`NO_FACE`/`UNSTABLE`
+ * remain hidden — they are already represented by the identity line, and no
+ * internal probability is ever exposed.
  */
-fun livenessLabelRes(liveness: LivenessState?): Int? = when (liveness) {
-    LivenessState.LIVE -> R.string.dashboard_liveness_live
-    LivenessState.SPOOF -> R.string.dashboard_liveness_spoof
+fun livenessLabelRes(liveness: LivenessState?, source: LivenessSource?): Int? = when {
+    liveness == LivenessState.LIVE && source == LivenessSource.MODEL ->
+        R.string.dashboard_liveness_live
+
+    liveness == LivenessState.SPOOF ->
+        R.string.dashboard_liveness_spoof
+
     else -> null
 }
 

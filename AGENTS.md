@@ -430,3 +430,22 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   full-wipe table test. Deferred/known (documented, not code): child-delete leaves
   per-child config rows (P3), R8 off (P3). Signing gate unchanged; no secrets added.
 
+
+- Stage 5 (Anti-Spoofing / Liveness) audit deliverable:
+  `docs/STAGE5_ANTI_SPOOFING_LIVENESS.md`. Finding: the build is **Level 1**
+  (heuristic anti-spoof signals) and *decision-inert* — no `AntiSpoofModel`
+  implementation exists, `setAntiSpoofModel` is never called, so
+  `FrameEvent.liveProbability` is always null and `LivenessState.SPOOF` (the only
+  liveness state that changes a policy decision) is unreachable. The heuristic in
+  `TemporalLivenessDetector` uses only head-pose range (yaw/pitch): >=3deg LIVE,
+  <=0.8deg UNKNOWN, else UNSTABLE; it never emits SPOOF. Photo/screen/video-replay
+  attacks are NOT stopped; no FAR/FRR/APCER/BPCER measured. Minimal hardening only:
+  `livenessLabelRes` is now source-gated (a LIVE verdict is surfaced only for
+  `LivenessSource.MODEL`, so the motion heuristic is never shown as "Real face");
+  `DashboardUiState` carries `livenessSource`. New JVM test
+  `Stage5LivenessHardeningTest` (8 tests). No model integrated, no threshold
+  changed, no recognition/policy/camera behaviour changed, no cloud/network. JVM
+  total 1844 -> 1852. Recommendation for a later stage: a validated offline
+  anti-spoof model behind the existing seam, optionally + a random active
+  challenge. Real-device spoof testing NOT TESTED (Stage 10).
+

@@ -633,7 +633,7 @@
     <string name="home_today_subtitle">Bolangiz faoliyati haqida qisqacha</string>
     <string name="home_children_subtitle">Farzandlar holati bir joyda</string>
     <string name="home_quick_actions_title">Tezkor amallar</string>
-    <string name="home_quick_actions_subtitle">Tezkor sozlamalar va boshqaruv</string>
+    <string name="home_quick_actions_subtitle">Tezkor sozlamalar va boshqarish</string>
     <string name="home_action_protected_apps_desc">Ilovalarni himoyalash sozlamalari</string>
     <string name="home_action_screen_time">Ekran vaqti</string>
     <string name="home_action_screen_time_desc">Kunlik ekran vaqtini nazorat qilish</string>

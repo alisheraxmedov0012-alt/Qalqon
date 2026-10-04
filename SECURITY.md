@@ -120,6 +120,32 @@ a one-tap deep link to the right settings page, and posts a parent notification
   debuggable device, the PIN *hash*, protection configuration and activity log are
   readable; `allowBackup="false"` prevents cloud backup extraction.
 
+### 3.11 Backup and device-to-device transfer
+* **Current mitigation:** `android:allowBackup="false"` (no cloud backup) **and**
+  `android:dataExtractionRules` (`res/xml/data_extraction_rules.xml`) excluding every
+  domain from both `cloud-backup` and `device-transfer`. Before Stage 4 only
+  `allowBackup` was set; on Android 12+ that attribute no longer governs D2D transfers,
+  so a phone-to-phone transfer was not excluded. Face templates are additionally
+  Keystore-encrypted and the Keystore key never transfers, so a copied ciphertext is
+  undecryptable elsewhere.
+* **Residual risk:** **Low — accepted.** The exclusion is verified by the merged
+  manifest and a JVM contract test; an end-to-end real-device D2D transfer was not
+  measured (no device available).
+
+### 3.12 Deletion of local data
+* **Current mitigation:** the full reset (`ResetRepositoryImpl.resetAll`) clears **every**
+  Room table, wipes the settings/session/security DataStore files and deletes the
+  Android Keystore key. Per-subject face deletion nulls the stored template. (Stage 4
+  fixed a reset that had missed five tables — see
+  [`docs/STAGE4_SECURITY_PRIVACY_AUDIT.md`](docs/STAGE4_SECURITY_PRIVACY_AUDIT.md), S4-1.)
+* **Residual risk:** **Low — accepted.** Deletion is verified at the SQL level; a rooted
+  attacker may still recover deleted pages from the SQLite file until vacuum.
+
+> Stage 4 (Security & Privacy Hardening) added the threat-model detail in
+> [`docs/STAGE4_THREAT_MODEL.md`](docs/STAGE4_THREAT_MODEL.md), the biometric lifecycle
+> in [`docs/STAGE4_BIOMETRIC_DATA_LIFECYCLE.md`](docs/STAGE4_BIOMETRIC_DATA_LIFECYCLE.md)
+> and the audit in [`docs/STAGE4_SECURITY_PRIVACY_AUDIT.md`](docs/STAGE4_SECURITY_PRIVACY_AUDIT.md).
+
 ## 4. Explicit non-goals
 
 * No anti-tamper / integrity attestation, no root detection, no obfuscation-based

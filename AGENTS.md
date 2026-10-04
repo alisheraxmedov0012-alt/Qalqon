@@ -414,3 +414,19 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   (no emulator/KVM); they run in CI. CI run `37210605668` on this commit:
   `build` + `Instrumented tests (API 35)` both PASS.
 
+
+- Stage 4 (Security & Privacy Hardening) docs:
+  `docs/STAGE4_SECURITY_PRIVACY_AUDIT.md`, `docs/STAGE4_BIOMETRIC_DATA_LIFECYCLE.md`,
+  `docs/STAGE4_THREAT_MODEL.md`; `SECURITY.md` extended (§3.11 backup/D2D, §3.12
+  deletion). Two confirmed P2 issues fixed: (1) `ResetRepositoryImpl.resetAll()`
+  cleared only 9/14 Room tables, leaving screen-time usage, per-child schedules and
+  eye-safety config on disk after the UI promised a full wipe — it now clears all 14
+  (added `deleteAll()` to `ScheduleDao`/`ChildEyeSafetyDao`, plus the existing
+  daily-usage/limit deletes); (2) `allowBackup="false"` does not cover Android 12+
+  device-to-device transfer, so `res/xml/data_extraction_rules.xml` now excludes every
+  domain from `cloud-backup` and `device-transfer`. No biometric egress exists (no
+  INTERNET permission, no network code, on-device only). JVM total 1839 -> 1844
+  (`Stage4DeletionAndBackupTest`); instrumented `SecurityPersistenceTest` gained a
+  full-wipe table test. Deferred/known (documented, not code): child-delete leaves
+  per-child config rows (P3), R8 off (P3). Signing gate unchanged; no secrets added.
+

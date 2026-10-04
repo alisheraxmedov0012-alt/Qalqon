@@ -18,7 +18,11 @@ data class UserAccountEntity(
     val fullName: String,
     /** digits-only normalized phone */
     val phoneNumber: String,
-    /** SHA-256 over (salt + pin), never the plain PIN. */
+    /**
+     * PBKDF2-HMAC-SHA256 envelope `pbkdf2$sha256$<iterations>$<saltHex>$<hashHex>`
+     * (legacy single-round SHA-256 values are accepted and upgraded on next verify).
+     * Never the plain PIN.
+     */
     val pinHash: String,
     val pinSalt: String,
     val createdAt: Long = System.currentTimeMillis(),

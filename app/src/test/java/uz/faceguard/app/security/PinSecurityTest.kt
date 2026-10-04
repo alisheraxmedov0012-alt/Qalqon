@@ -80,6 +80,38 @@ class PinSecurityTest {
         }
     }
 
+    // ---- strict hex handling ------------------------------------------------
+
+    @Test
+    fun aMalformedSaltIsRejectedAndNeverZeroFilled() {
+        // Odd length, non-hex characters and empty are all rejected outright rather
+        // than silently decoded to zero bytes (which would make the hash guessable).
+        listOf("", "abc", "zz", "00zz", "0g", "  ", "00112233445566778899aabbccddeefg").forEach { bad ->
+            val threw = try {
+                PinHasher.hash(pin, bad)
+                false
+            } catch (_: IllegalArgumentException) {
+                true
+            }
+            assertTrue("malformed salt '$bad' must be rejected", threw)
+        }
+    }
+
+    @Test
+    fun aMalformedSaltInsideAStoredEnvelopeNeverVerifiesAndNeverThrows() {
+        // Envelope shape is valid, but the embedded salt is not hex: verify must fail
+        // closed (false), not fall back to a zero-filled salt.
+        val malformed = listOf("pbkdf2", "sha256", "120000", "zzzz", "deadbeef").joinToString("\$")
+        assertFalse(PinHasher.verify(pin, malformed, salt))
+    }
+
+    @Test
+    fun aValidHexSaltStillRoundTripsAfterTheStrictChange() {
+        val stored = PinHasher.hash(pin, salt)
+        assertTrue(PinHasher.verify(pin, stored, salt))
+        assertFalse(PinHasher.verify("000000", stored, salt))
+    }
+
     // ---- attempt policy -----------------------------------------------------
 
     @Test

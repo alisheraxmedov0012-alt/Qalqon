@@ -622,6 +622,12 @@
     <string name="home_greeting">Salom, %1$s</string>
     <string name="home_more_options">Boshqa</string>
     <string name="home_attention_title">Diqqat talab qiladi</string>
+    <string name="home_setup_title">Sozlash holati</string>
+    <string name="home_setup_progress">%1$d/%2$d bajarildi</string>
+    <string name="home_setup_step_child">Bola profili qo\'shilgan</string>
+    <string name="home_setup_step_permissions">Ruxsatlar berilgan</string>
+    <string name="home_setup_step_protection">Himoya yoqilgan</string>
+    <string name="home_setup_action_open">Ochish</string>
     <string name="home_attention_children_setup">Ba\'zi bolalar uchun yuz hali sozlanmagan</string>
     <string name="home_today_title">Bugun</string>
     <string name="home_today_subtitle">Bolangiz faoliyati haqida qisqacha</string>

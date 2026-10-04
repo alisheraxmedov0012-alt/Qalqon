@@ -125,6 +125,28 @@ fun homeProtectionHeroSurface(status: HomeProtectionStatus): HomeHeroSurface = w
  */
 fun homeCanEnableProtection(state: DashboardUiState): Boolean = state.hasChild
 
+// ------------------------------------------------------------------- setup
+
+/** The three one-time steps a parent must complete before protection fully works. */
+enum class HomeSetupStepKind { CHILD_ADDED, PERMISSIONS_GRANTED, PROTECTION_ON }
+
+/** One setup step and whether it is already satisfied. */
+data class HomeSetupStep(val kind: HomeSetupStepKind, val done: Boolean)
+
+/**
+ * The "Sozlash holati" checklist: child profile added -> permissions granted ->
+ * protection on. Ordered as the parent should complete them. Every flag is real state,
+ * never a fabricated progress value.
+ */
+fun homeSetupSteps(state: DashboardUiState): List<HomeSetupStep> = listOf(
+    HomeSetupStep(HomeSetupStepKind.CHILD_ADDED, state.children.isNotEmpty()),
+    HomeSetupStep(HomeSetupStepKind.PERMISSIONS_GRANTED, state.enforcementReady),
+    HomeSetupStep(HomeSetupStepKind.PROTECTION_ON, state.protectionEnabled),
+)
+
+/** True once every setup step is satisfied, so the card can hide itself. */
+fun homeSetupComplete(state: DashboardUiState): Boolean = homeSetupSteps(state).all { it.done }
+
 // ------------------------------------------------------------------ banners
 
 /**

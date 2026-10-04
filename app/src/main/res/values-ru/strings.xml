@@ -621,6 +621,12 @@
     <string name="home_greeting">Здравствуйте, %1$s</string>
     <string name="home_more_options">Ещё</string>
     <string name="home_attention_title">Требует внимания</string>
+    <string name="home_setup_title">Статус настройки</string>
+    <string name="home_setup_progress">Выполнено %1$d/%2$d</string>
+    <string name="home_setup_step_child">Профиль ребёнка добавлен</string>
+    <string name="home_setup_step_permissions">Разрешения предоставлены</string>
+    <string name="home_setup_step_protection">Защита включена</string>
+    <string name="home_setup_action_open">Открыть</string>
     <string name="home_attention_children_setup">У некоторых детей ещё не настроено лицо</string>
     <string name="home_today_title">Сегодня</string>
     <string name="home_today_subtitle">Кратко об активности ребёнка</string>

@@ -621,6 +621,12 @@
     <string name="home_greeting">Hi, %1$s</string>
     <string name="home_more_options">More</string>
     <string name="home_attention_title">Needs attention</string>
+    <string name="home_setup_title">Setup status</string>
+    <string name="home_setup_progress">%1$d/%2$d complete</string>
+    <string name="home_setup_step_child">Child profile added</string>
+    <string name="home_setup_step_permissions">Permissions granted</string>
+    <string name="home_setup_step_protection">Protection on</string>
+    <string name="home_setup_action_open">Open</string>
     <string name="home_attention_children_setup">Some children still need face setup</string>
     <string name="home_today_title">Today</string>
     <string name="home_today_subtitle">A quick look at your child\'s activity</string>

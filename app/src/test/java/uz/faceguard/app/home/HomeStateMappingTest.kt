@@ -13,10 +13,13 @@ import uz.faceguard.app.feature.home.DashboardUiState
 import uz.faceguard.app.feature.home.HomeBannerKind
 import uz.faceguard.app.feature.home.HomeHeroSurface
 import uz.faceguard.app.feature.home.HomeProtectionStatus
+import uz.faceguard.app.feature.home.HomeSetupStepKind
 import uz.faceguard.app.feature.home.PolicyCounts
 import uz.faceguard.app.feature.home.ScreenTimeSummaryStatus
 import uz.faceguard.app.feature.home.ScreenTimeSummaryUiState
 import uz.faceguard.app.feature.home.homeBanners
+import uz.faceguard.app.feature.home.homeSetupComplete
+import uz.faceguard.app.feature.home.homeSetupSteps
 import uz.faceguard.app.feature.home.homeCanEnableProtection
 import uz.faceguard.app.feature.home.homeProtectionHeroSurface
 import uz.faceguard.app.feature.home.homeProtectionStatus
@@ -150,5 +153,38 @@ class HomeStateMappingTest {
         // degradation is derived from the runtime state, which reports nothing when off.
         val s = state(protectionEnabled = false)
         assertTrue(homeBanners(s).isEmpty())
+    }
+
+    // ------------------------------------------------ 5. setup checklist
+
+    @Test
+    fun theSetupChecklistReflectsRealProgressInOrder() {
+        val fresh = homeSetupSteps(state())
+        assertEquals(
+            listOf(
+                HomeSetupStepKind.CHILD_ADDED,
+                HomeSetupStepKind.PERMISSIONS_GRANTED,
+                HomeSetupStepKind.PROTECTION_ON,
+            ),
+            fresh.map { it.kind },
+        )
+        assertTrue("nothing is done on a fresh account", fresh.none { it.done })
+        assertFalse(homeSetupComplete(state()))
+
+        val partly = homeSetupSteps(state(children = listOf(childProfile())))
+        assertTrue("the child step is done", partly.first().done)
+        assertFalse("permissions are still open", partly[1].done)
+        assertFalse(homeSetupComplete(state(children = listOf(childProfile()))))
+
+        val done = state(
+            protectionEnabled = true,
+            children = listOf(childProfile()),
+            child = childSection(),
+            overlay = true,
+            usage = true,
+            accessibility = true,
+        )
+        assertTrue(homeSetupComplete(done))
+        assertTrue(homeSetupSteps(done).all { it.done })
     }
 }

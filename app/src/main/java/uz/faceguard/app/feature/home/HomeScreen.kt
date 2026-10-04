@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
@@ -401,6 +402,16 @@ fun HomeScreen(
                 // Priority order: the protection verdict, then the single banner area
                 // (most severe first), then today's states, the children and the actions.
                 item { ProtectionStatusSection(dashboard, onOpenProtection) }
+
+                // Setup checklist ("Sozlash holati") while the three one-time steps are
+                // incomplete; hides itself once done.
+                item {
+                    HomeSetupStatusCard(
+                        steps = homeSetupSteps(dashboard),
+                        onOpenChildren = onOpenChildren,
+                        onOpenProtection = onOpenProtection,
+                    )
+                }
 
                 // ONE banner area: degraded protection, camera-limited-after-boot,
                 // notifications off, pending requests and children needing setup are
@@ -799,6 +810,72 @@ private fun HomeBannerButton(label: String, onClick: () -> Unit) {
         modifier = Modifier.heightIn(min = QalqonDimens.sizes.touchTarget),
     ) {
         Text(label)
+    }
+}
+
+/**
+ * The "Sozlash holati" card: the three one-time setup steps with real progress and a
+ * one-tap action per still-open step. Shown only while setup is incomplete.
+ */
+@Composable
+private fun HomeSetupStatusCard(
+    steps: List<HomeSetupStep>,
+    onOpenChildren: () -> Unit,
+    onOpenProtection: () -> Unit,
+) {
+    if (steps.all { it.done }) return
+    val doneCount = steps.count { it.done }
+
+    QalqonCard(
+        modifier = Modifier.fillMaxWidth(),
+        bordered = true,
+        containerColor = MaterialTheme.colorScheme.surface,
+        elevation = QalqonDimens.elevation.raised,
+        shape = QalqonShapes.xLargeShape,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = stringResource(R.string.home_setup_title),
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = stringResource(R.string.home_setup_progress, doneCount, steps.size),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        steps.forEach { step ->
+            val labelRes = when (step.kind) {
+                HomeSetupStepKind.CHILD_ADDED -> R.string.home_setup_step_child
+                HomeSetupStepKind.PERMISSIONS_GRANTED -> R.string.home_setup_step_permissions
+                HomeSetupStepKind.PROTECTION_ON -> R.string.home_setup_step_protection
+            }
+            val onOpen = when (step.kind) {
+                HomeSetupStepKind.CHILD_ADDED -> onOpenChildren
+                HomeSetupStepKind.PERMISSIONS_GRANTED, HomeSetupStepKind.PROTECTION_ON -> onOpenProtection
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = if (step.done) Icons.Filled.Check else Icons.Filled.Warning,
+                    contentDescription = null,
+                    tint = if (step.done) QalqonTheme.colors.success else QalqonTheme.colors.warning,
+                    modifier = Modifier.size(QalqonDimens.icon.sm),
+                )
+                Text(
+                    text = stringResource(labelRes),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = QalqonDimens.spacing.sm),
+                )
+                if (!step.done) {
+                    TextButton(onClick = onOpen) {
+                        Text(stringResource(R.string.home_setup_action_open))
+                    }
+                }
+            }
+        }
     }
 }
 

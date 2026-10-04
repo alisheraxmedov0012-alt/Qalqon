@@ -75,12 +75,13 @@ fun QalqonAppShell(
 /**
  * The QALQON bottom navigation: exactly the primary destinations, no more.
  *
- * Visual reference treatment — a floating, rounded white bar that sits on the light
- * canvas rather than a full-bleed Material bar: it is inset from the screen edges,
- * separated by a hairline and a soft shadow, and the selected item is emphasised with
- * a soft-blue pill behind its icon and a blue icon/label. Only the *presentation*
- * changed: the destination list, the selected tracking, the tap callbacks, the
- * always-visible labels and the 48 dp touch target are unchanged.
+ * Visual treatment — a full-width, compact bar anchored to the bottom edge: it spans
+ * the whole width (no side insets), is separated from the content by a hairline, and
+ * the selected item is emphasised with a soft-blue pill behind its icon and a blue
+ * icon/label. Only the *presentation* changed: the destination list, the selected
+ * tracking, the tap callbacks, the always-visible labels and the 48 dp touch target
+ * are unchanged, and the bar still hides entirely on non-tab routes (the caller only
+ * passes a non-null [selected] for the primary destinations).
  */
 @Composable
 fun QalqonNavigationBar(
@@ -88,43 +89,30 @@ fun QalqonNavigationBar(
     onSelect: (QalqonTopLevelDestination) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            // The canvas colour continues behind the insets so the floating bar never
-            // sits on a mismatched strip.
-            .background(MaterialTheme.colorScheme.background)
-            .navigationBarsPadding()
-            .padding(
-                start = QalqonDimens.spacing.md,
-                end = QalqonDimens.spacing.md,
-                top = QalqonDimens.spacing.sm,
-                bottom = QalqonDimens.spacing.sm,
-            ),
-        contentAlignment = Alignment.Center,
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = QalqonElevation.flat,
+        shadowElevation = QalqonElevation.raised,
+        border = BorderStroke(QalqonDimens.cardBorder, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = QalqonShapes.largeShape,
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = QalqonElevation.flat,
-            shadowElevation = QalqonElevation.raised,
-            border = BorderStroke(QalqonDimens.cardBorder, MaterialTheme.colorScheme.outlineVariant),
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(
+                    horizontal = QalqonDimens.spacing.xs,
+                    vertical = QalqonDimens.spacing.xs,
+                ),
+            horizontalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = QalqonDimens.spacing.xs, vertical = QalqonDimens.spacing.xs),
-                horizontalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.xs),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                QalqonTopLevelDestination.entries.forEach { destination ->
-                    QalqonNavItem(
-                        destination = destination,
-                        selected = destination == selected,
-                        onClick = { onSelect(destination) },
-                    )
-                }
+            QalqonTopLevelDestination.entries.forEach { destination ->
+                QalqonNavItem(
+                    destination = destination,
+                    selected = destination == selected,
+                    onClick = { onSelect(destination) },
+                )
             }
         }
     }

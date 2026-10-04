@@ -69,7 +69,8 @@ class SettingsStoreAccountScopeTest {
         assertEquals(ScanMode.BALANCED, s.scanMode)
         assertEquals(30_000L, s.recoveryDelayMs)
         assertEquals(BlockPolicy.SOFT_BLOCK, s.unknownUserPolicy)
-        assertEquals(BlockPolicy.ALLOW, s.noFacePolicy)
+        // No-face fails closed: a covered/revoked camera must not pass an app.
+        assertEquals(BlockPolicy.SOFT_BLOCK, s.noFacePolicy)
         assertEquals(true, s.lowBatteryBehaviorEnabled)
     }
 
@@ -79,7 +80,8 @@ class SettingsStoreAccountScopeTest {
         val s = currentSettings()
         assertEquals(false, s.protectionEnabled)
         assertEquals(BlockPolicy.SOFT_BLOCK, s.unknownUserPolicy)
-        assertEquals(BlockPolicy.ALLOW, s.noFacePolicy)
+        // No-face fails closed: a covered/revoked camera must not pass an app.
+        assertEquals(BlockPolicy.SOFT_BLOCK, s.noFacePolicy)
     }
 
     // ------------------------------------------------------------ persistence
@@ -137,7 +139,8 @@ class SettingsStoreAccountScopeTest {
 
         val s = currentSettings()
         assertEquals(BlockPolicy.SOFT_BLOCK, s.unknownUserPolicy)
-        assertEquals(BlockPolicy.ALLOW, s.noFacePolicy)
+        // Corrupt/absent values fall back to the fail-closed no-face default.
+        assertEquals(BlockPolicy.SOFT_BLOCK, s.noFacePolicy)
     }
 
     @Test

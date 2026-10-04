@@ -660,8 +660,13 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
             // The hero's primary, full-width pill action in the mockup's deep blue, with
             // a shield glyph (the mockup's "🛡️"), the label and a forward chevron. The
             // shield is a real icon rather than an emoji glyph, per the product's icon rules.
+            //
+            // Protection cannot be turned on before a child exists, so the CTA is disabled
+            // in that case and a short explanation sits beneath it — "Bola qo'shish" in the
+            // Children section is then the first primary action the parent can take.
             Button(
                 onClick = onOpenProtection,
+                enabled = homeCanEnableProtection(state),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(QalqonDimens.sizes.buttonDefault),
@@ -683,6 +688,13 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
                     modifier = Modifier.size(QalqonDimens.icon.sm),
+                )
+            }
+            if (!state.hasChild) {
+                Text(
+                    text = stringResource(R.string.home_protection_needs_child),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

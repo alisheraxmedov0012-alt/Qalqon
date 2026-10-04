@@ -116,6 +116,15 @@ fun homeProtectionHeroSurface(status: HomeProtectionStatus): HomeHeroSurface = w
     -> HomeHeroSurface.WARNING
 }
 
+/**
+ * Whether the hero's primary "turn on / manage protection" action may be used.
+ *
+ * Protection cannot be turned on before a child profile exists (there is nothing to
+ * protect), so the CTA is disabled until then and the child-add action is the parent's
+ * first step. Compose-free so the empty-state rule is unit-testable.
+ */
+fun homeCanEnableProtection(state: DashboardUiState): Boolean = state.hasChild
+
 // ------------------------------------------------------------------ banners
 
 /**

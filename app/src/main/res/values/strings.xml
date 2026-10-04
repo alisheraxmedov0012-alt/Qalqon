@@ -634,6 +634,7 @@
     <string name="home_action_protected_apps_desc">Ilovalarni himoyalash sozlamalari</string>
     <string name="home_action_requests_desc">Boladan kelgan so‘rovlarni ko‘rish</string>
     <string name="home_status_off_hint">Bolangiz qurilmasi hozir himoyasiz</string>
+    <string name="home_protection_needs_child">Himoyani yoqish uchun avval bola qo\'shing</string>
     <string name="home_status_active_hint">Himoya faol va ishlayapti</string>
     <string name="home_status_setup_hint">Himoyani yoqish uchun ruxsatlarni to\'ldiring</string>
     <string name="home_status_blocking">Himoya bloklayapti</string>

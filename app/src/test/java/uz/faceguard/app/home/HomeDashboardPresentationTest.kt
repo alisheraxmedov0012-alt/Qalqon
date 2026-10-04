@@ -263,9 +263,40 @@ class HomeDashboardPresentationTest {
         val noChild = homeTodayMetrics(readyState(), summary(status = ScreenTimeSummaryStatus.NO_TARGET))
         assertTrue(noChild.none { it.kind == HomeTodayMetricKind.SCHEDULE })
         assertTrue(noChild.none { it.kind == HomeTodayMetricKind.EYE_SAFETY })
-        // Protection is deliberately NOT a Today tile: it appears only in the hero, so
-        // "Himoya o'chirilgan" is never duplicated.
-        assertTrue(noChild.none { it.labelRes == R.string.dashboard_protection_title })
+        // The protection-coverage tile needs protection on + at least one protected app.
+        assertTrue(noChild.none { it.kind == HomeTodayMetricKind.PROTECTION_SUMMARY })
+    }
+
+    @Test
+    fun theProtectionTileAppearsOnlyWhenRelevantAndNeverRepeatsTheHeroCopy() {
+        // Not relevant while protection is off …
+        val off = homeTodayMetrics(
+            readyState(protectionEnabled = false, protectedAppsCount = 3),
+            summary(status = ScreenTimeSummaryStatus.NO_TARGET),
+        )
+        assertTrue(off.none { it.kind == HomeTodayMetricKind.PROTECTION_SUMMARY })
+
+        // … and not relevant while nothing is protected.
+        val noneProtected = homeTodayMetrics(
+            readyState(protectionEnabled = true, protectedAppsCount = 0),
+            summary(status = ScreenTimeSummaryStatus.NO_TARGET),
+        )
+        assertTrue(noneProtected.none { it.kind == HomeTodayMetricKind.PROTECTION_SUMMARY })
+
+        // Relevant with protection on and a real coverage count.
+        val relevant = homeTodayMetrics(
+            readyState(protectionEnabled = true, protectedAppsCount = 4),
+            summary(status = ScreenTimeSummaryStatus.NO_TARGET),
+        ).single { it.kind == HomeTodayMetricKind.PROTECTION_SUMMARY }
+        assertEquals(HomeMetricValue.Text(R.string.home_protection_apps_count, 4), relevant.value)
+
+        // It must not carry the hero's on/off status copy.
+        val heroLabels = listOf(
+            R.string.dashboard_protection_on,
+            R.string.dashboard_protection_off,
+        )
+        assertTrue(relevant.labelRes !in heroLabels)
+        assertTrue((relevant.value as HomeMetricValue.Text).res !in heroLabels)
     }
 
     @Test

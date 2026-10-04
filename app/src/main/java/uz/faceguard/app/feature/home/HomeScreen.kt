@@ -107,7 +107,6 @@ import uz.faceguard.app.core.ui.qalqon.QalqonErrorState
 import uz.faceguard.app.core.ui.qalqon.ProtectionDegradedBanner
 import uz.faceguard.app.core.ui.qalqon.QalqonLoadingState
 import uz.faceguard.app.core.ui.qalqon.QalqonSectionHeader
-import uz.faceguard.app.core.ui.qalqon.QalqonStatusBadge
 import uz.faceguard.app.core.ui.qalqon.QalqonStatusTone
 import uz.faceguard.app.core.ui.qalqon.severityColor
 import uz.faceguard.app.core.ui.qalqon.toneColor
@@ -452,7 +451,7 @@ fun HomeScreen(
                     )
                 }
 
-                item { TodaySection(dashboard, screenTimeSummary, onOpenChildPolicy, onOpenChildren) }
+                item { TodaySection(dashboard, screenTimeSummary, onOpenChildPolicy, onOpenChildren, onOpenProtection) }
                 item { ChildrenSection(dashboard, screenTimeSummary, onOpenChildPolicy, onOpenChildren) }
                 item {
                     QuickActionsSection(
@@ -621,8 +620,6 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
     val actionLabel = homeProtectionActionLabelRes(status)
     val statusLabel = stringResource(homeProtectionLabelRes(status))
     val supporting = stringResource(homeProtectionSupportingRes(status))
-    val runCount = (status == HomeProtectionStatus.ACTIVE || status == HomeProtectionStatus.BLOCKING) &&
-        state.protectedAppsCount > 0
 
     // ON = green, OFF/setup/recovering = amber, a live block = red. The colour is a
     // semantic token, animated so a state change reads as a calm transition.
@@ -670,7 +667,7 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
                         .size(QalqonDimens.sizes.heroIllustration),
                 )
                 HeroCta(label = ctaLabel, enabled = ctaEnabled, onClick = onOpenProtection)
-                HeroFootnote(state = state, runCount = runCount)
+                HeroFootnote(state = state)
             }
         } else {
             Row(
@@ -683,7 +680,7 @@ private fun ProtectionStatusSection(state: DashboardUiState, onOpenProtection: (
                 ) {
                     HeroStatusBlock(statusLabel = statusLabel, supporting = supporting, accent = accent)
                     HeroCta(label = ctaLabel, enabled = ctaEnabled, onClick = onOpenProtection)
-                    HeroFootnote(state = state, runCount = runCount)
+                    HeroFootnote(state = state)
                 }
                 Spacer(Modifier.size(QalqonDimens.spacing.md))
                 QalqonProtectionMotif(
@@ -764,18 +761,11 @@ private fun HeroCta(label: String, enabled: Boolean, onClick: () -> Unit) {
 }
 
 /**
- * The hero's small footnote: the real protected-app count while protection runs, plus
- * the "add a child first" hint when there is no child yet.
+ * The hero's small footnote: the "add a child first" hint when there is no child yet.
+ * The protected-app count lives in the Bugun coverage tile instead, so it is shown once.
  */
 @Composable
-private fun HeroFootnote(state: DashboardUiState, runCount: Boolean) {
-    if (runCount) {
-        Text(
-            text = stringResource(R.string.home_protection_apps_count, state.protectedAppsCount),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+private fun HeroFootnote(state: DashboardUiState) {
     if (!state.hasChild) {
         Text(
             text = stringResource(R.string.home_protection_needs_child),
@@ -1087,6 +1077,7 @@ private fun TodaySection(
     screenTime: ScreenTimeSummaryUiState,
     onOpenChildPolicy: (Long) -> Unit,
     onOpenScreenTimeChild: () -> Unit,
+    onOpenProtection: () -> Unit,
 ) {
     val metrics = homeTodayMetrics(state, screenTime)
     // The screen-time tile opens the selected child's detail hub (which owns screen
@@ -1110,14 +1101,15 @@ private fun TodaySection(
             ) {
                 rowMetrics.forEach { metric ->
                     // The screen-time tile with no target offers a real button to pick a child.
+                    val noTargetText = (metric.value as? HomeMetricValue.Text)?.res
                     val needsChild = metric.kind == HomeTodayMetricKind.SCREEN_TIME &&
-                        metric.value is HomeMetricValue.Text &&
-                        (metric.value as HomeMetricValue.Text).res == R.string.screentime_summary_no_target
+                        noTargetText == R.string.screentime_summary_no_target
                     HomeMetricTile(
                         metric = metric,
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                         onClick = when (metric.kind) {
                             HomeTodayMetricKind.SCREEN_TIME -> screenTimeTarget
+                            HomeTodayMetricKind.PROTECTION_SUMMARY -> onOpenProtection
                             HomeTodayMetricKind.SCHEDULE,
                             HomeTodayMetricKind.EYE_SAFETY,
                             -> null
@@ -1134,10 +1126,11 @@ private fun TodaySection(
 
 /** The glyph for each metric; decorative, so the localized label carries the meaning. */
 private fun homeMetricIcon(kind: HomeTodayMetricKind): ImageVector = when (kind) {
-    // Reference mockup: a clock for screen time.
+    // Reference mockup: a clock for screen time, a shield for protection coverage.
     HomeTodayMetricKind.SCREEN_TIME -> HomeClockIcon
     HomeTodayMetricKind.SCHEDULE -> Icons.Filled.Info
     HomeTodayMetricKind.EYE_SAFETY -> Icons.Filled.Warning
+    HomeTodayMetricKind.PROTECTION_SUMMARY -> HomeShieldIcon
 }
 
 /**
@@ -1360,6 +1353,8 @@ private fun HomeMetricTile(
     val (iconContainer, iconTint) = when (metric.kind) {
         HomeTodayMetricKind.SCREEN_TIME ->
             MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.primary
+        HomeTodayMetricKind.PROTECTION_SUMMARY ->
+            QalqonTheme.colors.successContainer to QalqonTheme.colors.success
         else ->
             accent.copy(alpha = 0.14f) to accent
     }

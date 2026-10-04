@@ -250,7 +250,7 @@ fun homeChildSummaries(state: DashboardUiState): List<HomeChildSummary> =
 
 // --------------------------------------------------------------------- today
 
-enum class HomeTodayMetricKind { SCREEN_TIME, SCHEDULE, EYE_SAFETY }
+enum class HomeTodayMetricKind { SCREEN_TIME, SCHEDULE, EYE_SAFETY, PROTECTION_SUMMARY }
 
 /**
  * A metric's value. [Duration] carries exact milliseconds and is rendered with the
@@ -260,7 +260,7 @@ enum class HomeTodayMetricKind { SCREEN_TIME, SCHEDULE, EYE_SAFETY }
  * name — user data, never UI copy).
  */
 sealed interface HomeMetricValue {
-    data class Text(@StringRes val res: Int, val arg: String? = null) : HomeMetricValue
+    data class Text(@StringRes val res: Int, val arg: Any? = null) : HomeMetricValue
     data class Duration(val ms: Long) : HomeMetricValue
 }
 
@@ -277,13 +277,14 @@ data class HomeTodayMetric(
 )
 
 /**
- * The "Today" overview: screen time, schedule and eye safety, using only data the
- * existing aggregator/evaluator already produced.
+ * The "Today" overview: screen time plus, only when relevant, a protection-coverage
+ * tile — using only data the existing aggregator/evaluator already produced.
  *
- * Protection status is deliberately NOT a Today tile: it appears exactly once, in the
- * hero, so "Himoya o'chirilgan" can never be duplicated. A metric with no reliable data
- * is rendered as its own honest state ("usage data unavailable", "no screen-time child
- * selected") — never as a fabricated zero.
+ * The protection tile is deliberately NOT the hero's status copy: it reports how many
+ * apps are actually covered, so protection status is never printed twice. It appears
+ * only while protection is enabled and at least one app is protected ("relevant");
+ * otherwise the hero and the setup checklist already own that message. A metric with no
+ * reliable data is rendered as its own honest state — never as a fabricated zero.
  */
 fun homeTodayMetrics(
     state: DashboardUiState,
@@ -292,6 +293,27 @@ fun homeTodayMetrics(
     screenTimeMetric(screenTime)?.let { add(it) }
     if (state.hasChild) add(scheduleMetric(state.scheduleResolution))
     state.eyeSafety?.let { add(eyeSafetyMetric(it, state.child?.name)) }
+    protectionSummaryMetric(state)?.let { add(it) }
+}
+
+/**
+ * The protection-coverage tile, or `null` when it is not relevant.
+ *
+ * Relevant = protection is on and at least one app is protected. The value is the real
+ * protected-app count (never a fabricated figure), and the tile says nothing about the
+ * on/off state — that is the hero's job.
+ */
+private fun protectionSummaryMetric(state: DashboardUiState): HomeTodayMetric? {
+    if (!state.protectionEnabled || state.protectedAppsCount <= 0) return null
+    return HomeTodayMetric(
+        kind = HomeTodayMetricKind.PROTECTION_SUMMARY,
+        labelRes = R.string.dashboard_apps_title,
+        value = HomeMetricValue.Text(
+            R.string.home_protection_apps_count,
+            state.protectedAppsCount,
+        ),
+        tone = homeProtectionTone(homeProtectionStatus(state)),
+    )
 }
 
 private fun screenTimeMetric(summary: ScreenTimeSummaryUiState): HomeTodayMetric? {

@@ -62,10 +62,11 @@ class HomeVisualRefinementTest {
 
     @Test
     fun theRefinementIntroducedNoNewMetricKinds() {
-        // Protection is deliberately NOT a Today tile (it lives only in the hero), so
-        // the metrics are the three derivable from existing data.
+        // SCREEN_TIME / SCHEDULE / EYE_SAFETY are the derivable metrics; the
+        // PROTECTION_SUMMARY tile is the conditional protection-coverage tile, which
+        // never repeats the hero's status copy.
         assertEquals(
-            listOf("SCREEN_TIME", "SCHEDULE", "EYE_SAFETY"),
+            listOf("SCREEN_TIME", "SCHEDULE", "EYE_SAFETY", "PROTECTION_SUMMARY"),
             HomeTodayMetricKind.entries.map { it.name },
         )
     }

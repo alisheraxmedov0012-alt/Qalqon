@@ -112,6 +112,33 @@ class PinSecurityTest {
         assertFalse(PinHasher.verify("000000", stored, salt))
     }
 
+    // ---- credential material stays in the data layer ------------------------
+
+    @Test
+    fun theDomainModelCarriesNoCredentialMaterial() {
+        // The hash+salt must live only in UserAccountEntity; the domain/UI must not see them.
+        val models = java.io.File(repoRoot(), "app/src/main/java/uz/faceguard/app/domain/model/Models.kt")
+            .readText()
+        val account = models.substringAfter("data class UserAccount(").substringBefore("\n)")
+        assertFalse("the domain model must not expose pinHash", account.contains("pinHash"))
+        assertFalse("the domain model must not expose pinSalt", account.contains("pinSalt"))
+
+        // …and the entity genuinely keeps them (the data layer still owns the credential).
+        val entity = java.io.File(repoRoot(), "app/src/main/java/uz/faceguard/app/data/db/Entities.kt")
+            .readText()
+        assertTrue("the entity must keep the hash", entity.contains("val pinHash: String"))
+        assertTrue("the entity must keep the salt", entity.contains("val pinSalt: String"))
+    }
+
+    private fun repoRoot(): java.io.File {
+        var dir = java.io.File(System.getProperty("user.dir")).absoluteFile
+        while (dir.parentFile != null) {
+            if (java.io.File(dir, "app/src/main/res/values/strings.xml").isFile) return dir
+            dir = dir.parentFile
+        }
+        error("could not locate the repository root from ${System.getProperty("user.dir")}")
+    }
+
     // ---- attempt policy -----------------------------------------------------
 
     @Test

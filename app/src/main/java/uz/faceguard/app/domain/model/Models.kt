@@ -6,7 +6,10 @@ data class UserAccount(
     val id: Long = 0,
     val fullName: String,
     val phoneNumber: String,
-    val pinHash: String,
+    /**
+     * No credential material here: the PIN hash and salt live only in the data layer
+     * (`UserAccountEntity`). The domain/UI must never see them.
+     */
     val createdAt: Long = System.currentTimeMillis(),
 )
 

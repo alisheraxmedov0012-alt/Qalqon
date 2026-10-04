@@ -131,7 +131,7 @@ class ScreenTimeTargetViewModelTest {
             AuthResult.Failure(AuthResult.Reason.INVALID_CREDENTIALS)
 
         override suspend fun getCurrentAccount(): UserAccount? = state.value?.let {
-            UserAccount(id = it, fullName = "Parent", phoneNumber = "998901234567", pinHash = "h")
+            UserAccount(id = it, fullName = "Parent", phoneNumber = "998901234567")
         }
 
         override suspend fun logout() = Unit

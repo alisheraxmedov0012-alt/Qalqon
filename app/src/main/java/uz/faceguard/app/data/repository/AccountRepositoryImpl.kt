@@ -63,7 +63,6 @@ class AccountRepositoryImpl @Inject constructor(
                 id = id,
                 fullName = fullName.trim(),
                 phoneNumber = normalizedPhone,
-                pinHash = hash,
             ),
         )
     }
@@ -143,7 +142,6 @@ class AccountRepositoryImpl @Inject constructor(
         id = id,
         fullName = fullName,
         phoneNumber = phoneNumber,
-        pinHash = pinHash,
         createdAt = createdAt,
     )
 }

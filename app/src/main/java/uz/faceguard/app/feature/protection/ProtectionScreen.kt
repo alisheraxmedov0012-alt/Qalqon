@@ -181,7 +181,9 @@ fun ProtectionScreen(
 
             RequirementsCard(
                 state = state,
-                cameraGranted = cameraPermission.status.isGranted,
+                // Authoritative from the runtime state, so a system-wide revocation is
+                // reflected even before the permission dialog's callback lands.
+                cameraGranted = state.cameraGranted,
                 onGrantCamera = { cameraPermission.launchPermissionRequest() },
                 onGrantUsage = { context.startActivity(viewModel.usageAccessIntent()) },
                 onGrantOverlay = { context.startActivity(viewModel.overlayPermissionIntent()) },

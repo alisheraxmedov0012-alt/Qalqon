@@ -1,9 +1,12 @@
 package uz.faceguard.app.core.protection
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.util.Log
+import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.Instant
 import java.time.ZoneId
@@ -75,6 +78,15 @@ data class ProtectionRuntimeState(
     val foregroundApp: String? = null,
     val overlayGranted: Boolean = false,
     val usageAccessGranted: Boolean = false,
+    /**
+     * Phase 14: whether the CAMERA permission is currently held. Tracked by the
+     * runtime (not only by [uz.faceguard.app.feature.protection.ProtectionScreen]),
+     * so a revoked/never-granted camera is visible in the protection state and can
+     * never be mistaken for "recognition is running". It is deliberately NOT part
+     * of [ready]: blocking an app needs the overlay, not the camera, and the
+     * fail-closed no-face policy still protects without a frame.
+     */
+    val cameraGranted: Boolean = false,
     /** True when the user has explicitly enabled QALQON's accessibility service. */
     val accessibilityEnabled: Boolean = false,
     /**
@@ -584,6 +596,7 @@ class ProtectionRuntime @Inject constructor(
                 childrenFaceEnrolled = children.count { child -> child.isFaceEnrolled },
                 overlayGranted = overlay.hasPermission(),
                 usageAccessGranted = monitor.hasUsageAccess(),
+                cameraGranted = hasCameraPermission(),
             )
         }
     }
@@ -685,11 +698,23 @@ class ProtectionRuntime @Inject constructor(
                 overlayGranted = overlay.hasPermission(),
                 usageAccessGranted = monitor.hasUsageAccess(),
                 accessibilityEnabled = AccessibilityCapability.isEnabled(context),
+                cameraGranted = hasCameraPermission(),
                 notificationsEnabled = runCatching { notificationDispatcher.areNotificationsEnabled() }.getOrDefault(true),
                 securityState = securityStateHolder.state.value,
             )
         }
     }
+
+    /**
+     * Whether the CAMERA permission is currently held.
+     *
+     * Probed from the injected application context by the runtime itself, so a
+     * revocation made in system settings is reflected in the protection state even
+     * if the Protection screen is never opened.
+     */
+    private fun hasCameraPermission(): Boolean =
+        ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
 
     /**
      * Group 7: the accessibility service is bound. It becomes the authoritative

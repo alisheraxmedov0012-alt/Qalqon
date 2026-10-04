@@ -396,3 +396,20 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   it warns and skips when the secrets are not configured, so existing CI is
   unaffected. No Room/DataStore/migration/schema change - an APK update is not an
   uninstall, so all local data is preserved.
+
+- Stage 3 (Android System/OEM compatibility) deliverable:
+  `docs/STAGE3_DEVICE_COMPATIBILITY_MATRIX.md`. No device/emulator/KVM in the
+  dev container, so real-device and OEM rows are honestly `NOT TESTED`; the
+  Android API rows are static platform-contract analysis. One deterministic P1
+  code bug was fixed: the legacy `TYPE_APPLICATION_OVERLAY` scrim is a
+  Service-hosted `ComposeView`, which throws `ViewTreeLifecycleOwner not found`
+  on attach unless the three ViewTree owners are installed first. It now installs
+  `setViewTreeLifecycleOwner` / `setViewTreeViewModelStoreOwner` /
+  `setViewTreeSavedStateRegistryOwner` from a real owner torn down with the
+  window (`OverlayWindowOwner`, idempotent create/destroy). JVM total 1834 ->
+  1839, 0 failures/skipped (`LegacyOverlayHostTest`). `START_NOT_STICKY` was
+  deliberately left unchanged (needs real-device evidence). `assembleDebug` PASS;
+  `assembleRelease` compiles but packaging still fails at the intentional signing
+  gate. Instrumented tests compile in `assembleDebug` but cannot execute locally
+  (no emulator/KVM); they run in CI.
+

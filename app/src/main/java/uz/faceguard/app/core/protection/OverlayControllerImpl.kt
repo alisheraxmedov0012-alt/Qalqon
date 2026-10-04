@@ -28,6 +28,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.SavedStateRegistry
+import androidx.savedstate.SavedStateRegistryController
+import androidx.savedstate.SavedStateRegistryOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import uz.faceguard.app.R
 import uz.faceguard.app.core.accessibility.AccessibilityOverlayRegistry
 import uz.faceguard.app.core.i18n.AppLanguage
@@ -71,6 +82,18 @@ class OverlayControllerImpl(
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private var overlayView: View? = null
 
+    /**
+     * The lifecycle/ViewModel/saved-state owners the legacy Compose overlay needs.
+     *
+     * A [ComposeView] hosted in a `WindowManager` overlay has no Activity or Fragment
+     * above it, so Compose cannot find a `ViewTreeLifecycleOwner` and throws
+     * `IllegalStateException: ViewTreeLifecycleOwner not found` the moment it attaches.
+     * That made the fallback scrim unable to render (and, when the deferred attach ran
+     * after `addView` returned, could crash the process). Installing these owners on the
+     * view is the documented fix for a Service-hosted Compose overlay.
+     */
+    private var overlayOwner: OverlayWindowOwner? = null
+
     fun hasPermission(): Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(context)
 
     fun permissionIntent(): android.content.Intent =
@@ -98,7 +121,13 @@ class OverlayControllerImpl(
     private fun showLegacy() {
         if (!hasPermission()) return
         if (overlayView != null) return
+        // The owners must be installed *before* the view attaches: attaching is what
+        // triggers Compose to resolve (and require) them.
+        val owner = OverlayWindowOwner()
         val view = ComposeView(context).apply {
+            setViewTreeLifecycleOwner(owner)
+            setViewTreeViewModelStoreOwner(owner)
+            setViewTreeSavedStateRegistryOwner(owner)
             setContent {
                 LocalizedApp(languageProvider()) {
                     ProtectionOverlay(onRequestExtraTime = onRequestExtraTime)
@@ -118,14 +147,22 @@ class OverlayControllerImpl(
                 WindowManager.LayoutParams.FLAG_SECURE,
             PixelFormat.TRANSLUCENT,
         ).apply { gravity = Gravity.TOP or Gravity.START }
+        owner.create()
         // A WindowManager failure (an invalid window token after a process/overlay
         // reconnect, or a window already gone) must never crash the caller and must
         // never leave a stale reference: a non-null `overlayView` whose view is not
         // actually attached would make every later show() a silent no-op and
         // permanently disable the block for the rest of the process.
         runCatching { windowManager.addView(view, params) }
-            .onSuccess { overlayView = view }
-            .onFailure { Log.w(TAG, "legacy blocking overlay could not be shown", it) }
+            .onSuccess {
+                overlayView = view
+                overlayOwner = owner
+            }
+            .onFailure {
+                // Never leak the owner of a window that was not added.
+                owner.destroy()
+                Log.w(TAG, "legacy blocking overlay could not be shown", it)
+            }
     }
 
     private fun hideLegacy() {
@@ -133,8 +170,50 @@ class OverlayControllerImpl(
         // Clear the reference first, so a failing removeView cannot leave the stale
         // reference behind (which would block every future show()).
         overlayView = null
+        val owner = overlayOwner
+        overlayOwner = null
         runCatching { windowManager.removeView(view) }
             .onFailure { Log.w(TAG, "legacy blocking overlay could not be removed", it) }
+        // The window is gone, so tear the Compose host's lifecycle down too.
+        owner?.destroy()
+    }
+
+    /**
+     * The owners a Service-hosted [ComposeView] must expose so Compose can run outside
+     * an Activity. A real lifecycle (RESUMED while the window is up, DESTROYED once it
+     * is removed) plus a ViewModel store and saved-state registry, so the overlay
+     * composable works and is fully torn down with the window.
+     */
+    internal class OverlayWindowOwner :
+        LifecycleOwner,
+        ViewModelStoreOwner,
+        SavedStateRegistryOwner {
+
+        private val registry = LifecycleRegistry.createUnsafe(this)
+        override val lifecycle: Lifecycle get() = registry
+
+        override val viewModelStore: ViewModelStore = ViewModelStore()
+
+        private val savedStateController = SavedStateRegistryController.create(this)
+        override val savedStateRegistry: SavedStateRegistry
+            get() = savedStateController.savedStateRegistry
+
+        private var created = false
+        private var destroyed = false
+
+        fun create() {
+            if (created || destroyed) return
+            created = true
+            savedStateController.performRestore(null)
+            registry.currentState = Lifecycle.State.RESUMED
+        }
+
+        fun destroy() {
+            if (destroyed) return
+            destroyed = true
+            registry.currentState = Lifecycle.State.DESTROYED
+            viewModelStore.clear()
+        }
     }
 
     private companion object {

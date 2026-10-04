@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -82,6 +83,9 @@ class MainActivity : FragmentActivity() {
 
     override fun onStart() {
         super.onStart()
+        // Returning to the foreground cancels a pending re-lock, so a quick switch
+        // away and back keeps the parent's session (see AppLockState.lockAfter).
+        appLockState.cancelPendingLock()
         protectionRuntime.onUiForeground()
     }
 
@@ -89,6 +93,10 @@ class MainActivity : FragmentActivity() {
         // The camera session is deliberately not stopped here: it is process-scoped
         // and keeps running while protection is active (Phase 7.1).
         protectionRuntime.onUiBackground()
+        // Re-lock the parent UI once the grace period elapses, so a handed-over or
+        // pocketed device returns to the credential gate without punishing a brief
+        // app switch. The timer runs on the Activity lifecycle scope.
+        appLockState.lockAfter(lifecycleScope, AppLockState.DEFAULT_BACKGROUND_GRACE_MILLIS)
         super.onStop()
     }
 

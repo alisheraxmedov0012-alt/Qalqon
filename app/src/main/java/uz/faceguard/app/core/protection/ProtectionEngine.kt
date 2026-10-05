@@ -391,7 +391,15 @@ class ProtectionEngine(
             // the evaluation loop. The deterministic fallback is NoFace, which then
             // follows the parent's configured no-face policy — so a failure can never
             // silently *allow* a protected app when the policy fails closed.
-            runCatching { recognizer.evaluate(f, parent, children) }
+            runCatching {
+                // Stage 2: evaluate every detected face and aggregate them deterministically.
+                // The per-child action for the foreground app is passed so that, when several
+                // children are recognised at once, the most restrictive one is chosen (and its
+                // identity — child id — is preserved for the downstream per-child policy).
+                recognizer.evaluateAll(f, parent, children) { childId ->
+                    foreground?.let { appPolicyLookup(childId, it) }?.action
+                }.result
+            }
                 .getOrElse { error ->
                     reportEngineError(error)
                     RecognitionResult.NoFace

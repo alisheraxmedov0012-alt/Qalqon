@@ -2,9 +2,11 @@ package uz.faceguard.app.core.recognition
 
 import kotlinx.coroutines.flow.MutableSharedFlow
 import uz.faceguard.app.core.embed.FaceEmbeddingCodec
+import uz.faceguard.app.core.pipeline.FaceFeature
 import uz.faceguard.app.core.pipeline.FrameEvent
 import uz.faceguard.app.domain.model.ChildProfile
 import uz.faceguard.app.domain.model.ParentProfile
+import uz.faceguard.app.domain.policy.ProtectionAction
 
 /**
  * Cosine-similarity acceptance thresholds on L2-normalized embeddings.
@@ -48,22 +50,69 @@ class Recognizer(
 
     fun updateThresholds(new: Thresholds) { thresholds = new }
 
-    fun evaluate(frame: FrameEvent, parent: ParentProfile?, children: List<ChildProfile>): RecognitionResult {
-        val frameFeatures = frame.features ?: return RecognitionResult.NoFace
-        if (frameFeatures.isEmpty()) return RecognitionResult.NoFace
+    /**
+     * Stage 2: evaluates **every** detected face in the frame into a per-face
+     * [IdentityDecision], then aggregates them with the deterministic [MultiFacePolicyEngine].
+     * The result no longer depends on the detector's face order.
+     *
+     * [childActionOf] resolves the configured action for a recognised child and the current
+     * foreground app, so multiple recognised children are resolved to the most restrictive
+     * one; it defaults to "no policy" so a caller without app context still gets a
+     * deterministic result.
+     */
+    fun evaluateAll(
+        frame: FrameEvent,
+        parent: ParentProfile?,
+        children: List<ChildProfile>,
+        childActionOf: (childId: Long) -> ProtectionAction? = { null },
+    ): MultiFaceDecision {
+        val faces = frame.faceFeatures()
+        if (faces.isEmpty()) {
+            return MultiFaceDecision(RecognitionResult.NoFace, emptyList(), null, frame.faceCount)
+        }
 
-        return IdentityDecisionEngine.decide(
-            live = frameFeatures,
-            source = frame.embeddingSource,
-            parentTemplate = parent?.faceTemplateRef?.let { FaceEmbeddingCodec.decode(it) },
-            children = children.mapNotNull { child ->
-                child.faceTemplateRef?.let { ref ->
-                    FaceEmbeddingCodec.decode(ref)?.let { template ->
-                        ChildTemplate(childId = child.id, childName = child.childName, template = template)
-                    }
+        val parentTemplate = parent?.faceTemplateRef?.let { FaceEmbeddingCodec.decode(it) }
+        val childTemplates = children.mapNotNull { child ->
+            child.faceTemplateRef?.let { ref ->
+                FaceEmbeddingCodec.decode(ref)?.let { template ->
+                    ChildTemplate(childId = child.id, childName = child.childName, template = template)
                 }
-            },
-            thresholds = thresholds,
-        ).result
+            }
+        }
+
+        val candidates = faces.map { face ->
+            IdentityDecisionEngine.decide(
+                live = face.values,
+                source = face.source,
+                parentTemplate = parentTemplate,
+                children = childTemplates,
+                thresholds = thresholds,
+            )
+        }
+        return MultiFacePolicyEngine.decide(candidates, childActionOf)
+    }
+
+    /**
+     * Single-result convenience over [evaluateAll], kept for the debug screen and any caller
+     * that only needs the final identity. Behaviour is identical to Stage 1 for one face.
+     */
+    fun evaluate(
+        frame: FrameEvent,
+        parent: ParentProfile?,
+        children: List<ChildProfile>,
+        childActionOf: (childId: Long) -> ProtectionAction? = { null },
+    ): RecognitionResult = evaluateAll(frame, parent, children, childActionOf).result
+
+    /**
+     * The per-face feature vectors for this frame.
+     *
+     * Prefers the multi-face [FrameEvent.faces] list. When it is empty — a single-face frame,
+     * or a caller that only populated [FrameEvent.features] — it falls back to that single
+     * vector, so pre-Stage-2 behaviour is preserved exactly.
+     */
+    private fun FrameEvent.faceFeatures(): List<FaceFeature> = when {
+        faces.isNotEmpty() -> faces
+        features != null && features.isNotEmpty() -> listOf(FaceFeature(features, embeddingSource))
+        else -> emptyList()
     }
 }

@@ -187,15 +187,26 @@ class FaceCaptureController(
                             .addOnSuccessListener { faces ->
                                 try {
                                     val primary = faces.firstOrNull()
-                                    val feature = primary?.let { extractEmbedding(upright, it) }
+                                    // Stage 2: embed every detected face (bounded) so the
+                                    // identity policy sees all of them, not just the first.
+                                    val faceFeatures = faces.take(MAX_ANALYZED_FACES).mapNotNull { face ->
+                                        extractEmbedding(upright, face)?.let {
+                                            FaceFeature(it.values, it.source)
+                                        }
+                                    }
                                     val liveProbability = primary?.let { runAntiSpoof(upright, it) }
                                     val frame = FrameEvent(
                                         image = input,
                                         faceCount = faces.size,
-                                        features = feature?.values,
+                                        // features/embeddingSource stay the primary face for
+                                        // enrollment guidance and liveness; `faces` carries all
+                                        // faces for the identity policy.
+                                        features = faceFeatures.firstOrNull()?.values,
                                         quality = buildQuality(faces, primary, upright),
                                         liveProbability = liveProbability,
-                                        embeddingSource = feature?.source ?: EmbeddingSource.MODEL,
+                                        embeddingSource = faceFeatures.firstOrNull()?.source
+                                            ?: EmbeddingSource.MODEL,
+                                        faces = faceFeatures,
                                     )
                                     recognizer?.publish(frame)
                                     callback?.onFaceFrame(frame)
@@ -396,5 +407,11 @@ class FaceCaptureController(
         const val ERROR_THROTTLE_MS = 3_000L
         /** Pixel step used for both luminance and gradient sampling. */
         const val SHARPNESS_STRIDE = 8
+        /**
+         * Stage 2: the maximum number of faces embedded per frame. One MobileFaceNet
+         * inference per face is not free, so a frame that somehow reports a crowd is
+         * bounded; the policy still sees up to this many faces and never depends on order.
+         */
+        const val MAX_ANALYZED_FACES = 5
     }
 }

@@ -68,6 +68,26 @@ data class FrameEvent(
      * pre-Stage-1 recognition behaviour (the tests that construct frames directly).
      */
     val embeddingSource: EmbeddingSource = EmbeddingSource.MODEL,
+    /**
+     * Stage 2: the feature vector of every detected face in the frame, each tagged with
+     * its [EmbeddingSource]. The recogniser evaluates all of them so the identity policy
+     * never depends on the order the detector returned faces in.
+     *
+     * Empty means "no per-face evidence was supplied", in which case the recogniser falls
+     * back to the single [features]/[embeddingSource] pair — this keeps single-face frames
+     * (and callers that only populate [features]) behaving exactly as before.
+     */
+    val faces: List<FaceFeature> = emptyList(),
+)
+
+/**
+ * One detected face's feature vector and its provenance, so the recogniser can decide on
+ * every face independently while still refusing to treat a non-identity-grade geometry
+ * vector as an identity.
+ */
+data class FaceFeature(
+    val values: FloatArray,
+    val source: EmbeddingSource = EmbeddingSource.MODEL,
 )
 
 /**

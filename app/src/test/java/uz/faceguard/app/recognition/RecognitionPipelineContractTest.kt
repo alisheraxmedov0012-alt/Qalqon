@@ -6,42 +6,57 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Stage 1 (Recognition Reliability): source-contract guards for the wiring that cannot
- * be exercised on the JVM (it needs the Android camera/ML Kit stack). The decision logic
- * itself is fully covered by [RecognitionDecisionTest]; these assertions pin the three
- * integration points that make that logic apply in production.
+ * Source-contract guards for the recognition wiring that cannot be exercised on the JVM
+ * (it needs the Android camera/ML Kit stack). The decision logic itself is fully covered by
+ * [RecognitionDecisionTest] and [MultiFacePolicyTest]; these assertions pin the integration
+ * points that make that logic apply in production.
+ *
+ * Stage 1 pinned the single-face wiring; Stage 2 pins the multi-face wiring (all faces are
+ * embedded and evaluated, and aggregation is centralised in `MultiFacePolicyEngine`).
  */
 class RecognitionPipelineContractTest {
 
     private val recognizer by lazy { read("core/recognition/Recognizer.kt") }
     private val controller by lazy { read("core/pipeline/FaceCaptureController.kt") }
     private val frameEvent by lazy { read("core/pipeline/FrameEvent.kt") }
+    private val engine by lazy { read("core/protection/ProtectionEngine.kt") }
 
     @Test
-    fun theRecognizerDelegatesToTheSingleDecisionEngineAndPassesTheEmbeddingSource() {
+    fun theRecognizerEvaluatesEveryFaceAndAggregatesDeterministically() {
         assertTrue(
-            "the recogniser must delegate the decision to IdentityDecisionEngine",
+            "the recogniser must decide each face via IdentityDecisionEngine",
             recognizer.contains("IdentityDecisionEngine.decide("),
         )
         assertTrue(
-            "the recogniser must pass the frame's embedding source so geometry is excluded",
-            recognizer.contains("source = frame.embeddingSource"),
+            "each face's own embedding source must be passed (geometry cannot identify)",
+            recognizer.contains("source = face.source"),
+        )
+        assertTrue(
+            "the per-face decisions must be aggregated by MultiFacePolicyEngine",
+            recognizer.contains("MultiFacePolicyEngine.decide("),
         )
     }
 
     @Test
-    fun theCaptureControllerTagsModelEmbeddingsAsModelAndFallbacksAsGeometry() {
+    fun theRecognizerFallsBackToTheSingleFeatureVectorForSingleFaceFrames() {
+        // Pre-Stage-2 frames (and callers that only set `features`) must keep working.
+        assertTrue(recognizer.contains("faces.isNotEmpty()"))
+        assertTrue(recognizer.contains("listOf(FaceFeature(features, embeddingSource))"))
+    }
+
+    @Test
+    fun theCaptureControllerEmbedsEveryFaceNotJustTheFirst() {
         assertTrue(
-            "the model embedding must be tagged MODEL",
-            controller.contains("FeatureVector(embedding, EmbeddingSource.MODEL)"),
+            "every detected face must be embedded (bounded)",
+            controller.contains("faces.take(MAX_ANALYZED_FACES)"),
         )
         assertTrue(
-            "the geometry fallback must be tagged GEOMETRY",
-            controller.contains("FeatureVector(it, EmbeddingSource.GEOMETRY)"),
+            "the frame must carry all per-face features",
+            controller.contains("faces = faceFeatures"),
         )
-        assertTrue(
-            "the frame must carry the feature source",
-            controller.contains("embeddingSource = feature?.source ?: EmbeddingSource.MODEL"),
+        assertFalse(
+            "the identity path must not be decided from faces.firstOrNull()",
+            controller.contains("features = primary?.let { extractEmbedding"),
         )
     }
 
@@ -51,14 +66,28 @@ class RecognitionPipelineContractTest {
             "FrameEvent.embeddingSource must default to MODEL",
             frameEvent.contains("val embeddingSource: EmbeddingSource = EmbeddingSource.MODEL"),
         )
+        assertTrue(
+            "FrameEvent.faces must default to an empty list",
+            frameEvent.contains("val faces: List<FaceFeature> = emptyList()"),
+        )
+    }
+
+    @Test
+    fun theEngineRoutesThroughTheMultiFaceEvaluationAndPassesTheChildActionResolver() {
+        assertTrue(
+            "the protection engine must evaluate all faces",
+            engine.contains("recognizer.evaluateAll(f, parent, children)"),
+        )
+        assertTrue(
+            "the engine must supply the per-child configured action for the foreground app",
+            engine.contains("appPolicyLookup(childId, it) }?.action"),
+        )
     }
 
     @Test
     fun noBiometricVectorIsEverLogged() {
-        // Privacy: an embedding/template *value* must never be interpolated into a log
-        // line. (A message such as "embedding inference failed" is a failure notice, not
-        // the data, and is allowed.)
-        listOf(recognizer, controller).forEach { source ->
+        // Privacy: an embedding/template *value* must never be interpolated into a log line.
+        listOf(recognizer, controller, engine).forEach { source ->
             assertFalse(
                 "a biometric value must never be logged",
                 Regex("""Log\.[dviwe]\([^)]*\$[{(]?(embedding|features|template|templateRef|plainRef)\b""")

@@ -502,3 +502,17 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   declaration, target audience/content rating, subscription config, store assets,
   reviewer access. JVM total 1891 -> 1900. Everything Stage 2-7 preserved.
 
+
+- Stage 8 REMEDIATION (submission-readiness completion; NOT a new stage). Added the
+  full Play Console/docs pack under `docs/STAGE8_*.md` (privacy policy text + hosting
+  requirements, account deletion, accessibility declaration, usage-access, overlay,
+  FGS, data-safety answer sheet, child/family compliance, subscription Play Console
+  setup + test plan, store listing draft, store assets plan, reviewer access, Play
+  Console master checklist + action pack, hosting requirements). Strengthened
+  `compliance/PlayComplianceContractTest` (now also pins: billing wired / no
+  location / no QUERY_ALL_PACKAGES, FGS types + specialUse subtype, no biometric
+  VALUE logged, account reset deletes key+session+settings, BIND_ACCESSIBILITY_SERVICE
+  guard). No production-code change (target API 36 and the accessibility
+  disclosure/consent already shipped in the Stage 8 code commit). HOSTING/Play Console
+  remain `MANUAL ACTION REQUIRED`; no fake URL/status was invented.
+

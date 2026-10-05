@@ -127,10 +127,66 @@ class PlayComplianceContractTest {
     }
 
     @Test
+    fun billingIsDeclaredButNoLocationOrQueryAllPackagesIs() {
+        // The Billing library (subscription) is used, but no broad/location permissions.
+        assertTrue("billing must be wired", appGradle.contains("libs.billing"))
+        assertFalse("QUERY_ALL_PACKAGES must not be declared", manifest.contains("QUERY_ALL_PACKAGES"))
+        assertFalse("no location permission", manifest.contains("ACCESS_FINE_LOCATION") || manifest.contains("ACCESS_COARSE_LOCATION"))
+    }
+
+    @Test
+    fun theForegroundServiceDeclaresItsTypesAndSubtype() {
+        // Play FGS review needs the declared types + a specialUse subtype justification.
+        assertTrue(manifest.contains("foregroundServiceType=\"camera|specialUse\""))
+        assertTrue(manifest.contains("PROPERTY_SPECIAL_USE_FGS_SUBTYPE"))
+        assertTrue(manifest.contains("FOREGROUND_SERVICE_SPECIAL_USE"))
+        assertTrue(manifest.contains("FOREGROUND_SERVICE_CAMERA"))
+    }
+
+    @Test
+    fun biometricValuesAreNeverLogged() {
+        // No log call may interpolate a biometric value (the template/embedding/features
+        // variables). A message such as "embedding inference failed" is a failure notice,
+        // not the data; only interpolated *values* are a privacy violation.
+        val main = File(repoRoot(), "app/src/main/java/uz/faceguard/app")
+        val offending = main.walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .flatMap { file ->
+                file.readLines().withIndex()
+                    .filter { (_, line) ->
+                        line.contains("Log.") &&
+                            Regex("""\$\{?(template|embedding|features|faceTemplateRef|plainRef)\b""")
+                                .containsMatchIn(line)
+                    }
+                    .map { (i, _) -> "${file.name}:${i + 1}" }
+            }
+            .toList()
+        assertTrue("no biometric value may be logged: $offending", offending.isEmpty())
+    }
+
+    @Test
     fun aPrivacyScreenExists() {
         assertTrue(
             "an in-app privacy screen must exist",
             File(repoRoot(), "app/src/main/java/uz/faceguard/app/feature/privacy/PrivacyScreen.kt").isFile,
+        )
+    }
+
+    @Test
+    fun theAccountResetDeletesAllDataAndTheBiometricKey() {
+        // Account deletion must delete all data and the Keystore key (Play requirement).
+        val reset = read("app/src/main/java/uz/faceguard/app/data/repository/ResetRepositoryImpl.kt")
+        assertTrue("reset must delete the biometric key", reset.contains("keyProvider.deleteKey()"))
+        assertTrue("reset must clear the session", reset.contains("sessionManager.clearSession()"))
+        assertTrue("reset must clear settings", reset.contains("settingsStore.clearAll()"))
+    }
+
+    @Test
+    fun theAccessibilityServiceIsNotExportedAsAGenericBoundService() {
+        // The service must require BIND_ACCESSIBILITY_SERVICE (system-only caller).
+        assertTrue(
+            "the accessibility service must be guarded by BIND_ACCESSIBILITY_SERVICE",
+            manifest.contains("BIND_ACCESSIBILITY_SERVICE"),
         )
     }
 

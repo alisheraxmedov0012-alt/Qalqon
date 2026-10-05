@@ -5,7 +5,6 @@ import uz.faceguard.app.core.embed.FaceEmbeddingCodec
 import uz.faceguard.app.core.pipeline.FrameEvent
 import uz.faceguard.app.domain.model.ChildProfile
 import uz.faceguard.app.domain.model.ParentProfile
-import uz.faceguard.app.domain.similarity.CosineSimilarity
 
 /**
  * Cosine-similarity acceptance thresholds on L2-normalized embeddings.
@@ -30,11 +29,14 @@ sealed class RecognitionResult {
 /**
  * Matches a live frame against persisted on-device templates.
  *
- * Templates are the face vectors produced during enrollment (TFLite
- * MobileFaceNet embeddings when available, otherwise geometry fallback) and
- * stored in `ParentProfile.faceTemplateRef` / `ChildProfile.faceTemplateRef`.
- * The parent template is evaluated first so the parent identity can never be
- * misreported as a child.
+ * Templates are the face vectors produced during enrollment (TFLite MobileFaceNet
+ * embeddings when available, otherwise geometry fallback) and stored in
+ * `ParentProfile.faceTemplateRef` / `ChildProfile.faceTemplateRef`.
+ *
+ * Stage 1: the decision itself lives in the pure, order-independent
+ * [IdentityDecisionEngine] (documented there), so the recogniser is a thin adapter
+ * that only decodes stored templates and delegates. Identity is accepted only from a
+ * real model embedding whose dimension matches the stored template.
  */
 class Recognizer(
     private var thresholds: Thresholds = Thresholds(),
@@ -50,42 +52,18 @@ class Recognizer(
         val frameFeatures = frame.features ?: return RecognitionResult.NoFace
         if (frameFeatures.isEmpty()) return RecognitionResult.NoFace
 
-        parent?.faceTemplateRef?.let { ref ->
-            FaceEmbeddingCodec.decode(ref)?.let { template ->
-                val score = cosine(frameFeatures, template)
-                if (score >= thresholds.parent) return RecognitionResult.ParentRecognized(score)
-            }
-        }
-
-        var bestChild: Pair<ChildProfile, Double>? = null
-        for (child in children) {
-            val ref = child.faceTemplateRef ?: continue
-            val template = FaceEmbeddingCodec.decode(ref) ?: continue
-            val score = cosine(frameFeatures, template)
-            if (score >= thresholds.child && (bestChild == null || score > bestChild!!.second)) {
-                bestChild = child to score
-            }
-        }
-        if (bestChild != null) {
-            return RecognitionResult.ChildRecognized(bestChild!!.first.id, bestChild!!.first.childName, bestChild!!.second)
-        }
-
-        return RecognitionResult.Unknown(bestScore(frameFeatures, parent, children))
+        return IdentityDecisionEngine.decide(
+            live = frameFeatures,
+            source = frame.embeddingSource,
+            parentTemplate = parent?.faceTemplateRef?.let { FaceEmbeddingCodec.decode(it) },
+            children = children.mapNotNull { child ->
+                child.faceTemplateRef?.let { ref ->
+                    FaceEmbeddingCodec.decode(ref)?.let { template ->
+                        ChildTemplate(childId = child.id, childName = child.childName, template = template)
+                    }
+                }
+            },
+            thresholds = thresholds,
+        ).result
     }
-
-    private fun bestScore(frameFeatures: FloatArray, parent: ParentProfile?, children: List<ChildProfile>): Double {
-        var best = 0.0
-        parent?.faceTemplateRef?.let { ref ->
-            FaceEmbeddingCodec.decode(ref)?.let { best = maxOf(best, cosine(frameFeatures, it)) }
-        }
-        children.forEach { child ->
-            child.faceTemplateRef?.let { ref ->
-                FaceEmbeddingCodec.decode(ref)?.let { best = maxOf(best, cosine(frameFeatures, it)) }
-            }
-        }
-        return best
-    }
-
-    /** Delegates to the single shared implementation; identical maths. */
-    private fun cosine(a: FloatArray, b: FloatArray): Double = CosineSimilarity.of(a, b)
 }

@@ -58,4 +58,23 @@ data class FrameEvent(
      */
     val liveProbability: Float? = null,
     val timestamp: Long = System.currentTimeMillis(),
+    /**
+     * Where [features] came from.
+     *
+     * Stage 1: only a real model embedding may authorise a Parent/Child identity.
+     * The 19-d geometry fallback is a detection/quality signal, not identity-grade,
+     * so [EmbeddingSource.GEOMETRY] frames are never matched for identity. Defaults to
+     * [EmbeddingSource.MODEL] so a frame built without an explicit source keeps the
+     * pre-Stage-1 recognition behaviour (the tests that construct frames directly).
+     */
+    val embeddingSource: EmbeddingSource = EmbeddingSource.MODEL,
 )
+
+/**
+ * Provenance of a frame's [FrameEvent.features].
+ *
+ * - [MODEL] — a real on-device face embedding (TFLite MobileFaceNet). Identity-grade.
+ * - [GEOMETRY] — the 19-d geometry fallback (pose/size/landmarks). NOT identity-grade;
+ *   it must never be used to accept a Parent or Child identity.
+ */
+enum class EmbeddingSource { MODEL, GEOMETRY }

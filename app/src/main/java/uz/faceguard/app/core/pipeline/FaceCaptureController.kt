@@ -187,14 +187,15 @@ class FaceCaptureController(
                             .addOnSuccessListener { faces ->
                                 try {
                                     val primary = faces.firstOrNull()
-                                    val features = primary?.let { extractEmbedding(upright, it) }
+                                    val feature = primary?.let { extractEmbedding(upright, it) }
                                     val liveProbability = primary?.let { runAntiSpoof(upright, it) }
                                     val frame = FrameEvent(
                                         image = input,
                                         faceCount = faces.size,
-                                        features = features,
+                                        features = feature?.values,
                                         quality = buildQuality(faces, primary, upright),
                                         liveProbability = liveProbability,
+                                        embeddingSource = feature?.source ?: EmbeddingSource.MODEL,
                                     )
                                     recognizer?.publish(frame)
                                     callback?.onFaceFrame(frame)
@@ -211,21 +212,36 @@ class FaceCaptureController(
                 }
             }
 
-    /** TFLite embedding when ready; geometry vector as the offline fallback. */
-    private fun extractEmbedding(bitmap: Bitmap, face: Face): FloatArray? {
+    /**
+     * A frame's feature vector together with where it came from, so the recogniser can
+     * refuse to treat a non-identity-grade geometry vector as an identity.
+     */
+    private data class FeatureVector(val values: FloatArray, val source: EmbeddingSource)
+
+    /**
+     * TFLite embedding when ready; geometry vector as the offline fallback.
+     *
+     * Stage 1: the returned vector is tagged with its [EmbeddingSource] — a real model
+     * embedding is identity-grade, the geometry fallback is not.
+     */
+    private fun extractEmbedding(bitmap: Bitmap, face: Face): FeatureVector? {
         try {
             val model = embeddingModel
             if (model != null && model.isReady()) {
                 val crop = FaceImageUtils.cropFace(bitmap, face.boundingBox)
                 if (crop != null) {
                     val embedding = model.embed(crop)
-                    if (embedding != null && embedding.isNotEmpty()) return embedding
+                    if (embedding != null && embedding.isNotEmpty()) {
+                        return FeatureVector(embedding, EmbeddingSource.MODEL)
+                    }
                 }
             }
         } catch (t: Throwable) {
             reportError(t)
         }
-        return runCatching { FaceFeatureExtractor.extract(face, bitmap.width, bitmap.height) }.getOrNull()
+        return runCatching { FaceFeatureExtractor.extract(face, bitmap.width, bitmap.height) }
+            .getOrNull()
+            ?.let { FeatureVector(it, EmbeddingSource.GEOMETRY) }
     }
 
     /**

@@ -516,3 +516,15 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   disclosure/consent already shipped in the Stage 8 code commit). HOSTING/Play Console
   remain `MANUAL ACTION REQUIRED`; no fake URL/status was invented.
 
+
+- Stage 10 (Real Device QA & 72-Hour Soak) — **BLOCKED, not executed**: no physical
+  Android device and no emulator in the container (`adb devices` empty, `/dev/bus/usb`
+  absent, `/dev/kvm` absent, emulator package not installed). Per the no-fake-pass policy,
+  no real-device or soak result is reported as PASS. Deliverables:
+  `docs/STAGE10_REAL_DEVICE_QA_72H_SOAK.md` (executable runbook + full test matrix, every
+  real-device row BLOCKED with the exact reason, unblock criteria, soak heartbeat method)
+  and `docs/STAGE10_DEVICE_FAILURE_LOG.md` (verified environment block + failure/heartbeat
+  templates). Verified installable artifact: `app-debug.apk` package `uz.faceguard.app`,
+  targetSdk 36, SHA-256 `76b19e62…`. No code change (no device -> no device bug -> no fix).
+  JVM suite re-verified 1917 / 0 / 0 / 0; debug APK builds; CI green.
+

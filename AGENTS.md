@@ -528,3 +528,15 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   targetSdk 36, SHA-256 `76b19e62…`. No code change (no device -> no device bug -> no fix).
   JVM suite re-verified 1917 / 0 / 0 / 0; debug APK builds; CI green.
 
+
+- Stage 10 continuation (2026-10-05): physical-device gate re-verified at HEAD
+  `e995abed…` — STILL BLOCKED (0 devices; `adb devices` empty, `adb get-state` fails,
+  `/dev/bus/usb` and `/dev/kvm` absent, 0 virt flags, no emulator/AVD, local `adb connect`
+  refused). No fake pass. Added a turnkey QA harness `tools/device-qa/device_qa.sh`
+  (read-mostly adb wrapper: gate/inventory/state/install/launch/stop/reboot/logcat/
+  crash-scan/mem/battery/heartbeat; syntax-checked with `bash -n`; `gate` verified to fail
+  cleanly with no device; never collects secrets/biometrics) and
+  `docs/STAGE10_DEVICE_EVIDENCE.md` (fresh gate evidence + harness usage + evidence
+  rules). Updated `STAGE10_REAL_DEVICE_QA_72H_SOAK.md` and `STAGE10_DEVICE_FAILURE_LOG.md`
+  with the fresh verification. No Kotlin/product change.
+

@@ -15,21 +15,27 @@
 |---|---|
 | Date | 2026-10-05 |
 | Environment | OpenHands dev container (ephemeral) |
+| Baseline HEAD | `e995abed91baead0388f464a1a0ad238e6115bc5` |
 | Physical device | **NONE** |
 | Emulator | **NONE** (emulator package not installed; no AVD) |
 | `adb devices -l` | empty (`List of devices attached`) |
+| `adb get-state` | `error: no devices/emulators found` |
+| `adb connect 127.0.0.1:5555` | `Connection refused` |
 | `/dev/bus/usb` | absent (no USB access) |
+| `/sys/bus/usb/devices` | empty |
 | `/dev/kvm` | absent (no hardware acceleration) |
 | CPU virtualization flags | 0 (`vmx`/`svm`) |
 | Consequence | All real-device QA + 24/48/72h soak = **BLOCKED** |
 
 ### Unblock criteria
 1. Attach a physical Android device (API 33–36) with USB debugging; confirm
-   `adb devices` shows it as `device`.
+   `adb devices` shows it as `device` (the harness `gate` command enforces this).
 2. (For multi-OEM) attach a second device on a different OEM.
 3. Provide a previous-version APK for the upgrade test.
 4. Provide a Play Console app + `qalqon_premium` + license tester for real billing.
 5. Allocate 72 h wall-clock for the final soak.
+6. Run `tools/device-qa/device_qa.sh` (see `STAGE10_DEVICE_EVIDENCE.md` §6) to capture
+   consistent evidence.
 
 ---
 

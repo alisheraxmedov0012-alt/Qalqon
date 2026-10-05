@@ -7,6 +7,11 @@
 > No real-device result is reported as PASS, because none was executed. This document is
 > the executable runbook + evidence template for when a device is available, plus the
 > exact environment evidence that establishes the block.
+>
+> **Continuation (2026-10-05):** the physical-device gate was re-verified on the Stage 10
+> continuation at HEAD `e995abed…` and is **still BLOCKED** (0 devices). See
+> `STAGE10_DEVICE_EVIDENCE.md` for the fresh evidence and
+> `tools/device-qa/device_qa.sh` for the ready-to-run evidence harness.
 
 ---
 
@@ -39,7 +44,6 @@ validation (an emulator is explicitly not a substitute), every real-device test 
 `BLOCKED`. Multi-OEM coverage is therefore impossible: **0 devices**, not "verified".
 
 ## 3. What a realistic device QA run needs (unblock criteria)
-
 To execute this stage, the reviewer/device lab must provide at least:
 - One **physical Android phone** (API 33–36), USB-debugging enabled, connected via ADB.
 - A second device on a **different OEM** to claim any multi-OEM result (e.g. Pixel +

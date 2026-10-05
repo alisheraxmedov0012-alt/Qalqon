@@ -58,7 +58,15 @@ class TemporalLivenessDetector(
 
         val modelScores = faceFrames.mapNotNull { it.modelScore }
         if (modelScores.size >= modelMinFrames) {
-            val mean = modelScores.average().toFloat().coerceIn(0f, 1f)
+            val rawMean = modelScores.average().toFloat()
+            // A model must never *authorise* liveness from a malformed output. A non-finite
+            // mean (NaN from a NaN score, or +/-Infinity from an out-of-range score) is a
+            // model failure: it can be neither LIVE nor SPOOF, so it is undecided. This is
+            // the one place an out-of-range high score could otherwise clamp to 1.0 -> LIVE.
+            if (!rawMean.isFinite()) {
+                return LivenessResult(LivenessState.UNSTABLE, null, timestamp, LivenessSource.MODEL)
+            }
+            val mean = rawMean.coerceIn(0f, 1f)
             return when {
                 mean <= modelSpoofThreshold ->
                     LivenessResult(LivenessState.SPOOF, (1f - mean).coerceIn(0f, 1f), timestamp, LivenessSource.MODEL)

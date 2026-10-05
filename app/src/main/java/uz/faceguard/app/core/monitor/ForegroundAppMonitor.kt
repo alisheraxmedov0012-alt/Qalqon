@@ -1,13 +1,10 @@
 package uz.faceguard.app.core.monitor
 
-import android.app.AppOpsManager
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-
-import android.os.Process
 import android.provider.Settings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +14,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import uz.faceguard.app.core.usage.AndroidUsageAccess
 
 /**
  * Polling foreground monitor. Best-practical MVP: uses UsageStats events
@@ -40,15 +38,12 @@ class ForegroundAppMonitor(private val context: Context) : ForegroundAppSource {
     @Volatile
     private var accessibilityActive = false
 
-    fun hasUsageAccess(): Boolean {
-        val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-        val mode = appOps.checkOpNoThrow(
-            AppOpsManager.OPSTR_GET_USAGE_STATS,
-            Process.myUid(),
-            context.packageName,
-        )
-        return mode == AppOpsManager.MODE_ALLOWED
-    }
+    /**
+     * Whether Usage Access is held. Delegates to the single source of truth
+     * ([AndroidUsageAccess]) so the foreground monitor and the capability/UI checks can
+     * never disagree, and so the modern app-op API is used consistently.
+     */
+    fun hasUsageAccess(): Boolean = AndroidUsageAccess.isGranted(context)
 
     fun usageAccessIntent(): Intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
 

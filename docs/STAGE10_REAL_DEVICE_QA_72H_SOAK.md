@@ -12,6 +12,11 @@
 > continuation at HEAD `e995abed…` and is **still BLOCKED** (0 devices). See
 > `STAGE10_DEVICE_EVIDENCE.md` for the fresh evidence and
 > `tools/device-qa/device_qa.sh` for the ready-to-run evidence harness.
+>
+> **Special-permission/OEM fix (2026-10-05):** a Redmi Note 14 blocker (Usage Access /
+> Overlay / Accessibility never turning "Tayyor") was analysed and fixed generically, with
+> JVM regression tests; **device verification is still BLOCKED** (no device). See
+> `STAGE10_SPECIAL_PERMISSION_OEM_COMPATIBILITY.md`.
 
 ---
 

@@ -19,6 +19,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -35,6 +36,8 @@ import uz.faceguard.app.core.liveness.LivenessResult
 import uz.faceguard.app.core.security.SecurityState
 import uz.faceguard.app.core.security.SecurityStateHolder
 import uz.faceguard.app.core.monitor.ForegroundAppMonitor
+import uz.faceguard.app.core.permission.AndroidProtectionCapabilitySource
+import uz.faceguard.app.core.permission.ProtectionCapabilitySource
 import uz.faceguard.app.core.recognition.Recognizer
 import uz.faceguard.app.core.scan.ScanScheduler
 import uz.faceguard.app.core.screentime.ScreenTimeUsageCollectionRunner
@@ -267,6 +270,13 @@ class ProtectionRuntime @Inject constructor(
     )
     private val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val scheduler = ScanScheduler(context)
+    /**
+     * The three special-access reads, behind one seam so they are consistent (Usage
+     * Access uses a single source of truth) and refreshable after returning from system
+     * settings. Android state on some OEMs updates a moment *after* the activity
+     * resumes, so [refreshPermissions] re-probes a bounded number of times.
+     */
+    private val capabilities: ProtectionCapabilitySource = AndroidProtectionCapabilitySource(context)
     private val engine = ProtectionEngine(
         recognizer = recognizer,
         monitor = monitor,
@@ -275,6 +285,9 @@ class ProtectionRuntime @Inject constructor(
     ).also { it.attachScheduler(scheduler) }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    /** The bounded post-resume capability re-probe; replaced (cancelled) on each resume. */
+    private var capabilityReprobeJob: Job? = null
 
     private val _state = MutableStateFlow(ProtectionRuntimeState())
     val state: StateFlow<ProtectionRuntimeState> = _state
@@ -774,15 +787,42 @@ class ProtectionRuntime @Inject constructor(
         // crossing midnight and returning to the screen) starts/stops enforcement without any
         // new timer. Collectors are only re-created, never started anywhere else.
         refreshChildUsage()
+        applyCapabilitySnapshot()
+        // Some OEMs update the app-op / accessibility setting a fraction of a second
+        // *after* the activity resumes, so a single immediate probe can read stale state
+        // and leave the requirement stuck on "grant". Re-probe a bounded number of times
+        // until everything is granted (or the attempts run out) — generic, no OEM
+        // hardcoding, and no false "ready": each probe reads the real system state.
+        scheduleCapabilityReprobe()
+    }
+
+    /** Reads the three special-access capabilities and publishes them. */
+    private fun applyCapabilitySnapshot() {
+        val caps = capabilities.read()
         _state.update {
             it.copy(
-                overlayGranted = overlay.hasPermission(),
-                usageAccessGranted = monitor.hasUsageAccess(),
-                accessibilityEnabled = AccessibilityCapability.isEnabled(context),
+                overlayGranted = caps.overlayGranted,
+                usageAccessGranted = caps.usageAccessGranted,
+                accessibilityEnabled = caps.accessibilityEnabled,
                 cameraGranted = hasCameraPermission(),
                 notificationsEnabled = runCatching { notificationDispatcher.areNotificationsEnabled() }.getOrDefault(true),
                 securityState = securityStateHolder.state.value,
             )
+        }
+    }
+
+    /**
+     * Bounded post-resume re-probe. Cancels any previous re-probe so rapid open/close of
+     * settings cannot stack coroutines. Stops early once all three capabilities are held.
+     */
+    private fun scheduleCapabilityReprobe() {
+        capabilityReprobeJob?.cancel()
+        capabilityReprobeJob = scope.launch {
+            repeat(CAPABILITY_REPROBE_ATTEMPTS) {
+                delay(CAPABILITY_REPROBE_INTERVAL_MS)
+                applyCapabilitySnapshot()
+                if (capabilities.read().allGranted) return@launch
+            }
         }
     }
 
@@ -938,5 +978,14 @@ class ProtectionRuntime @Inject constructor(
 
     private companion object {
         const val TAG = "ProtectionRuntime"
+
+        /**
+         * Post-resume capability re-probe: a bounded number of attempts (≈2s total) so an
+         * OEM that updates the app-op / accessibility secure setting slightly after
+         * resume is still caught without a restart, and without ever reporting a false
+         * "ready" (each attempt reads real system state).
+         */
+        const val CAPABILITY_REPROBE_ATTEMPTS = 3
+        const val CAPABILITY_REPROBE_INTERVAL_MS = 700L
     }
 }

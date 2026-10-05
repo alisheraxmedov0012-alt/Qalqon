@@ -92,6 +92,7 @@ import kotlinx.coroutines.launch
 import java.time.ZoneId
 import uz.faceguard.app.R
 import uz.faceguard.app.core.debug.DebugFlags
+import uz.faceguard.app.core.permission.openSettingsOrFallback
 import uz.faceguard.app.core.protection.ProtectionRuntime
 import uz.faceguard.app.core.protection.ProtectionRuntimeState
 import uz.faceguard.app.core.theme.QalqonDimens
@@ -443,9 +444,9 @@ fun HomeScreen(
                         ),
                         degradedCapabilities = protectionState.degradedCapabilities,
                         onFixCapability = { capability ->
-                            context.startActivity(viewModel.capabilitySettingsIntent(capability))
+                            context.openSettingsOrFallback(viewModel.capabilitySettingsIntent(capability))
                         },
-                        onEnableNotifications = { context.startActivity(notificationSettingsIntent(context)) },
+                        onEnableNotifications = { context.openSettingsOrFallback(notificationSettingsIntent(context)) },
                         onOpenRequests = onOpenRequests,
                         onOpenChildren = onOpenChildren,
                     )

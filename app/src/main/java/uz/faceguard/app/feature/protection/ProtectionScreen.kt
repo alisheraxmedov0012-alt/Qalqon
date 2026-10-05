@@ -57,6 +57,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import uz.faceguard.app.R
+import uz.faceguard.app.core.permission.openSettingsOrFallback
 import uz.faceguard.app.core.protection.ProtectionRuntime
 import uz.faceguard.app.core.protection.ProtectionRuntimeState
 import uz.faceguard.app.core.protection.ProtectionState
@@ -193,7 +194,7 @@ fun ProtectionScreen(
             ProtectionDegradedBanner(
                 missing = state.degradedCapabilities,
                 onFix = { capability ->
-                    context.startActivity(viewModel.capabilitySettingsIntent(capability))
+                    context.openSettingsOrFallback(viewModel.capabilitySettingsIntent(capability))
                 },
                 cameraLimitedAfterBoot = state.cameraLimitedAfterBoot,
             )
@@ -206,8 +207,8 @@ fun ProtectionScreen(
                 // reflected even before the permission dialog's callback lands.
                 cameraGranted = state.cameraGranted,
                 onGrantCamera = { cameraPermission.launchPermissionRequest() },
-                onGrantUsage = { context.startActivity(viewModel.usageAccessIntent()) },
-                onGrantOverlay = { context.startActivity(viewModel.overlayPermissionIntent()) },
+                onGrantUsage = { context.openSettingsOrFallback(viewModel.usageAccessIntent()) },
+                onGrantOverlay = { context.openSettingsOrFallback(viewModel.overlayPermissionIntent()) },
                 onOpenAccessibility = { showAccessibilityDisclosure = true },
                 onOpenParentProfile = onOpenParentProfile,
                 onOpenProtectedApps = onOpenProtectedApps,
@@ -273,7 +274,7 @@ fun ProtectionScreen(
             confirmButton = {
                 TextButton(onClick = {
                     showAccessibilityDisclosure = false
-                    context.startActivity(viewModel.accessibilitySettingsIntent())
+                    context.openSettingsOrFallback(viewModel.accessibilitySettingsIntent())
                 }) {
                     Text(stringResource(R.string.accessibility_disclosure_agree))
                 }

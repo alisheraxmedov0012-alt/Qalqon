@@ -540,3 +540,22 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   rules). Updated `STAGE10_REAL_DEVICE_QA_72H_SOAK.md` and `STAGE10_DEVICE_FAILURE_LOG.md`
   with the fresh verification. No Kotlin/product change.
 
+
+- Stage 10 special-permission/OEM compatibility fix (Redmi Note 14 blocker: Usage
+  Access, draw-over-other-apps and accessibility never turned "Tayyor"). Generic,
+  OEM-independent fixes: (1) settings deep-links now go through
+  `core/permission/ProtectionCapabilities.kt`'s failure-safe
+  `Context.openSettingsOrFallback` (resolveActivity + try/catch + app-details fallback),
+  so a page with no handler can never crash/dead-end; (2) `AndroidUsageAccess` uses the
+  non-deprecated `unsafeCheckOpNoThrow` on API 29+ and `ForegroundAppMonitor.hasUsageAccess`
+  now delegates to it (single source of truth); (3) accessibility enabled-state matches
+  Qalqon's own component via `ComponentName(service.packageName, service.name)`;
+  (4) `ProtectionRuntime` reads the three capabilities through a `ProtectionCapabilitySource`
+  seam and does a **bounded post-resume re-probe** (3 × 700ms, stops early) so an OEM
+  app-op/secure-setting update that lands just after resume is caught without a restart —
+  and never reports a false Ready. No Xiaomi hardcoding; no legacy rename; no
+  DB/subscription/network change. New `permission/SpecialPermissionCompatibilityTest`
+  (+10). JVM 1917 -> 1927, 0/0/0; lint + assembleDebug pass. **Device re-test BLOCKED**
+  (no physical device / adb in the container). Docs:
+  `docs/STAGE10_SPECIAL_PERMISSION_OEM_COMPATIBILITY.md`.
+

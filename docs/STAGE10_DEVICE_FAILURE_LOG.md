@@ -4,6 +4,10 @@
 > tests with the exact reason and unblock criteria, and (b) the **template** for
 > real-device failures to be filled when a device is available.
 >
+> **Special-permission/OEM blocker (Redmi Note 14):** analysed and fixed generically with
+> JVM regression tests; device verification is BLOCKED (no device). See
+> `STAGE10_SPECIAL_PERMISSION_OEM_COMPATIBILITY.md`.
+>
 > No fabricated entries: there are no observed device failures because no device run
 > occurred. Only the verified environment block is recorded.
 

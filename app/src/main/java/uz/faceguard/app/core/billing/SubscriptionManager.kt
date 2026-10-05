@@ -153,7 +153,11 @@ class SubscriptionManager @Inject constructor(
             }
 
         store.save(id, ent)
-        publish(ent)
+        // Publish only if this result still belongs to the signed-in account. A refresh
+        // that was in flight when the user switched (or signed out) must persist to that
+        // account's own cache but must never surface its entitlement in the new session
+        // (cross-account entitlement leak, INVARIANT 6).
+        if (id == accountId) publish(ent)
         return RefreshOutcome.Verified(ent)
     }
 

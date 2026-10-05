@@ -36,8 +36,8 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   - write gitignored `local.properties` with `sdk.dir=$HOME/Android/Sdk`
 - Build env for every command: `HOME=/home/openhands`, `ANDROID_HOME=$HOME/Android/Sdk`,
   `JAVA_HOME=$JAVA_HOME` (JDK 17), `PATH=$JAVA_HOME/bin:$PATH`.
-  AGP 8.7.2 / Kotlin 2.3.21 / KSP 2.3.6 / Hilt 2.58 / Room 2.7.2 /
-  Compose BOM 2024.12.01 / Gradle 9.7.1 / SDK 35, min SDK 26, Java+Kotlin target 17.
+  AGP 8.13.2 / Kotlin 2.3.21 / KSP 2.3.6 / Hilt 2.58 / Room 2.7.2 /
+  Compose BOM 2024.12.01 / Gradle 9.5.1 / SDK 36, min SDK 26, Java+Kotlin target 17.
   CI pins JDK 17 (temurin); JDK 21 also compiles but is not the target.
 - `gradlew` IS executable now (mode 100755, commit `build: mark gradlew executable`).
   Run `./gradlew <task>` directly; CI's `chmod +x` is a harmless no-op.
@@ -485,4 +485,20 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   purchase/renewal/refund/restore = NOT TESTED (mock-verified lifecycle only). New tests:
   `billing/*` (33). `testOptions.unitTests.isReturnDefaultValues = true` added so the
   deferred-ack `Log.w` path does not throw in JVM tests. JVM total 1858 -> 1891.
+
+
+- Stage 8 (Google Play compliance) deliverable:
+  `docs/STAGE8_GOOGLE_PLAY_COMPLIANCE_AUDIT.md` +
+  `docs/STAGE8_PLAY_CONSOLE_ACTION_ITEMS.md`. Code fixes: (1) target API 36
+  migration — AGP 8.7.2 -> 8.13.2, Gradle wrapper 9.7.1 -> 9.5.1 (AGP 8.x is
+  incompatible with Gradle >= 9.6, which removed `InternalProblems`), compileSdk/
+  targetSdk 35 -> 36; (2) AccessibilityService in-app disclosure + affirmative
+  consent before enabling the service (Play User Data policy requires it for
+  non-accessibility-tool apps); strings x3 locales. `isAccessibilityTool` stays
+  unset (QALQON is not a disability tool). New JVM test
+  `compliance/PlayComplianceContractTest`. BLOCKERS requiring Play Console / web
+  hosting (NOT VERIFIED, cannot be done from the repo): external web account-deletion
+  resource (P0) and hosted privacy-policy URL (P1); plus Data safety, accessibility
+  declaration, target audience/content rating, subscription config, store assets,
+  reviewer access. JVM total 1891 -> 1900. Everything Stage 2-7 preserved.
 

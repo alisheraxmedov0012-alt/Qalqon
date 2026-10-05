@@ -2,6 +2,12 @@
 <resources>
     <string name="app_name">Qalqon</string>
     <string name="accessibility_service_description">Qalqon отслеживает защищённые приложения и применяет родительские правила.</string>
+    <!-- Stage 8: Google Play User Data policy requires a clear in-app disclosure and
+         affirmative consent before enabling the AccessibilityService API. -->
+    <string name="accessibility_disclosure_title">Служба фонового мониторинга приложений</string>
+    <string name="accessibility_disclosure_body">Qalqon использует службу спец. возможностей, чтобы определять, когда открыто защищённое приложение. Служба узнаёт только имя пакета приложения на экране; текст экрана, пароли и уведомления никогда не читаются. Эти данные используются только на этом устройстве для родительского контроля и никуда не отправляются.</string>
+    <string name="accessibility_disclosure_agree">Согласен — открыть настройки</string>
+    <string name="accessibility_disclosure_decline">Отмена</string>
     <string name="protection_req_accessibility">Служба фонового мониторинга приложений</string>
     <string name="splash_tagline">Защита детей по распознаванию лица</string>
     <string name="welcome_title">Добро пожаловать в Qalqon</string>

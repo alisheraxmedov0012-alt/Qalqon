@@ -55,12 +55,12 @@ val resolvedVersionName = (project.findProperty("qalqonVersionName") as String?)
 
 android {
     namespace = "uz.faceguard.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "uz.faceguard.app"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = resolvedVersionCode
         versionName = resolvedVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

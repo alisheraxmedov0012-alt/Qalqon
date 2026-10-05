@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -22,6 +23,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -141,6 +143,10 @@ fun ProtectionScreen(
     var showTech by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
     var pinError by remember { mutableStateOf(false) }
+    // Google Play User Data policy: a non-accessibility-tool app that uses the
+    // AccessibilityService API must show a clear in-app disclosure and obtain
+    // affirmative consent before the user is sent to enable the service.
+    var showAccessibilityDisclosure by remember { mutableStateOf(false) }
     val lockoutRemainingMs by viewModel.lockoutRemainingMs.collectAsStateWithLifecycle()
 
     // Phase 7.1: the screen no longer owns the camera. The process-scoped camera
@@ -202,7 +208,7 @@ fun ProtectionScreen(
                 onGrantCamera = { cameraPermission.launchPermissionRequest() },
                 onGrantUsage = { context.startActivity(viewModel.usageAccessIntent()) },
                 onGrantOverlay = { context.startActivity(viewModel.overlayPermissionIntent()) },
-                onOpenAccessibility = { context.startActivity(viewModel.accessibilitySettingsIntent()) },
+                onOpenAccessibility = { showAccessibilityDisclosure = true },
                 onOpenParentProfile = onOpenParentProfile,
                 onOpenProtectedApps = onOpenProtectedApps,
             )
@@ -254,6 +260,30 @@ fun ProtectionScreen(
                 onToggle = { showTech = !showTech },
             )
         }
+    }
+
+    // Google Play User Data policy (Accessibility API): clear in-app disclosure +
+    // affirmative consent before enabling the service. The disclosure states what the
+    // service does and which data it accesses; consent is the explicit confirm action.
+    if (showAccessibilityDisclosure) {
+        AlertDialog(
+            onDismissRequest = { showAccessibilityDisclosure = false },
+            title = { Text(stringResource(R.string.accessibility_disclosure_title)) },
+            text = { Text(stringResource(R.string.accessibility_disclosure_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showAccessibilityDisclosure = false
+                    context.startActivity(viewModel.accessibilitySettingsIntent())
+                }) {
+                    Text(stringResource(R.string.accessibility_disclosure_agree))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAccessibilityDisclosure = false }) {
+                    Text(stringResource(R.string.accessibility_disclosure_decline))
+                }
+            },
+        )
     }
 }
 

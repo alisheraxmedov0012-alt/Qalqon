@@ -559,3 +559,26 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   (no physical device / adb in the container). Docs:
   `docs/STAGE10_SPECIAL_PERMISSION_OEM_COMPATIBILITY.md`.
 
+
+- Stage 4 (Protection Enforcement, roadmap 4/12) — enforcement self-heal. Audit
+  found the block was applied once at the transition and never re-asserted while
+  it held, so a blocking overlay lost without a state change (accessibility
+  service reconnect → new window owner, transient WindowManager detach, or
+  out-of-band removal) left the child in front of an "enforced" app with nothing
+  blocking it. Fix (additive): `ProtectionActionExecutor.reassert(action)` (default
+  no-op) re-shows the overlay for SOFT_BLOCK/HARD_BLOCK without repeating the
+  one-shot side effects; `ProtectionEngine` calls it on every evaluation in the
+  already-blocked branch via the existing `safeSideEffect` isolation, so the block
+  self-heals within one 500ms tick. No action/threshold/state-machine/recognition/
+  liveness change. DIM/BLUR/BLACK_SCREEN remain deliberately unimplemented and
+  unreachable (UI filters to IMPLEMENTED_ACTIONS; mappers reject loudly) — no false
+  claim. The accessibility overlay is the real block (TYPE_ACCESSIBILITY_OVERLAY,
+  full-screen, touch-consuming); the SYSTEM_ALERT_WINDOW window is an explicit
+  non-touchable VISUAL fallback only. Consumer-app hard limits (Home/Recents/Back,
+  notification shade, Quick Settings, power menu, split-screen/PiP, system
+  dialogs, uninstall/force-stop/clear-data, disabling accessibility/overlay) are
+  Android-limited / not controllable and documented honestly. New
+  `ProtectionEnforcementTest` (9) + `ProtectionEnforcementContractTest` (5); JVM
+  2004 -> 2018 (0/0/0). Device-owner/kiosk deliberately NOT added (Play-consumer
+  app; would require provisioning/UX changes — a later architecture decision).
+

@@ -32,8 +32,8 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
     and unpack to `/opt/jdk` (Debian 13 only ships openjdk-21/25, which also compile).
   - `curl -sSL -o /tmp/cmdtools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip`
     then unpack into `$HOME/Android/Sdk/cmdline-tools/latest`
-  - `sdkmanager --licenses`, then install `platform-tools platforms;android-35 build-tools;35.0.0`
-  - write gitignored `local.properties` with `sdk.dir=$HOME/Android/Sdk`
+  - `sdkmanager --licenses`, then install `platform-tools platforms;android-36 build-tools;36.0.0`
+  - write gitignored `local.properties` with `sdk.dir=<sdk>` (this session used `/opt/android-sdk`)
 - Build env for every command: `HOME=/home/openhands`, `ANDROID_HOME=$HOME/Android/Sdk`,
   `JAVA_HOME=$JAVA_HOME` (JDK 17), `PATH=$JAVA_HOME/bin:$PATH`.
   AGP 8.13.2 / Kotlin 2.3.21 / KSP 2.3.6 / Hilt 2.58 / Room 2.7.2 /
@@ -581,4 +581,31 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   `ProtectionEnforcementTest` (9) + `ProtectionEnforcementContractTest` (5); JVM
   2004 -> 2018 (0/0/0). Device-owner/kiosk deliberately NOT added (Play-consumer
   app; would require provisioning/UX changes — a later architecture decision).
+
+- Stage 5 (Background & Process Reliability, roadmap 5/12) — background runtime
+  hardening. Audit found: (1) `START_NOT_STICKY` made an OS low-memory process kill a
+  permanent, silent protection loss; (2) a same-process service recreate could not
+  re-activate the runtime (its `started` flag was already set); (3) a failed camera bind
+  was logged once and never retried, so one bad camera moment disabled recognition; (4)
+  screen lock/unlock was untracked (stale recognition + camera left running); (5)
+  Recents-removal semantics were implicit. Fixes (additive, no recognition/policy
+  change): `ProtectionServiceLifecyclePolicy` (pure) → `START_STICKY` + null-intent
+  handling + `shouldStopOnTaskRemoved()==false`; `runtime.onServiceStarted()` re-derives
+  the active session on every service create/start; `ProtectionRuntimeState.settingsLoaded`
+  gates a self-stop for a restart whose persisted intent is no longer ON;
+  `CameraRecoveryBackoff` (bounded 1/2/5/15/30s, reset on success) + bind-outcome signal
+  through `FaceCaptureController.setBindStateListener` → `CameraXSessionBinding` →
+  `ProtectionCameraSession` (one retry timer, `recovering` report); screen receiver in the
+  FGS → `runtime.onScreenOff()` (`engine.onCameraInterrupted()` + camera `suspendBinding()`,
+  session/FGS type stay latched) / `onScreenOn()` (rebind / fresh recovery budget);
+  manifest `android:stopWithTask="false"`. `cameraRecovering` is reporting-only (never a
+  capability). New JVM: `ProtectionServiceLifecyclePolicyTest` (6),
+  `CameraRecoveryBackoffTest` (8), `ProtectionCameraSessionRecoveryTest` (17),
+  `ProtectionEngineCameraInterruptionTest` (6), `Stage5RuntimeStateContractTest` (4);
+  JVM 2018 -> 2059 (0/0/0). Instrumented `ProtectionServiceRestartPolicyInstrumentedTest`
+  (3, compiles only; no emulator here). `SecurityThreatModelTest` updated: SECURITY.md
+  now describes `START_STICKY` honestly and still admits force stop is NOT bypassed.
+  Hostile-avoidance kept: no OEM workarounds, no force-stop bypass, no background-camera
+  restriction circumvention. Docs: `docs/STAGE5_BACKGROUND_PROCESS_RELIABILITY.md`.
+  REAL DEVICE TEST = NO (no device/ADB).
 

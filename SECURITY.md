@@ -49,11 +49,15 @@ an attacker who can modify the APK.
 * **Residual risk:** **High — accepted.** Indistinguishable from a fresh install.
 
 ### 3.3 Force stop
-* **Current mitigation:** `ProtectionForegroundService` returns `START_NOT_STICKY`
-  (`core/protection/ProtectionForegroundService.kt`). A force-stopped app also stops
-  receiving `BOOT_COMPLETED` until manually reopened.
+* **Current mitigation:** `ProtectionForegroundService` returns `START_STICKY`, so the
+  system **may** recreate the service (and the app-scoped `ProtectionRuntime`) after an
+  OS-initiated process kill such as low memory. This is deliberately distinct from a
+  user **force stop**: Android does not restart a force-stopped package, and it also
+  stops `BOOT_COMPLETED` delivery until the app is manually reopened.
 * **Residual risk:** **High — accepted.** Force stop halts background protection; the
-  OS provides no restart mechanism for user-stopped apps.
+  OS provides no restart mechanism for user-stopped apps, and QALQON does not attempt
+  to bypass that. The sticky restart is best-effort and is never claimed as a
+  force-stop workaround.
 
 ### 3.4 Rebooting the device
 * **Current mitigation:** `ProtectionBootReceiver` → `ProtectionBootRestorer` restart

@@ -50,8 +50,18 @@ class SecurityThreatModelTest {
             security.contains("no uninstall guard") || security.contains("does not request Device"),
         )
         assertTrue(
-            "must admit force stop halts protection",
-            security.contains("START_NOT_STICKY"),
+            "must admit force stop halts protection and is not bypassed",
+            security.contains("Force stop halts background protection"),
+        )
+        // The restart strategy must be described honestly: a sticky restart is
+        // best-effort, distinct from (and never a workaround for) force stop.
+        assertTrue(
+            "must describe the sticky restart honestly",
+            security.contains("START_STICKY"),
+        )
+        assertTrue(
+            "must not claim a force-stop bypass",
+            security.contains("never claimed as a", ignoreCase = true),
         )
     }
 

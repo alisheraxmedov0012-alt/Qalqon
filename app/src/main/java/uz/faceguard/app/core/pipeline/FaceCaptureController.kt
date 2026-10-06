@@ -58,6 +58,22 @@ class FaceCaptureController(
     private var errorListener: ((Throwable) -> Unit)? = null
     fun setErrorListener(listener: (Throwable) -> Unit) { errorListener = listener }
 
+    /**
+     * Stage 5: reports the outcome of the most recent bind. Called with `true`
+     * once the use cases are bound, and with `false` when the bind fails (camera
+     * unavailable/in use, no owner, platform error) so a process-scoped owner can
+     * attempt a bounded rebind instead of silently losing recognition.
+     */
+    private var bindStateListener: ((Boolean) -> Unit)? = null
+    fun setBindStateListener(listener: (Boolean) -> Unit) { bindStateListener = listener }
+
+    private fun reportBindState(bound: Boolean) {
+        val listener = bindStateListener ?: return
+        // The bind callback runs on the main executor; a throwing observer must not
+        // abort the camera path.
+        runCatching { listener(bound) }
+    }
+
     @Volatile
     private var lastErrorAt = 0L
 
@@ -122,6 +138,7 @@ class FaceCaptureController(
                 val owner = lifecycleOwner
                 if (owner == null) {
                     reportError(IllegalStateException("LifecycleOwner is not attached"))
+                    reportBindState(false)
                     return@addListener
                 }
 
@@ -132,8 +149,10 @@ class FaceCaptureController(
                 provider.bindToLifecycle(owner, CameraSelector.DEFAULT_FRONT_CAMERA, preview, analysis)
                 // Q-1: record ownership so teardown releases only these use cases.
                 rememberBound(preview, analysis)
+                reportBindState(true)
             } catch (t: Throwable) {
                 reportError(t)
+                reportBindState(false)
             }
         }, ContextCompat.getMainExecutor(context))
     }
@@ -152,14 +171,17 @@ class FaceCaptureController(
                 val owner = lifecycleOwner
                 if (owner == null) {
                     reportError(IllegalStateException("LifecycleOwner is not attached"))
+                    reportBindState(false)
                     return@addListener
                 }
                 val analysis = buildAnalysis(null)
                 provider.bindToLifecycle(owner, CameraSelector.DEFAULT_FRONT_CAMERA, analysis)
                 // Q-1: record ownership so teardown releases only this use case.
                 rememberBound(analysis)
+                reportBindState(true)
             } catch (t: Throwable) {
                 reportError(t)
+                reportBindState(false)
             }
         }, ContextCompat.getMainExecutor(context))
     }

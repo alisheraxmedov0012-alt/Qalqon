@@ -102,6 +102,18 @@ data class ProtectionRuntimeState(
      * fresh session is never reported as limited before the service says otherwise.
      */
     val cameraForegroundReady: Boolean = true,
+    /**
+     * Stage 5: true once the persisted settings have been observed at least once,
+     * so "protection is off" can be told apart from "settings have not loaded yet".
+     * A system-initiated service restart uses it to decide whether to continue.
+     */
+    val settingsLoaded: Boolean = false,
+    /**
+     * Stage 5: true while a failed camera binding is being retried (bounded), or its
+     * retries are exhausted, so recognition is camera-limited. Reported honestly;
+     * never a blocking decision — blocking is the overlay's job.
+     */
+    val cameraRecovering: Boolean = false,
     /** True when the user has explicitly enabled QALQON's accessibility service. */
     val accessibilityEnabled: Boolean = false,
     /**
@@ -223,6 +235,12 @@ class ProtectionRuntime @Inject constructor(
     private val policyEvaluator: PolicyEvaluator,
     private val serviceLauncher: ProtectionServiceLauncher,
     /**
+     * Stage 5: the process-scoped camera session the foreground service drives. The
+     * runtime mirrors its bounded-recovery state, so "recognition is camera-limited"
+     * is visible to the UI/diagnostics without reaching into the service.
+     */
+    private val cameraSession: ProtectionCameraSession,
+    /**
      * Phase 7.2: the connected accessibility overlay host, if any. Its presence
      * upgrades the legacy visual scrim into a real, touch-consuming
      * `TYPE_ACCESSIBILITY_OVERLAY` block. One-way dependency: this registry has no
@@ -294,6 +312,9 @@ class ProtectionRuntime @Inject constructor(
 
     private var started = false
     private var active = false
+
+    /** Stage 5: set once the persisted settings have been observed at least once. */
+    private var settingsLoaded = false
 
     private var accountId: Long? = null
 
@@ -564,6 +585,7 @@ class ProtectionRuntime @Inject constructor(
         scope.launch {
             settingsRepository.settings.collect { value ->
                 settings = ProtectionSettings.from(value)
+                settingsLoaded = true
                 syncContext()
                 syncActive()
             }
@@ -634,6 +656,13 @@ class ProtectionRuntime @Inject constructor(
         scope.launch {
             scheduler.lastEvent.collect { value -> _state.update { it.copy(lastTrigger = value?.trigger?.name ?: "") } }
         }
+        // Stage 5: the camera session's bounded-recovery state, mirrored so
+        // "recognition is camera-limited" is reportable without reaching the service.
+        scope.launch {
+            cameraSession.recovering.collect { value ->
+                _state.update { it.copy(cameraRecovering = value) }
+            }
+        }
         // Degraded protection: whenever the set of missing capabilities changes while
         // protection is requested, tell the parent once per distinct set. The
         // coordinator's dedup key (the set itself) collapses repeats, so a steady
@@ -677,6 +706,7 @@ class ProtectionRuntime @Inject constructor(
                 overlayGranted = overlay.hasPermission(),
                 usageAccessGranted = monitor.hasUsageAccess(),
                 cameraGranted = hasCameraPermission(),
+                settingsLoaded = settingsLoaded,
             )
         }
     }
@@ -727,6 +757,48 @@ class ProtectionRuntime @Inject constructor(
     }
 
     /**
+     * Stage 5: called by the protection foreground service on every create/start,
+     * including a system-initiated (sticky) restart. Re-derives the active session from
+     * the already-observed settings, so a service recreate *within the same process*
+     * re-activates protection instead of leaving it inactive until the next
+     * settings/account emission. Idempotent.
+     */
+    fun onServiceStarted() {
+        start()
+        syncActive()
+    }
+
+    /**
+     * Stage 5: whether the persisted intent wants protection running right now. Used by
+     * a system-initiated restart to decide whether to continue or end the service; it is
+     * the same definition the rest of the runtime uses ([ProtectionServicePolicy]).
+     */
+    fun protectionWanted(): Boolean =
+        ProtectionServicePolicy.shouldRun(settings.enabled, accountId)
+
+    /**
+     * Stage 5: the screen turned off. Drops stale recognition immediately (a face seen
+     * before the lock must never be treated as a current reading) and releases the camera
+     * binding while keeping the session — and the foreground service's camera type —
+     * latched. The protection *state* is deliberately untouched: releasing the block on a
+     * screen-off would be fail-open.
+     */
+    fun onScreenOff() {
+        engine.onCameraInterrupted()
+        cameraSession.onScreenStateChanged(false)
+    }
+
+    /**
+     * Stage 5: the screen is back on. Re-establishes a suspended camera binding, or
+     * resumes a bounded recovery that the screen-off interrupted. It never *starts* the
+     * session: a screen-on is not a while-in-use moment, so this only affects a session
+     * that is already latched.
+     */
+    fun onScreenOn() {
+        cameraSession.onScreenStateChanged(true)
+    }
+
+    /**
      * Phase 7.1: whether a Qalqon activity is currently visible. This is the
      * while-in-use moment in which a camera foreground service may legally be
      * started; the process-scoped camera session starts only here and then keeps
@@ -743,7 +815,12 @@ class ProtectionRuntime @Inject constructor(
      */
     fun onUiForeground() {
         _uiForeground.value = true
-        if (active) serviceLauncher.start()
+        if (active) {
+            serviceLauncher.start()
+            // Stage 5: a legal foreground moment also clears a screen-off camera
+            // suspension or resumes a recovery the screen-off interrupted.
+            cameraSession.onScreenStateChanged(true)
+        }
     }
 
     /** Phase 7.1: the UI is no longer visible. The camera session stays latched. */

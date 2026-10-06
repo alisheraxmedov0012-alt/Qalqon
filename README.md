@@ -704,12 +704,15 @@ sync; the app remains fully functional with sync disabled or absent.
   `AntiSpoofModel` seam), but no anti-spoofing model is bundled and the heuristic
   is a weak signal: printed photos, phone screens and video replays are **not**
   reliably detected — see the Group 9 section and "Biometric capability" above.
-- **Accessibility-service blocking is not implemented.** Protection runs as an
-  app-scoped session (`ProtectionRuntime`) driven by `protectionEnabled`; it
-  works while the Qalqon process is alive and the overlay permission is
-  granted. It is not a guaranteed background guard: a production app needs a
-  foreground service plus an AccessibilityService (or Device Admin) to overlay
-  other apps reliably while backgrounded.
+- **Background protection is best-effort, not guaranteed.** Protection runs as an
+  app-scoped session (`ProtectionRuntime`) driven by `protectionEnabled`, kept alive
+  by a foreground service that owns a process-scoped camera session and an
+  accessibility-service touch-blocking overlay. It survives Home, app switching and
+  Recents removal, and the OS *may* restart the service after a low-memory process
+  kill (`START_STICKY`, best effort). It does **not** survive a user force stop, and
+  after a reboot recognition stays limited until the app is opened once (Android 15
+  foreground-service/camera rules). See
+  `docs/STAGE5_BACKGROUND_PROCESS_RELIABILITY.md`.
 - **Migrations are explicit.** Room is at schema v10 with an additive
   migration chain (v3 → v10); a destructive fallback is not used, so a release
   build must keep adding a migration for every schema change.

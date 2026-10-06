@@ -16,6 +16,17 @@ import uz.faceguard.app.core.recognition.Recognizer
 interface CameraSessionBinding {
     fun start()
     fun stop()
+
+    /**
+     * Stage 5: reports whether the most recent [start] actually bound the camera.
+     *
+     * The bind is asynchronous, so a failure cannot be observed synchronously from
+     * [start]; the controller signals it here instead. `false` means the camera is
+     * not producing frames (unavailable, in use by another app, or a platform
+     * error) and the session should attempt a bounded rebind. Default no-op so a
+     * binding without a failure signal still satisfies the contract.
+     */
+    fun setBindStateListener(listener: (Boolean) -> Unit) {}
 }
 
 /**
@@ -37,6 +48,13 @@ class CameraXSessionBinding(
     private var lifecycleOwner: CameraSessionLifecycleOwner? = null
     private var controller: FaceCaptureController? = null
 
+    /** Stage 5: forwarded to the session so a failed bind triggers bounded recovery. */
+    private var bindStateListener: ((Boolean) -> Unit)? = null
+
+    override fun setBindStateListener(listener: (Boolean) -> Unit) {
+        bindStateListener = listener
+    }
+
     override fun start() {
         if (lifecycleOwner != null) return
         val owner = CameraSessionLifecycleOwner()
@@ -44,6 +62,8 @@ class CameraXSessionBinding(
             setRecognizer(recognizer)
             setEmbeddingModel(embeddingModel)
             setLifecycleOwner(owner)
+            // Stage 5: the controller reports the (asynchronous) bind outcome here.
+            setBindStateListener { bound -> bindStateListener?.invoke(bound) }
         }
         lifecycleOwner = owner
         controller = capture

@@ -328,6 +328,31 @@ class ProtectionEngine(
         resetEyeSafety()
     }
 
+    /**
+     * Stage 5: the camera stream was interrupted — the screen turned off, the
+     * binding was lost, or the session is being rebound.
+     *
+     * Drops the last frame and the in-progress multi-frame confirmation so a
+     * pre-interruption recognition can never be treated as current, and clears the
+     * published identity and liveness signals. The protection **state** is
+     * deliberately left untouched: releasing the block on a lost camera would be
+     * fail-open, so the existing no-face policy continues to govern from the next
+     * tick (and a still-blocked cycle keeps self-healing its overlay).
+     *
+     * Must run on the same dispatcher as [tick] (the session's main-dispatcher
+     * scope), since it touches the confirmation buffer the tick also owns.
+     */
+    fun onCameraInterrupted() {
+        latestFrame = null
+        pending.clear()
+        emptyFaceStreak = 0
+        recentConfidences.clear()
+        lastEvaluateNow = 0L
+        // A stale identity/liveness must never be presented as a current reading.
+        _identity.value = null
+        resetLiveness()
+    }
+
     private fun tick(now: Long) {
         val foreground = monitor.current.value
         val protectedNow = foreground != null && foreground in protectedPackages

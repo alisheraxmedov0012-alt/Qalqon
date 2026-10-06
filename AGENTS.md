@@ -606,6 +606,30 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   (3, compiles only; no emulator here). `SecurityThreatModelTest` updated: SECURITY.md
   now describes `START_STICKY` honestly and still admits force stop is NOT bypassed.
   Hostile-avoidance kept: no OEM workarounds, no force-stop bypass, no background-camera
-  restriction circumvention. Docs: `docs/STAGE5_BACKGROUND_PROCESS_RELIABILITY.md`.
+  restriction circumvention. Docs:   `docs/STAGE5_BACKGROUND_PROCESS_RELIABILITY.md`.
   REAL DEVICE TEST = NO (no device/ADB).
+
+- Stage 6 (Permission & OEM Compatibility, roadmap 6/12) — capability/OEM
+  compatibility. Audit found no crash-prone code; the gap was honesty & guidance:
+  battery optimization, OEM background restriction and OEM identity were invisible, so
+  a parent could see "ready" while those were off. Additive changes (no recognition/
+  policy/enforcement change): pure `domain/oem` (`OemFamily`, `OemDetector` —
+  case-insensitive, sub-brands before parents; `OemCompatibilityProfiles` with
+  *candidate* components that are resolved before use); Android `core/oem`
+  (`AndroidOemDetector` cached once; `AndroidBatteryOptimization` — permission-free
+  `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS`, never forces; `AndroidOemSettings` —
+  the single place with OEM intent knowledge, ordered candidate -> generic -> app
+  details); `DiagnosticStatus.UNAVAILABLE` + new `DiagnosticCheck.BATTERY_OPTIMIZATION`
+  / `OEM_BACKGROUND` (recommended signals: WARNING/UNAVAILABLE, never FAILED);
+  `ProtectionRuntimeState.oemFamily/oemGuidanceAvailable/batteryOptimizationIgnored`
+  (reporting-only, never a capability) + `batteryOptimizationIntents()` /
+  `oemBackgroundIntents()`; `openFirstAvailable`/`openFirstSettingsOrFallback`
+  (resolve-then-fallback, generic over the item type); a "Device reliability" card on
+  ProtectionScreen. No new INTERNET/dangerous permission; OEM detection is local-only.
+  New JVM: `OemDetectorTest` (20), `OemCompatibilityProfilesTest` (9),
+  `Stage6SettingsIntentFallbackTest` (6), `Stage6HealthEvaluatorTest` (11),
+  `Stage6CapabilityMatrixTest` (15), `Stage6RegressionGuardTest` (6); JVM 2059 -> 2126
+  (0/0/0). Instrumented `Stage6OemCompatibilityInstrumentedTest` (6, compiles in CI;
+  no emulator here). Docs: `docs/STAGE6_PERMISSION_OEM_COMPATIBILITY.md`. ALL OEMs
+  NOT TESTED on real hardware; REAL DEVICE TEST = NO.
 

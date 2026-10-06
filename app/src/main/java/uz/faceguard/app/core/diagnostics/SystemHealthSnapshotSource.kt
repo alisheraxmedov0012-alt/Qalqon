@@ -8,6 +8,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.first
 import uz.faceguard.app.core.accessibility.AccessibilityCapability
+import uz.faceguard.app.core.oem.AndroidOemSettings
 import uz.faceguard.app.core.protection.ProtectionForegroundService
 import uz.faceguard.app.core.usage.AndroidUsageAccess
 import uz.faceguard.app.domain.diagnostics.SystemHealthEvaluator
@@ -37,6 +38,8 @@ class SystemHealthSnapshotSource @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val accountRepository: AccountRepository,
     private val notificationDispatcher: AppNotificationDispatcher,
+    /** Stage 6: the OEM/battery compatibility readings, from the single OEM layer. */
+    private val oemSettings: AndroidOemSettings,
 ) {
 
     private val evaluator = SystemHealthEvaluator()
@@ -57,6 +60,13 @@ class SystemHealthSnapshotSource @Inject constructor(
             usageAccessGranted = AndroidUsageAccess.isGranted(context),
             notificationsEnabled = runCatching { notificationDispatcher.areNotificationsEnabled() }
                 .getOrDefault(true),
+            // Stage 6: read-only OEM/battery facts. Both are failure-safe: a missing
+            // service or an unknown OEM degrades the guidance, never the audit.
+            batteryOptimizationIgnored = runCatching { oemSettings.isIgnoringBatteryOptimizations() }
+                .getOrNull(),
+            oemFamily = oemSettings.family,
+            oemGuidanceAvailable =
+                oemSettings.profile().supportLevel == uz.faceguard.app.domain.oem.OemSupportLevel.SUPPORTED,
         )
     }
 

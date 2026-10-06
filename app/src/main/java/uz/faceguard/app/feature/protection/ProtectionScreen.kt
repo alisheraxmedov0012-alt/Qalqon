@@ -57,6 +57,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import uz.faceguard.app.R
+import uz.faceguard.app.core.permission.openFirstSettingsOrFallback
 import uz.faceguard.app.core.permission.openSettingsOrFallback
 import uz.faceguard.app.core.protection.ProtectionRuntime
 import uz.faceguard.app.core.protection.ProtectionRuntimeState
@@ -125,6 +126,19 @@ class ProtectionViewModel @Inject constructor(
     /** The system settings page that fixes [capability], for the degraded banner action. */
     fun capabilitySettingsIntent(capability: ProtectionCapability): Intent =
         runtime.capabilitySettingsIntent(capability)
+
+    /**
+     * Stage 6: ordered battery-optimization settings pages (platform list page then the
+     * app details page). Launched with `openFirstSettingsOrFallback`, so an unresolved
+     * page never dead-ends.
+     */
+    fun batteryOptimizationIntents(): List<Intent> = runtime.batteryOptimizationIntents()
+
+    /**
+     * Stage 6: ordered OEM background/autostart settings pages for this device, ending
+     * in a universal fallback.
+     */
+    fun oemBackgroundIntents(): List<Intent> = runtime.oemBackgroundIntents()
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
@@ -212,6 +226,20 @@ fun ProtectionScreen(
                 onOpenAccessibility = { showAccessibilityDisclosure = true },
                 onOpenParentProfile = onOpenParentProfile,
                 onOpenProtectedApps = onOpenProtectedApps,
+            )
+
+            // Stage 6: OEM / battery compatibility guidance. Recommended reliability
+            // steps, kept separate from the *required* capabilities above so the two
+            // are never confused. Every action resolves its page before launching and
+            // falls back to the app's own settings.
+            DeviceReliabilityCard(
+                state = state,
+                onOpenBatterySettings = {
+                    context.openFirstSettingsOrFallback(viewModel.batteryOptimizationIntents())
+                },
+                onOpenOemBackground = {
+                    context.openFirstSettingsOrFallback(viewModel.oemBackgroundIntents())
+                },
             )
 
             EmergencyCard(
@@ -434,6 +462,90 @@ private fun RequirementRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary,
             )
+        }
+    }
+}
+
+@Composable
+private fun DeviceReliabilityCard(
+    state: ProtectionRuntimeState,
+    onOpenBatterySettings: () -> Unit,
+    onOpenOemBackground: () -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                stringResource(R.string.settings_device_reliability),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(R.string.settings_device_reliability_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Spacer(Modifier.height(12.dp))
+            Text(
+                stringResource(R.string.settings_battery_optimization),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+                stringResource(R.string.settings_battery_optimization_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                stringResource(
+                    when (state.batteryOptimizationIgnored) {
+                        true -> R.string.settings_battery_optimization_ignored
+                        false -> R.string.settings_battery_optimization_active
+                        null -> R.string.settings_battery_optimization_unavailable
+                    },
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (state.batteryOptimizationIgnored == false) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+            if (state.batteryOptimizationIgnored == false) {
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(onClick = onOpenBatterySettings) {
+                    Text(stringResource(R.string.settings_open_settings))
+                }
+            }
+
+            // OEM background/autostart guidance is shown only for families known to
+            // restrict background work, and always ends in a page that resolves.
+            if (state.oemFamily.hasKnownBackgroundRestrictions) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    stringResource(R.string.settings_oem_background),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    stringResource(R.string.settings_oem_background_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    stringResource(
+                        if (state.oemGuidanceAvailable) {
+                            R.string.settings_oem_background_known
+                        } else {
+                            R.string.settings_oem_background_generic
+                        },
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(onClick = onOpenOemBackground) {
+                    Text(stringResource(R.string.settings_open_settings))
+                }
+            }
         }
     }
 }

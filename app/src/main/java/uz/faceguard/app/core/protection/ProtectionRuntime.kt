@@ -36,8 +36,12 @@ import uz.faceguard.app.core.liveness.LivenessResult
 import uz.faceguard.app.core.security.SecurityState
 import uz.faceguard.app.core.security.SecurityStateHolder
 import uz.faceguard.app.core.monitor.ForegroundAppMonitor
+import uz.faceguard.app.core.oem.AndroidOemSettings
 import uz.faceguard.app.core.permission.AndroidProtectionCapabilitySource
 import uz.faceguard.app.core.permission.ProtectionCapabilitySource
+import uz.faceguard.app.domain.oem.OemFamily
+import uz.faceguard.app.domain.oem.OemSettingsTarget
+import uz.faceguard.app.domain.oem.OemSupportLevel
 import uz.faceguard.app.core.recognition.Recognizer
 import uz.faceguard.app.core.scan.ScanScheduler
 import uz.faceguard.app.core.screentime.ScreenTimeUsageCollectionRunner
@@ -114,6 +118,22 @@ data class ProtectionRuntimeState(
      * never a blocking decision — blocking is the overlay's job.
      */
     val cameraRecovering: Boolean = false,
+    /**
+     * Stage 6: the device's detected OEM family, for compatibility guidance only. A
+     * property of the device, not of protection — it never changes any decision.
+     */
+    val oemFamily: OemFamily = OemFamily.UNKNOWN,
+    /**
+     * Stage 6: true when an OEM-specific guidance page is known for [oemFamily]; the
+     * UI then offers the specific page, otherwise the generic app settings.
+     */
+    val oemGuidanceAvailable: Boolean = false,
+    /**
+     * Stage 6: whether the OS will not battery-optimize QALQON. `null` means the
+     * concept does not apply on this platform. A *recommended* signal: it is reported
+     * but never counted as a missing protection capability.
+     */
+    val batteryOptimizationIgnored: Boolean? = true,
     /** True when the user has explicitly enabled QALQON's accessibility service. */
     val accessibilityEnabled: Boolean = false,
     /**
@@ -240,6 +260,12 @@ class ProtectionRuntime @Inject constructor(
      * is visible to the UI/diagnostics without reaching into the service.
      */
     private val cameraSession: ProtectionCameraSession,
+    /**
+     * Stage 6: the centralised OEM-compatibility layer. The runtime only *reads* it —
+     * the detected family, the battery-optimization state and the ordered settings
+     * intents — so recognition/policy/enforcement are never affected by OEM detection.
+     */
+    private val oemSettings: AndroidOemSettings,
     /**
      * Phase 7.2: the connected accessibility overlay host, if any. Its presence
      * upgrades the legacy visual scrim into a real, touch-consuming
@@ -884,6 +910,13 @@ class ProtectionRuntime @Inject constructor(
                 cameraGranted = hasCameraPermission(),
                 notificationsEnabled = runCatching { notificationDispatcher.areNotificationsEnabled() }.getOrDefault(true),
                 securityState = securityStateHolder.state.value,
+                // Stage 6: the device's OEM family and battery-optimization state. Both
+                // are read (never inferred) and are reporting-only — they change no
+                // recognition/policy decision and are not part of the degraded set.
+                oemFamily = oemSettings.family,
+                oemGuidanceAvailable = oemSettings.profile().supportLevel == OemSupportLevel.SUPPORTED,
+                batteryOptimizationIgnored = runCatching { oemSettings.isIgnoringBatteryOptimizations() }
+                    .getOrNull(),
             )
         }
     }
@@ -1052,6 +1085,25 @@ class ProtectionRuntime @Inject constructor(
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
     }
+
+    /**
+     * Stage 6: the ordered battery-optimization settings pages (platform list page,
+     * then the app's own details page). The caller launches the first one that
+     * resolves — see `openFirstAvailable`. There is deliberately no intent that forces
+     * the change: battery optimization is recommended, never mandated.
+     */
+    fun batteryOptimizationIntents(): List<Intent> = oemSettings.batteryOptimizationIntentCandidates()
+
+    /**
+     * Stage 6: the ordered OEM background/autostart settings pages for this device,
+     * ending in a universal fallback. The list is always non-empty, so the guidance is
+     * always actionable even on an unknown OEM.
+     *
+     * @param target which OEM surface to open (autostart or app-specific battery page).
+     */
+    fun oemBackgroundIntents(
+        target: OemSettingsTarget = OemSettingsTarget.AUTOSTART,
+    ): List<Intent> = oemSettings.settingsIntentCandidates(target)
 
     private companion object {
         const val TAG = "ProtectionRuntime"

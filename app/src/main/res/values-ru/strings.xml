@@ -80,6 +80,18 @@
     <string name="settings_no_face_policy">Если лицо не видно</string>
     <string name="settings_low_battery">Низкий заряд</string>
     <string name="settings_low_battery_toggle">Отключать при низком заряде</string>
+    <string name="settings_device_reliability">Надёжность устройства</string>
+    <string name="settings_device_reliability_hint">Некоторые устройства ограничивают фоновую защиту. Проверьте настройки ниже для повышения надёжности.</string>
+    <string name="settings_battery_optimization">Оптимизация батареи</string>
+    <string name="settings_battery_optimization_hint">Рекомендуется. Если оптимизация включена, система может останавливать фоновую работу.</string>
+    <string name="settings_battery_optimization_ignored">Отключена — защита не ограничена</string>
+    <string name="settings_battery_optimization_active">Включена — защита может быть ограничена</string>
+    <string name="settings_battery_optimization_unavailable">Недоступно на этом устройстве</string>
+    <string name="settings_oem_background">Автозапуск и фон</string>
+    <string name="settings_oem_background_hint">Некоторые производители ограничивают приложения в фоне. QALQON не может определить это ограничение сам.</string>
+    <string name="settings_oem_background_known">Для вашего устройства доступна соответствующая страница настроек.</string>
+    <string name="settings_oem_background_generic">Проверьте фоновые настройки в настройках приложения.</string>
+    <string name="settings_open_settings">Открыть настройки</string>
     <string name="papps_title">Защищённые приложения</string>
     <string name="papps_subtitle">Выберите приложения, которые должны оставаться закрытыми для ребёнка</string>
     <string name="papps_empty">Подходящие приложения пока не найдены</string>
@@ -573,6 +585,9 @@
     <string name="health_status_warning">Предупреждение</string>
     <string name="health_status_failed">Ошибка</string>
     <string name="health_status_unknown">Неизвестно</string>
+    <string name="health_check_battery_optimization">Оптимизация батареи</string>
+    <string name="health_check_oem_background">Фоновое ограничение производителя</string>
+    <string name="health_status_unavailable">Недоступно</string>
 
     <!-- Robust frontal multi-frame enrollment -->
     <string name="enroll_hint_initial">Направьте лицо в камеру и побудьте несколько мгновений естественно.</string>

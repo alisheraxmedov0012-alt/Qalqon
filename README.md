@@ -713,6 +713,11 @@ sync; the app remains fully functional with sync disabled or absent.
   after a reboot recognition stays limited until the app is opened once (Android 15
   foreground-service/camera rules). See
   `docs/STAGE5_BACKGROUND_PROCESS_RELIABILITY.md`.
+- **OEM background restrictions are guidance-only.** QALQON detects the device's OEM
+  family locally and, for families known to restrict background apps, offers the
+  relevant settings page (battery optimization / autostart). It cannot read or bypass
+  the OEM's own restriction state, and never forces a change. See
+  `docs/STAGE6_PERMISSION_OEM_COMPATIBILITY.md`.
 - **Migrations are explicit.** Room is at schema v10 with an additive
   migration chain (v3 → v10); a destructive fallback is not used, so a release
   build must keep adding a migration for every schema change.

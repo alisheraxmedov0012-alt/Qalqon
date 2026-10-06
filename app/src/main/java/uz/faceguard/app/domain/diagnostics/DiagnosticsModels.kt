@@ -1,5 +1,7 @@
 package uz.faceguard.app.domain.diagnostics
 
+import uz.faceguard.app.domain.oem.OemFamily
+
 /**
  * Phase 12: the individual system checks Qalqon audits before it claims protection
  * is actually working.
@@ -32,6 +34,18 @@ enum class DiagnosticCheck {
 
     /** A mechanism exists that keeps schedule/scan state synchronised in the background. */
     SCHEDULE_SYNC,
+
+    /**
+     * Stage 6: the OS will not battery-optimize QALQON. A **recommended** capability —
+     * its absence degrades reliability but is never a failure.
+     */
+    BATTERY_OPTIMIZATION,
+
+    /**
+     * Stage 6: whether the device's OEM has a known background-restriction surface the
+     * user may need to allow. Guidance only; the app cannot read the OEM's own state.
+     */
+    OEM_BACKGROUND,
 }
 
 /**
@@ -40,8 +54,10 @@ enum class DiagnosticCheck {
  * [FAILED] means protection cannot work as promised; [WARNING] means it works in
  * a reduced/degraded form; [UNKNOWN] means the check could not be evaluated
  * (e.g. nobody is signed in), which is deliberately distinct from "bad".
+ * [UNAVAILABLE] means the capability does not apply on this platform/device (e.g.
+ * battery optimization below API 23) — it is neither healthy nor degraded.
  */
-enum class DiagnosticStatus { OK, WARNING, FAILED, UNKNOWN }
+enum class DiagnosticStatus { OK, WARNING, FAILED, UNKNOWN, UNAVAILABLE }
 
 data class DiagnosticFinding(
     val check: DiagnosticCheck,
@@ -98,6 +114,23 @@ data class SystemHealthSnapshot(
     val notificationsEnabled: Boolean,
     val bootRestoreWired: Boolean,
     val scheduleSyncMechanism: ScheduleSyncMechanism,
+    /**
+     * Stage 6: whether the OS will not battery-optimize QALQON. `null` means the
+     * concept does not apply on this platform (below API 23) — reported as
+     * [DiagnosticStatus.UNAVAILABLE]. Defaults to `true` so a device that has not
+     * reported it is not falsely flagged as optimized-away.
+     */
+    val batteryOptimizationIgnored: Boolean? = true,
+    /**
+     * Stage 6: the detected OEM family. Defaults to [OemFamily.UNKNOWN], which carries
+     * no guidance and audits as OK.
+     */
+    val oemFamily: OemFamily = OemFamily.UNKNOWN,
+    /**
+     * Stage 6: true when an OEM-specific guidance page is known for [oemFamily]. Only
+     * used to word the OEM check; it never turns the check into a failure.
+     */
+    val oemGuidanceAvailable: Boolean = false,
 ) {
     /** True when protection is supposed to be running right now. */
     val protectionRequested: Boolean get() = signedIn && protectionEnabled

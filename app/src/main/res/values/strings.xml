@@ -81,6 +81,18 @@
     <string name="settings_no_face_policy">Yuz ko\'rinmasa</string>
     <string name="settings_low_battery">Kam batareyada</string>
     <string name="settings_low_battery_toggle">Kam batareyada cheklashni o\'chirish</string>
+    <string name="settings_device_reliability">Qurilma ishonchliligi</string>
+    <string name="settings_device_reliability_hint">Baʼzi qurilmalarda tizim fon rejimidagi himoyani cheklashi mumkin. Ishonchlilikni oshirish uchun quyidagi sozlamalarni tekshiring.</string>
+    <string name="settings_battery_optimization">Batareya optimallashtirish</string>
+    <string name="settings_battery_optimization_hint">Tavsiya etiladi. Optimallashtirish yoqilgan bo\'lsa, tizim fon ishini to\'xtatib qo\'yishi mumkin.</string>
+    <string name="settings_battery_optimization_ignored">O\'chirilgan — himoya cheklanmaydi</string>
+    <string name="settings_battery_optimization_active">Yoqilgan — himoya cheklanishi mumkin</string>
+    <string name="settings_battery_optimization_unavailable">Bu qurilmada mavjud emas</string>
+    <string name="settings_oem_background">Avtomatik ishga tushish va fon rejimi</string>
+    <string name="settings_oem_background_hint">Baʼzi ishlab chiqaruvchilar ilovani fonda cheklaydi. QALQON bu cheklov holatini o\'zi aniqlay olmaydi.</string>
+    <string name="settings_oem_background_known">Qurilmangiz uchun tegishli sozlamalar sahifasi mavjud.</string>
+    <string name="settings_oem_background_generic">Ilova sozlamalari orqali fon rejimini tekshiring.</string>
+    <string name="settings_open_settings">Sozlamalarni ochish</string>
     <string name="papps_title">Himoya qilingan ilovalar</string>
     <string name="papps_subtitle">Bola uchun yopiq bo\'lishi kerak bo\'lgan ilovalarni tanlang</string>
     <string name="papps_empty">Hozircha mos ilovalar topilmadi</string>
@@ -574,6 +586,9 @@
     <string name="health_status_warning">Ogohlantirish</string>
     <string name="health_status_failed">Xato</string>
     <string name="health_status_unknown">Noma\'lum</string>
+    <string name="health_check_battery_optimization">Batareya optimallashtirish</string>
+    <string name="health_check_oem_background">Ishlab chiqaruvchi fon cheklovi</string>
+    <string name="health_status_unavailable">Mavjud emas</string>
 
     <!-- Robust frontal multi-frame enrollment (Uzbek Latin, default) -->
     <string name="enroll_hint_initial">Yuzingizni kameraga to\'g\'ri qarating va bir necha lahza tabiiy holatda turing.</string>

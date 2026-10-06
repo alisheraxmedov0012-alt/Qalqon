@@ -95,6 +95,26 @@ fun interface SettingsStarter {
 }
 
 /**
+ * Opens the first item in [items] whose [start] succeeds, in order; returns false when
+ * none does. Used by the Stage 6 OEM-compatibility layer, where an OEM-specific page is
+ * an unresolved *candidate* and the list always ends in a generic fallback — so "no
+ * handler" is a normal outcome, never a crash or a dead end. Generic over the item type
+ * so the ordering/fallback contract is JVM-testable without Android `Intent`s.
+ */
+fun <T> openFirstAvailable(items: List<T>, start: (T) -> Boolean): Boolean {
+    if (items.isEmpty()) return false
+    return items.any { start(it) }
+}
+
+/**
+ * Opens the first settings intent in [intents] that resolves, through the shared
+ * failure-safe [AndroidSettingsStarter]. Returns false when none resolves (the caller
+ * may then show plain instructions) — never throws.
+ */
+fun Context.openFirstSettingsOrFallback(intents: List<Intent>): Boolean =
+    openFirstAvailable(intents) { AndroidSettingsStarter(this).start(it) }
+
+/**
  * Pure orchestration: try the primary page, and fall back only when the device has no
  * handler for it. Generic over the page type so it is deterministic and JVM-testable
  * without Android.

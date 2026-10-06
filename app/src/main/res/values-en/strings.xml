@@ -80,6 +80,18 @@
     <string name="settings_no_face_policy">If no face is visible</string>
     <string name="settings_low_battery">Low battery</string>
     <string name="settings_low_battery_toggle">Disable on low battery</string>
+    <string name="settings_device_reliability">Device reliability</string>
+    <string name="settings_device_reliability_hint">Some devices restrict background protection. Check the settings below to improve reliability.</string>
+    <string name="settings_battery_optimization">Battery optimization</string>
+    <string name="settings_battery_optimization_hint">Recommended. When optimization is on, the system may stop background work.</string>
+    <string name="settings_battery_optimization_ignored">Off — protection is not restricted</string>
+    <string name="settings_battery_optimization_active">On — protection may be restricted</string>
+    <string name="settings_battery_optimization_unavailable">Not available on this device</string>
+    <string name="settings_oem_background">Autostart and background</string>
+    <string name="settings_oem_background_hint">Some manufacturers restrict apps in the background. QALQON cannot detect this restriction itself.</string>
+    <string name="settings_oem_background_known">A relevant settings page is available for your device.</string>
+    <string name="settings_oem_background_generic">Check background settings through the app settings.</string>
+    <string name="settings_open_settings">Open settings</string>
     <string name="papps_title">Protected apps</string>
     <string name="papps_subtitle">Choose the apps that should stay locked for your child</string>
     <string name="papps_empty">No suitable apps found yet</string>
@@ -573,6 +585,9 @@
     <string name="health_status_warning">Warning</string>
     <string name="health_status_failed">Failed</string>
     <string name="health_status_unknown">Unknown</string>
+    <string name="health_check_battery_optimization">Battery optimization</string>
+    <string name="health_check_oem_background">Manufacturer background restriction</string>
+    <string name="health_status_unavailable">Not available</string>
 
     <!-- Robust frontal multi-frame enrollment -->
     <string name="enroll_hint_initial">Face the camera and hold still naturally for a moment.</string>

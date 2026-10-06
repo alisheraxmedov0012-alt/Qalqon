@@ -26,6 +26,8 @@ import uz.faceguard.app.core.security.AndroidKeystoreKeyProvider
 import uz.faceguard.app.security.PassthroughTemplateCipher
 import uz.faceguard.app.core.security.AppLockState
 import uz.faceguard.app.data.prefs.PinAttemptStore
+import uz.faceguard.app.core.oem.AndroidOemDetector
+import uz.faceguard.app.core.oem.AndroidOemSettings
 import uz.faceguard.app.data.prefs.AppLanguageStore
 import uz.faceguard.app.data.db.FaceGuardDatabase
 import uz.faceguard.app.data.prefs.SessionManager
@@ -117,6 +119,9 @@ class SettingsViewModelTest {
             settingsRepository = settingsRepository,
             accountRepository = accountRepository,
             notificationDispatcher = AndroidNotificationDispatcher(context),
+            // Stage 6: the OEM/battery readings come from the real OEM layers, exactly
+            // as production wires them.
+            oemSettings = AndroidOemSettings(context, AndroidOemDetector()),
         ),
         languageStore = AppLanguageStore(dataStore),
         appLockState = AppLockState(),

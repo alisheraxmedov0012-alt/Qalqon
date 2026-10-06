@@ -643,6 +643,13 @@ class ProtectionEngine(
                     // request target, the parent-facing "blocked app", a later release)
                     // is derived from the previous app.
                     if (foreground != _blockedApp.value) _blockedApp.value = foreground
+                    // Stage 4: the block is still required, so re-assert its enforcement
+                    // surface. This self-heals an overlay lost without a state change (an
+                    // accessibility reconnect, a transient WindowManager detach, an
+                    // out-of-band removal) within one tick instead of leaving the app
+                    // "blocked" with nothing on screen. Idempotent and isolated, so it
+                    // neither duplicates the overlay nor risks the evaluation loop.
+                    safeSideEffect { actions.reassert(decision.action) }
                     return
                 }
 

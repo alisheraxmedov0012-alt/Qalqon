@@ -32,13 +32,17 @@ object AccessibilityCapability {
             .getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
             .any { info ->
                 val service = info.resolveInfo?.serviceInfo ?: return@any false
-                service.packageName == expected.packageName && service.name == expected.className
+                // Compare via ComponentName so a relative-vs-absolute service name (some
+                // OEMs report one or the other) still matches Qalqon's own component only.
+                ComponentName(service.packageName, service.name) == expected
             }
     }
 
     /**
-     * Persisted user decision. The manager can lag behind a just-changed setting,
-     * so this is the robust source for "has the user enabled the service".
+     * Persisted user decision. The manager can lag behind a just-changed setting, so
+     * this is the robust source for "has the user enabled the service". Only an entry
+     * that resolves to exactly Qalqon's component counts: another app's accessibility
+     * service being enabled must never read as Qalqon being enabled.
      */
     private fun isEnabledInSettings(context: Context): Boolean {
         val raw = runCatching {

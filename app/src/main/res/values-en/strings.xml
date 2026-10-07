@@ -2,6 +2,12 @@
 <resources>
     <string name="app_name">Qalqon</string>
     <string name="accessibility_service_description">Qalqon watches protected apps and applies your parental rules.</string>
+    <!-- Stage 8: Google Play User Data policy requires a clear in-app disclosure and
+         affirmative consent before enabling the AccessibilityService API. -->
+    <string name="accessibility_disclosure_title">Background app monitoring service</string>
+    <string name="accessibility_disclosure_body">Qalqon uses the accessibility service to detect when a protected app is opened. The service only learns which app is on screen (its package name); it never reads screen text, passwords or notifications. This is used only on this device for parental control and is never sent anywhere.</string>
+    <string name="accessibility_disclosure_agree">I agree — open settings</string>
+    <string name="accessibility_disclosure_decline">Cancel</string>
     <string name="protection_req_accessibility">Background app monitoring service</string>
     <string name="splash_tagline">Face-based protection for children</string>
     <string name="welcome_title">Welcome to Qalqon</string>
@@ -74,6 +80,18 @@
     <string name="settings_no_face_policy">If no face is visible</string>
     <string name="settings_low_battery">Low battery</string>
     <string name="settings_low_battery_toggle">Disable on low battery</string>
+    <string name="settings_device_reliability">Device reliability</string>
+    <string name="settings_device_reliability_hint">Some devices restrict background protection. Check the settings below to improve reliability.</string>
+    <string name="settings_battery_optimization">Battery optimization</string>
+    <string name="settings_battery_optimization_hint">Recommended. When optimization is on, the system may stop background work.</string>
+    <string name="settings_battery_optimization_ignored">Off — protection is not restricted</string>
+    <string name="settings_battery_optimization_active">On — protection may be restricted</string>
+    <string name="settings_battery_optimization_unavailable">Not available on this device</string>
+    <string name="settings_oem_background">Autostart and background</string>
+    <string name="settings_oem_background_hint">Some manufacturers restrict apps in the background. QALQON cannot detect this restriction itself.</string>
+    <string name="settings_oem_background_known">A relevant settings page is available for your device.</string>
+    <string name="settings_oem_background_generic">Check background settings through the app settings.</string>
+    <string name="settings_open_settings">Open settings</string>
     <string name="papps_title">Protected apps</string>
     <string name="papps_subtitle">Choose the apps that should stay locked for your child</string>
     <string name="papps_empty">No suitable apps found yet</string>
@@ -226,9 +244,30 @@
     <string name="protection_req_grant">Grant</string>
     <string name="protection_req_open">Open</string>
     <string name="protection_req_ok">Ready</string>
+    <string name="protection_readiness_label_off">Protection is off</string>
+    <string name="protection_readiness_label_not_ready">Setup needed</string>
+    <string name="protection_readiness_label_limited">Partial protection</string>
+    <string name="protection_readiness_label_ready">Protection ready</string>
+    <string name="protection_readiness_hint_off">Protection is off. Use the switch above to turn it on.</string>
+    <string name="protection_readiness_hint_not_ready">Finish setup for protection to work: a parent face and at least one protected app are needed.</string>
+    <string name="protection_readiness_hint_limited">Protection is running, but some permissions are missing. Enable them for full protection.</string>
+    <string name="protection_readiness_hint_ready">All required permissions are granted. QALQON is ready to protect.</string>
+    <string name="protection_requirements_required_group">Required for full protection</string>
+    <string name="protection_capability_why_camera">QALQON uses the camera to tell who is looking at the phone.</string>
+    <string name="protection_capability_why_usage_access">QALQON needs to know which app is open on the screen.</string>
+    <string name="protection_capability_why_accessibility">Needed to limit what the child can open on the phone screen.</string>
+    <string name="protection_capability_why_overlay">Needed to show the protection screen over other apps.</string>
+    <string name="protection_capability_state_ready">Ready</string>
+    <string name="protection_capability_state_missing">Not enabled</string>
+    <string name="protection_capability_state_unavailable">Not available on this device</string>
+    <string name="protection_camera_recovery_title">Restarting the camera</string>
+    <string name="protection_camera_recovery_body">We are restoring the camera. This may take a few seconds.</string>
+    <string name="protection_camera_recovery_unavailable">The camera is not working. Another app may be using it.</string>
+    <string name="protection_camera_recovery_retry">Try again</string>
+    <string name="protection_camera_recovery_restored">Camera restored, protection continues.</string>
     <string name="protection_emergency_hint">Enter the PIN to temporarily lift the block.</string>
     <string name="protection_tech_title">Technical details</string>
-    <string name="protection_limit_note">Protection currently works fully while Qalqon is open. Keeping the camera alive in the background will need a system service in a later phase.</string>
+    <string name="protection_limit_note">Protection keeps running in the background through a system service. The camera starts when Qalqon is opened and then keeps recognizing in the background; after a restart, it resumes the next time you open Qalqon.</string>
     <string name="parent_details_title">Your details</string>
     <string name="parent_details_subtitle">These details are used to tell you apart from your child.</string>
     <string name="parent_phone_label">Phone number: %1$s</string>
@@ -244,6 +283,7 @@
     <string name="settings_no_face_policy_hint">What Qalqon does when the camera sees no face.</string>
     <string name="settings_low_battery_hint">Slows checking down when the battery is low.</string>
     <string name="error_generic">Error: %1$s</string>
+    <string name="error_unexpected">Something went wrong. Please try again.</string>
     <string name="enroll_hint_no_face">Look at the camera</string>
     <string name="enroll_hint_look_straight">Look straight</string>
     <string name="enroll_hint_too_far">Come a bit closer</string>
@@ -566,6 +606,9 @@
     <string name="health_status_warning">Warning</string>
     <string name="health_status_failed">Failed</string>
     <string name="health_status_unknown">Unknown</string>
+    <string name="health_check_battery_optimization">Battery optimization</string>
+    <string name="health_check_oem_background">Manufacturer background restriction</string>
+    <string name="health_status_unavailable">Not available</string>
 
     <!-- Robust frontal multi-frame enrollment -->
     <string name="enroll_hint_initial">Face the camera and hold still naturally for a moment.</string>
@@ -837,4 +880,51 @@
     <string name="help_assistant_ctx_no_children">No child profile has been added yet. Add one from the Children tab.</string>
     <string name="help_assistant_ctx_no_children_followup">Open the Children tab and press Add (＋).</string>
     <string name="help_assistant_ctx_notifications_off">Notifications are currently disabled for Qalqon, so alerts are not shown. Check the notification permission in the device settings.</string>
+
+    <!-- Stage 7: subscription + 3-day trial. Prices are shown dynamically from Google Play. -->
+    <string name="settings_category_subscription">Subscription</string>
+    <string name="settings_category_subscription_desc">Premium subscription and 3-day free trial</string>
+    <string name="settings_group_subscription">Subscription</string>
+    <string name="subscription_title">Subscription</string>
+    <string name="subscription_plan_name">Qalqon Premium</string>
+    <string name="subscription_trial_badge">3 days free</string>
+    <string name="subscription_price_after_trial">Then %1$s per month</string>
+    <string name="subscription_price_unavailable">Loading price…</string>
+    <string name="subscription_billing_frequency">Monthly auto-renewing subscription</string>
+    <string name="subscription_auto_renew_notice">After the trial it starts automatically and renews monthly.</string>
+    <string name="subscription_cancel_notice">Cancel anytime; premium stays active until the end of the current period.</string>
+    <string name="subscription_start_trial">Start 3-day free trial</string>
+    <string name="subscription_manage">Manage subscription</string>
+    <string name="subscription_restore">Restore purchase</string>
+    <string name="subscription_refresh">Refresh</string>
+    <string name="subscription_loading">Loading…</string>
+    <string name="subscription_restored">Subscription restored</string>
+    <string name="subscription_offline_note">Premium status is based on the last check and is kept even when you are offline.</string>
+    <string name="subscription_benefits_title">What premium includes</string>
+    <string name="subscription_benefit_multi_child">Multiple child profiles</string>
+    <string name="subscription_benefit_schedules">Schedules</string>
+    <string name="subscription_benefit_screen_time">Screen-time limits</string>
+    <string name="subscription_benefit_eye_safety">Eye safety</string>
+    <string name="subscription_benefit_requests">Extra-time requests</string>
+    <string name="subscription_benefit_activity">Activity history</string>
+    <string name="subscription_free_note">Core protection (app blocking, face recognition, PIN) is free.</string>
+    <string name="subscription_status_none">No subscription</string>
+    <string name="subscription_status_trial">Free trial active</string>
+    <string name="subscription_status_active">Active</string>
+    <string name="subscription_status_canceled">Canceled; active until period end</string>
+    <string name="subscription_status_grace">Payment issue; premium still active</string>
+    <string name="subscription_status_hold">Payment issue; premium paused</string>
+    <string name="subscription_status_expired">Expired</string>
+    <string name="subscription_status_revoked">Revoked</string>
+    <string name="subscription_status_pending">Payment pending</string>
+    <string name="subscription_status_unavailable">Google Play unavailable</string>
+    <string name="subscription_status_unknown">Status unknown</string>
+    <string name="subscription_error_user_canceled">Purchase canceled</string>
+    <string name="subscription_error_billing_unavailable">Google Play is not available right now. Try again later.</string>
+    <string name="subscription_error_item_unavailable">The subscription is not available right now.</string>
+    <string name="subscription_error_already_owned">You are already subscribed. Tap “Restore purchase”.</string>
+    <string name="subscription_error_network">Network error. Check your connection and try again.</string>
+    <string name="subscription_error_pending">Payment pending.</string>
+    <string name="subscription_error_unexpected">Something went wrong. Try again later.</string>
+    <string name="subscription_manage_open_failed">Could not open the subscription management page.</string>
 </resources>

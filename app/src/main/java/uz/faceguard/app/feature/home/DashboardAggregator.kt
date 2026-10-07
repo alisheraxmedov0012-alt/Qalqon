@@ -226,6 +226,7 @@ class DashboardAggregator(
             protectionState = runtime.protectionState,
             identity = runtime.identity?.identity,
             liveness = runtime.liveness?.state,
+            livenessSource = runtime.liveness?.source,
             blockedApp = runtime.blockedApp,
             scheduleResolution = runtime.scheduleResolution,
             eyeSafety = eyeSafety,

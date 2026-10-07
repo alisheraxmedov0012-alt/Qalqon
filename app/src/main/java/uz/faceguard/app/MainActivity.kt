@@ -3,6 +3,7 @@ package uz.faceguard.app
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.fragment.app.FragmentActivity
@@ -54,6 +55,13 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Stage 7: Android 15 (API 35) enforces edge-to-edge for apps targeting 35+,
+        // and Android 16 continues it. Calling enableEdgeToEdge() makes that behaviour
+        // explicit and *uniform across API 26–36* (the library applies the right system
+        // bar transparency/icon contrast and scrims on older levels), instead of the
+        // app being edge-to-edge only from API 35 and opaque before it. Content insets
+        // are consumed by each screen's Material3 Scaffold.
+        enableEdgeToEdge()
         requestedDestination.value = intent?.getStringExtra(NotificationNavigation.EXTRA_DESTINATION)
         setContent {
             // Created outside LocalizedApp: the NavController must keep the real

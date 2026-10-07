@@ -45,9 +45,15 @@ val hasReleaseSigning = listOf(
 
 // Version source of truth. The values below are the defaults; a release pipeline
 // may override them for a single build without editing this file, e.g.
-//   ./gradlew :app:assembleRelease -PqalqonVersionCode=2 -PqalqonVersionName=0.1.1
+//   ./gradlew :app:assembleRelease -PqalqonVersionCode=2 -PqalqonVersionName=1.0.1
+//
+// Stage 12 (Final Device Certification & Release): the version was explicitly chosen
+// for the first production release — versionCode 1 / versionName "1.0.0" — rather than
+// leaving the pre-release "0.1.0" placeholder. This is a reported, deliberate change
+// (see docs/STAGE12_FINAL_DEVICE_CERTIFICATION.md), not an automatic bump. Every
+// subsequent Play upload must increase versionCode.
 val defaultVersionCode = 1
-val defaultVersionName = "0.1.0"
+val defaultVersionName = "1.0.0"
 val resolvedVersionCode = (project.findProperty("qalqonVersionCode") as String?)?.toIntOrNull()
     ?: defaultVersionCode
 val resolvedVersionName = (project.findProperty("qalqonVersionName") as String?)?.takeIf { it.isNotBlank() }
@@ -55,12 +61,12 @@ val resolvedVersionName = (project.findProperty("qalqonVersionName") as String?)
 
 android {
     namespace = "uz.faceguard.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "uz.faceguard.app"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = resolvedVersionCode
         versionName = resolvedVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -86,7 +92,19 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // Stage 10 (Privacy & Security Hardening): R8 minification + resource
+            // shrinking are ENABLED for release. They are the single largest
+            // attack-surface reduction available to a consumer app: without them the
+            // release APK ships full symbol names, dead code and unused resources, which
+            // makes reverse engineering the recognition/billing/licensing surfaces
+            // trivial. Debug/test variants are unaffected (minify is release-only).
+            //
+            // The R8 step is verified by `:app:minifyReleaseWithR8` in the build gate.
+            // The *runtime* of the minified release APK is NOT device-verified here
+            // (release signing secrets and a device are unavailable) — see
+            // `docs/STAGE10_PRIVACY_SECURITY_HARDENING.md`.
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // A permanent release identity, deliberately separate from the debug
             // key, so successive release APKs update over one another.
@@ -113,6 +131,13 @@ android {
     androidResources {
         // TFLite models must stay uncompressed so the Interpreter can mmap them.
         noCompress += "tflite"
+    }
+    testOptions {
+        // Stage 7: the billing layer logs recoverable failures (e.g. a deferred
+        // acknowledgement) via android.util.Log. Unit tests run on the JVM where the
+        // Android framework is stubbed; return defaults so a Log call does not throw
+        // "Method w in android.util.Log not mocked". No test asserts on Log output.
+        unitTests.isReturnDefaultValues = true
     }
 }
 
@@ -144,6 +169,10 @@ dependencies {
     // no INTERNET permission and no cloud client are introduced by this dependency.
     implementation(libs.mlkit.genai.prompt)
     implementation(libs.tensorflow.lite)
+    // Google Play Billing (subscriptions + 3-day trial). Talks to the Play Store over
+    // IPC; the offline-first contract is preserved by stripping the INTERNET/transport
+    // the library injects (see AndroidManifest.xml).
+    implementation(libs.billing)
     implementation(libs.accompanist.permissions)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

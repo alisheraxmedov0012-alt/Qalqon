@@ -7,6 +7,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import uz.faceguard.app.R
+import uz.faceguard.app.core.liveness.LivenessSource
 import uz.faceguard.app.core.protection.ProtectionState
 import uz.faceguard.app.domain.model.ActivityEvent
 import uz.faceguard.app.domain.model.ActivityEventType
@@ -65,12 +66,25 @@ class DashboardMappingTest {
 
     @Test
     fun livenessIsSurfacedOnlyWhenItIsActionable() {
-        assertEquals(R.string.dashboard_liveness_live, livenessLabelRes(LivenessState.LIVE))
-        assertEquals(R.string.dashboard_liveness_spoof, livenessLabelRes(LivenessState.SPOOF))
-        assertNull(livenessLabelRes(LivenessState.UNKNOWN))
-        assertNull(livenessLabelRes(LivenessState.NO_FACE))
-        assertNull(livenessLabelRes(LivenessState.UNSTABLE))
-        assertNull(livenessLabelRes(null))
+        // Stage 5: a LIVE verdict is only shown when a real model produced it; the
+        // passive motion heuristic must never be presented as "a real face".
+        assertEquals(
+            R.string.dashboard_liveness_live,
+            livenessLabelRes(LivenessState.LIVE, LivenessSource.MODEL),
+        )
+        assertNull(
+            "the heuristic must not claim a real face",
+            livenessLabelRes(LivenessState.LIVE, LivenessSource.HEURISTIC),
+        )
+        assertNull(livenessLabelRes(LivenessState.LIVE, null))
+        assertEquals(
+            R.string.dashboard_liveness_spoof,
+            livenessLabelRes(LivenessState.SPOOF, LivenessSource.MODEL),
+        )
+        assertNull(livenessLabelRes(LivenessState.UNKNOWN, LivenessSource.HEURISTIC))
+        assertNull(livenessLabelRes(LivenessState.NO_FACE, LivenessSource.HEURISTIC))
+        assertNull(livenessLabelRes(LivenessState.UNSTABLE, LivenessSource.HEURISTIC))
+        assertNull(livenessLabelRes(null, null))
     }
 
     @Test

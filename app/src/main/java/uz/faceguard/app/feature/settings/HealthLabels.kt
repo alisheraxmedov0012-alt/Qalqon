@@ -29,6 +29,8 @@ fun DiagnosticCheck.labelRes(): Int = when (this) {
     DiagnosticCheck.NOTIFICATIONS -> R.string.health_check_notifications
     DiagnosticCheck.BOOT_RESTORE -> R.string.health_check_boot_restore
     DiagnosticCheck.SCHEDULE_SYNC -> R.string.health_check_schedule_sync
+    DiagnosticCheck.BATTERY_OPTIMIZATION -> R.string.health_check_battery_optimization
+    DiagnosticCheck.OEM_BACKGROUND -> R.string.health_check_oem_background
 }
 
 fun DiagnosticStatus.labelRes(): Int = when (this) {
@@ -36,4 +38,5 @@ fun DiagnosticStatus.labelRes(): Int = when (this) {
     DiagnosticStatus.WARNING -> R.string.health_status_warning
     DiagnosticStatus.FAILED -> R.string.health_status_failed
     DiagnosticStatus.UNKNOWN -> R.string.health_status_unknown
+    DiagnosticStatus.UNAVAILABLE -> R.string.health_status_unavailable
 }

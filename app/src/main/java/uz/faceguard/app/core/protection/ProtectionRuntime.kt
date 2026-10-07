@@ -19,6 +19,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -35,6 +36,12 @@ import uz.faceguard.app.core.liveness.LivenessResult
 import uz.faceguard.app.core.security.SecurityState
 import uz.faceguard.app.core.security.SecurityStateHolder
 import uz.faceguard.app.core.monitor.ForegroundAppMonitor
+import uz.faceguard.app.core.oem.AndroidOemSettings
+import uz.faceguard.app.core.permission.AndroidProtectionCapabilitySource
+import uz.faceguard.app.core.permission.ProtectionCapabilitySource
+import uz.faceguard.app.domain.oem.OemFamily
+import uz.faceguard.app.domain.oem.OemSettingsTarget
+import uz.faceguard.app.domain.oem.OemSupportLevel
 import uz.faceguard.app.core.recognition.Recognizer
 import uz.faceguard.app.core.scan.ScanScheduler
 import uz.faceguard.app.core.screentime.ScreenTimeUsageCollectionRunner
@@ -50,7 +57,9 @@ import uz.faceguard.app.domain.model.ParentProfile
 import uz.faceguard.app.domain.model.ScanMode
 import uz.faceguard.app.domain.policy.AppPolicy
 import uz.faceguard.app.domain.protection.ProtectionCapability
+import uz.faceguard.app.domain.protection.ProtectionReadiness
 import uz.faceguard.app.domain.protection.missingProtectionCapabilities
+import uz.faceguard.app.domain.protection.protectionReadiness
 import uz.faceguard.app.domain.policy.ChildAppPolicyRepository
 import uz.faceguard.app.domain.notification.AppNotificationDispatcher
 import uz.faceguard.app.domain.notification.AppNotificationEvent
@@ -99,6 +108,34 @@ data class ProtectionRuntimeState(
      * fresh session is never reported as limited before the service says otherwise.
      */
     val cameraForegroundReady: Boolean = true,
+    /**
+     * Stage 5: true once the persisted settings have been observed at least once,
+     * so "protection is off" can be told apart from "settings have not loaded yet".
+     * A system-initiated service restart uses it to decide whether to continue.
+     */
+    val settingsLoaded: Boolean = false,
+    /**
+     * Stage 5: true while a failed camera binding is being retried (bounded), or its
+     * retries are exhausted, so recognition is camera-limited. Reported honestly;
+     * never a blocking decision — blocking is the overlay's job.
+     */
+    val cameraRecovering: Boolean = false,
+    /**
+     * Stage 6: the device's detected OEM family, for compatibility guidance only. A
+     * property of the device, not of protection — it never changes any decision.
+     */
+    val oemFamily: OemFamily = OemFamily.UNKNOWN,
+    /**
+     * Stage 6: true when an OEM-specific guidance page is known for [oemFamily]; the
+     * UI then offers the specific page, otherwise the generic app settings.
+     */
+    val oemGuidanceAvailable: Boolean = false,
+    /**
+     * Stage 6: whether the OS will not battery-optimize QALQON. `null` means the
+     * concept does not apply on this platform. A *recommended* signal: it is reported
+     * but never counted as a missing protection capability.
+     */
+    val batteryOptimizationIgnored: Boolean? = true,
     /** True when the user has explicitly enabled QALQON's accessibility service. */
     val accessibilityEnabled: Boolean = false,
     /**
@@ -170,6 +207,20 @@ data class ProtectionRuntimeState(
     val degraded: Boolean get() = degradedCapabilities.isNotEmpty()
 
     /**
+     * Stage 8: the honest readiness verdict (OFF / NOT_READY / LIMITED / READY),
+     * derived from real capability health rather than the on/off setting. The UI shows
+     * this so "Protection: ON" can never be mistaken for "fully protecting".
+     */
+    val readiness: ProtectionReadiness
+        get() = protectionReadiness(
+            enabled = enabled,
+            active = active,
+            parentFaceEnrolled = parentFaceEnrolled,
+            protectedAppCount = protectedCount,
+            missingCapabilities = degradedCapabilities,
+        )
+
+    /**
      * True after a background (e.g. post-reboot) restore while the camera foreground
      * type has not been claimed yet, so the camera — and therefore recognition — is
      * limited until the app is next opened. Distinct from a missing camera
@@ -220,6 +271,18 @@ class ProtectionRuntime @Inject constructor(
     private val policyEvaluator: PolicyEvaluator,
     private val serviceLauncher: ProtectionServiceLauncher,
     /**
+     * Stage 5: the process-scoped camera session the foreground service drives. The
+     * runtime mirrors its bounded-recovery state, so "recognition is camera-limited"
+     * is visible to the UI/diagnostics without reaching into the service.
+     */
+    private val cameraSession: ProtectionCameraSession,
+    /**
+     * Stage 6: the centralised OEM-compatibility layer. The runtime only *reads* it —
+     * the detected family, the battery-optimization state and the ordered settings
+     * intents — so recognition/policy/enforcement are never affected by OEM detection.
+     */
+    private val oemSettings: AndroidOemSettings,
+    /**
      * Phase 7.2: the connected accessibility overlay host, if any. Its presence
      * upgrades the legacy visual scrim into a real, touch-consuming
      * `TYPE_ACCESSIBILITY_OVERLAY` block. One-way dependency: this registry has no
@@ -267,6 +330,13 @@ class ProtectionRuntime @Inject constructor(
     )
     private val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val scheduler = ScanScheduler(context)
+    /**
+     * The three special-access reads, behind one seam so they are consistent (Usage
+     * Access uses a single source of truth) and refreshable after returning from system
+     * settings. Android state on some OEMs updates a moment *after* the activity
+     * resumes, so [refreshPermissions] re-probes a bounded number of times.
+     */
+    private val capabilities: ProtectionCapabilitySource = AndroidProtectionCapabilitySource(context)
     private val engine = ProtectionEngine(
         recognizer = recognizer,
         monitor = monitor,
@@ -276,11 +346,17 @@ class ProtectionRuntime @Inject constructor(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
+    /** The bounded post-resume capability re-probe; replaced (cancelled) on each resume. */
+    private var capabilityReprobeJob: Job? = null
+
     private val _state = MutableStateFlow(ProtectionRuntimeState())
     val state: StateFlow<ProtectionRuntimeState> = _state
 
     private var started = false
     private var active = false
+
+    /** Stage 5: set once the persisted settings have been observed at least once. */
+    private var settingsLoaded = false
 
     private var accountId: Long? = null
 
@@ -466,6 +542,13 @@ class ProtectionRuntime @Inject constructor(
         // resume. Probes are kept out of the hot syncActive() path because they
         // read system state and run on the main dispatcher.
         refreshPermissions()
+        // A failed recognition call or protection side effect (overlay/audio) is a
+        // runtime condition, not a crash: the engine isolates it and reports it here.
+        // It is logged only — no face image, embedding, PIN or personal data is ever
+        // involved — so a degraded block is diagnosable without weakening privacy.
+        engine.onEngineError = { error ->
+            Log.w(TAG, "protection side effect failed", error)
+        }
         engine.onEvent = { type, detail ->
             // Activity logging is secondary observability: it must never
             // interrupt protection, so a write failure is swallowed (and only
@@ -544,6 +627,7 @@ class ProtectionRuntime @Inject constructor(
         scope.launch {
             settingsRepository.settings.collect { value ->
                 settings = ProtectionSettings.from(value)
+                settingsLoaded = true
                 syncContext()
                 syncActive()
             }
@@ -614,6 +698,13 @@ class ProtectionRuntime @Inject constructor(
         scope.launch {
             scheduler.lastEvent.collect { value -> _state.update { it.copy(lastTrigger = value?.trigger?.name ?: "") } }
         }
+        // Stage 5: the camera session's bounded-recovery state, mirrored so
+        // "recognition is camera-limited" is reportable without reaching the service.
+        scope.launch {
+            cameraSession.recovering.collect { value ->
+                _state.update { it.copy(cameraRecovering = value) }
+            }
+        }
         // Degraded protection: whenever the set of missing capabilities changes while
         // protection is requested, tell the parent once per distinct set. The
         // coordinator's dedup key (the set itself) collapses repeats, so a steady
@@ -657,6 +748,7 @@ class ProtectionRuntime @Inject constructor(
                 overlayGranted = overlay.hasPermission(),
                 usageAccessGranted = monitor.hasUsageAccess(),
                 cameraGranted = hasCameraPermission(),
+                settingsLoaded = settingsLoaded,
             )
         }
     }
@@ -707,6 +799,59 @@ class ProtectionRuntime @Inject constructor(
     }
 
     /**
+     * Stage 5: called by the protection foreground service on every create/start,
+     * including a system-initiated (sticky) restart. Re-derives the active session from
+     * the already-observed settings, so a service recreate *within the same process*
+     * re-activates protection instead of leaving it inactive until the next
+     * settings/account emission. Idempotent.
+     */
+    fun onServiceStarted() {
+        start()
+        syncActive()
+    }
+
+    /**
+     * Stage 5: whether the persisted intent wants protection running right now. Used by
+     * a system-initiated restart to decide whether to continue or end the service; it is
+     * the same definition the rest of the runtime uses ([ProtectionServicePolicy]).
+     */
+    fun protectionWanted(): Boolean =
+        ProtectionServicePolicy.shouldRun(settings.enabled, accountId)
+
+    /**
+     * Stage 5: the screen turned off. Drops stale recognition immediately (a face seen
+     * before the lock must never be treated as a current reading) and releases the camera
+     * binding while keeping the session — and the foreground service's camera type —
+     * latched. The protection *state* is deliberately untouched: releasing the block on a
+     * screen-off would be fail-open.
+     */
+    fun onScreenOff() {
+        engine.onCameraInterrupted()
+        cameraSession.onScreenStateChanged(false)
+    }
+
+    /**
+     * Stage 5: the screen is back on. Re-establishes a suspended camera binding, or
+     * resumes a bounded recovery that the screen-off interrupted. It never *starts* the
+     * session: a screen-on is not a while-in-use moment, so this only affects a session
+     * that is already latched.
+     */
+    fun onScreenOn() {
+        cameraSession.onScreenStateChanged(true)
+    }
+
+    /**
+     * Stage 8: the parent's explicit "retry camera" action while recognition is
+     * camera-limited. Idempotent — it resets the bounded recovery counter and re-binds
+     * the single process-scoped session, so repeated taps cannot open a second camera,
+     * analyzer or session. A no-op when protection is not active.
+     */
+    fun retryCameraRecovery() {
+        if (!active) return
+        cameraSession.retryNow()
+    }
+
+    /**
      * Phase 7.1: whether a Qalqon activity is currently visible. This is the
      * while-in-use moment in which a camera foreground service may legally be
      * started; the process-scoped camera session starts only here and then keeps
@@ -723,7 +868,12 @@ class ProtectionRuntime @Inject constructor(
      */
     fun onUiForeground() {
         _uiForeground.value = true
-        if (active) serviceLauncher.start()
+        if (active) {
+            serviceLauncher.start()
+            // Stage 5: a legal foreground moment also clears a screen-off camera
+            // suspension or resumes a recovery the screen-off interrupted.
+            cameraSession.onScreenStateChanged(true)
+        }
     }
 
     /** Phase 7.1: the UI is no longer visible. The camera session stays latched. */
@@ -767,15 +917,49 @@ class ProtectionRuntime @Inject constructor(
         // crossing midnight and returning to the screen) starts/stops enforcement without any
         // new timer. Collectors are only re-created, never started anywhere else.
         refreshChildUsage()
+        applyCapabilitySnapshot()
+        // Some OEMs update the app-op / accessibility setting a fraction of a second
+        // *after* the activity resumes, so a single immediate probe can read stale state
+        // and leave the requirement stuck on "grant". Re-probe a bounded number of times
+        // until everything is granted (or the attempts run out) — generic, no OEM
+        // hardcoding, and no false "ready": each probe reads the real system state.
+        scheduleCapabilityReprobe()
+    }
+
+    /** Reads the three special-access capabilities and publishes them. */
+    private fun applyCapabilitySnapshot() {
+        val caps = capabilities.read()
         _state.update {
             it.copy(
-                overlayGranted = overlay.hasPermission(),
-                usageAccessGranted = monitor.hasUsageAccess(),
-                accessibilityEnabled = AccessibilityCapability.isEnabled(context),
+                overlayGranted = caps.overlayGranted,
+                usageAccessGranted = caps.usageAccessGranted,
+                accessibilityEnabled = caps.accessibilityEnabled,
                 cameraGranted = hasCameraPermission(),
                 notificationsEnabled = runCatching { notificationDispatcher.areNotificationsEnabled() }.getOrDefault(true),
                 securityState = securityStateHolder.state.value,
+                // Stage 6: the device's OEM family and battery-optimization state. Both
+                // are read (never inferred) and are reporting-only — they change no
+                // recognition/policy decision and are not part of the degraded set.
+                oemFamily = oemSettings.family,
+                oemGuidanceAvailable = oemSettings.profile().supportLevel == OemSupportLevel.SUPPORTED,
+                batteryOptimizationIgnored = runCatching { oemSettings.isIgnoringBatteryOptimizations() }
+                    .getOrNull(),
             )
+        }
+    }
+
+    /**
+     * Bounded post-resume re-probe. Cancels any previous re-probe so rapid open/close of
+     * settings cannot stack coroutines. Stops early once all three capabilities are held.
+     */
+    private fun scheduleCapabilityReprobe() {
+        capabilityReprobeJob?.cancel()
+        capabilityReprobeJob = scope.launch {
+            repeat(CAPABILITY_REPROBE_ATTEMPTS) {
+                delay(CAPABILITY_REPROBE_INTERVAL_MS)
+                applyCapabilitySnapshot()
+                if (capabilities.read().allGranted) return@launch
+            }
         }
     }
 
@@ -929,7 +1113,35 @@ class ProtectionRuntime @Inject constructor(
         }
     }
 
+    /**
+     * Stage 6: the ordered battery-optimization settings pages (platform list page,
+     * then the app's own details page). The caller launches the first one that
+     * resolves — see `openFirstAvailable`. There is deliberately no intent that forces
+     * the change: battery optimization is recommended, never mandated.
+     */
+    fun batteryOptimizationIntents(): List<Intent> = oemSettings.batteryOptimizationIntentCandidates()
+
+    /**
+     * Stage 6: the ordered OEM background/autostart settings pages for this device,
+     * ending in a universal fallback. The list is always non-empty, so the guidance is
+     * always actionable even on an unknown OEM.
+     *
+     * @param target which OEM surface to open (autostart or app-specific battery page).
+     */
+    fun oemBackgroundIntents(
+        target: OemSettingsTarget = OemSettingsTarget.AUTOSTART,
+    ): List<Intent> = oemSettings.settingsIntentCandidates(target)
+
     private companion object {
         const val TAG = "ProtectionRuntime"
+
+        /**
+         * Post-resume capability re-probe: a bounded number of attempts (≈2s total) so an
+         * OEM that updates the app-op / accessibility secure setting slightly after
+         * resume is still caught without a restart, and without ever reporting a false
+         * "ready" (each attempt reads real system state).
+         */
+        const val CAPABILITY_REPROBE_ATTEMPTS = 3
+        const val CAPABILITY_REPROBE_INTERVAL_MS = 700L
     }
 }

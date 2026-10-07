@@ -4,7 +4,7 @@ import uz.faceguard.app.domain.policy.AppPolicy
 import uz.faceguard.app.domain.policy.AppPolicyMode
 import uz.faceguard.app.domain.policy.DeviceOwnerMode
 import uz.faceguard.app.domain.policy.EyeSafetyState
-import uz.faceguard.app.domain.policy.LivenessState
+import uz.faceguard.app.domain.policy.LivenessPolicy
 import uz.faceguard.app.domain.policy.PolicyContext
 import uz.faceguard.app.domain.policy.PolicyDecision
 import uz.faceguard.app.domain.policy.PolicyEvaluator
@@ -33,9 +33,13 @@ class DefaultPolicyEvaluator : PolicyEvaluator {
         // 2. A spoofed presentation is never trusted. A printed photo, screen or
         //    replay that is *recognised* as the parent (or child) must not inherit
         //    that identity's policy, so this gate runs before the identity switch.
-        //    Non-spoof liveness states (LIVE/UNKNOWN/NO_FACE/UNSTABLE) fall through
-        //    unchanged, preserving all pre-Group-9 behaviour.
-        if (context.liveness == LivenessState.SPOOF) {
+        //    The combination rule is the explicit, unit-tested
+        //    [uz.faceguard.app.domain.policy.LivenessPolicy]: only a positive SPOOF
+        //    determination overrides a recognised identity. Undecided liveness
+        //    (LIVE/UNKNOWN/UNSTABLE/NO_FACE) falls through unchanged, preserving all
+        //    pre-Stage-3 behaviour (see that object's documentation for why an
+        //    undecided observation is not turned into a hard block).
+        if (LivenessPolicy.overridesIdentity(context.liveness)) {
             return configured(
                 settings.spoofAction,
                 PolicyTrigger.LIVENESS_SPOOF,

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -22,6 +23,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -55,10 +57,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import uz.faceguard.app.R
+import uz.faceguard.app.core.permission.openFirstSettingsOrFallback
+import uz.faceguard.app.core.permission.openSettingsOrFallback
 import uz.faceguard.app.core.protection.ProtectionRuntime
 import uz.faceguard.app.core.protection.ProtectionRuntimeState
 import uz.faceguard.app.core.protection.ProtectionState
 import uz.faceguard.app.core.security.SecurityState
+import uz.faceguard.app.core.ui.protectionCapabilityWhyRes
+import uz.faceguard.app.core.ui.protectionReadinessHintRes
+import uz.faceguard.app.core.ui.protectionReadinessLabelRes
 import uz.faceguard.app.core.ui.qalqon.ProtectionDegradedBanner
 import uz.faceguard.app.domain.model.AppSettings
 import uz.faceguard.app.domain.model.ScanMode
@@ -122,6 +129,25 @@ class ProtectionViewModel @Inject constructor(
     /** The system settings page that fixes [capability], for the degraded banner action. */
     fun capabilitySettingsIntent(capability: ProtectionCapability): Intent =
         runtime.capabilitySettingsIntent(capability)
+
+    /**
+     * Stage 6: ordered battery-optimization settings pages (platform list page then the
+     * app details page). Launched with `openFirstSettingsOrFallback`, so an unresolved
+     * page never dead-ends.
+     */
+    fun batteryOptimizationIntents(): List<Intent> = runtime.batteryOptimizationIntents()
+
+    /**
+     * Stage 6: ordered OEM background/autostart settings pages for this device, ending
+     * in a universal fallback.
+     */
+    fun oemBackgroundIntents(): List<Intent> = runtime.oemBackgroundIntents()
+
+    /**
+     * Stage 8: the parent's retry after a camera interruption. Idempotent (delegates to
+     * the single process-scoped session), so repeated taps cannot create a second camera.
+     */
+    fun retryCameraRecovery() = runtime.retryCameraRecovery()
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
@@ -141,6 +167,10 @@ fun ProtectionScreen(
     var showTech by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
     var pinError by remember { mutableStateOf(false) }
+    // Google Play User Data policy: a non-accessibility-tool app that uses the
+    // AccessibilityService API must show a clear in-app disclosure and obtain
+    // affirmative consent before the user is sent to enable the service.
+    var showAccessibilityDisclosure by remember { mutableStateOf(false) }
     val lockoutRemainingMs by viewModel.lockoutRemainingMs.collectAsStateWithLifecycle()
 
     // Phase 7.1: the screen no longer owns the camera. The process-scoped camera
@@ -187,12 +217,19 @@ fun ProtectionScreen(
             ProtectionDegradedBanner(
                 missing = state.degradedCapabilities,
                 onFix = { capability ->
-                    context.startActivity(viewModel.capabilitySettingsIntent(capability))
+                    context.openSettingsOrFallback(viewModel.capabilitySettingsIntent(capability))
                 },
                 cameraLimitedAfterBoot = state.cameraLimitedAfterBoot,
             )
 
             StatusCard(state)
+
+            // Stage 8: distinct camera-interruption feedback (recovery in progress /
+            // exhausted), never the same as "no permission".
+            CameraRecoveryCard(
+                recovering = state.cameraRecovering,
+                onRetry = viewModel::retryCameraRecovery,
+            )
 
             RequirementsCard(
                 state = state,
@@ -200,11 +237,25 @@ fun ProtectionScreen(
                 // reflected even before the permission dialog's callback lands.
                 cameraGranted = state.cameraGranted,
                 onGrantCamera = { cameraPermission.launchPermissionRequest() },
-                onGrantUsage = { context.startActivity(viewModel.usageAccessIntent()) },
-                onGrantOverlay = { context.startActivity(viewModel.overlayPermissionIntent()) },
-                onOpenAccessibility = { context.startActivity(viewModel.accessibilitySettingsIntent()) },
+                onGrantUsage = { context.openSettingsOrFallback(viewModel.usageAccessIntent()) },
+                onGrantOverlay = { context.openSettingsOrFallback(viewModel.overlayPermissionIntent()) },
+                onOpenAccessibility = { showAccessibilityDisclosure = true },
                 onOpenParentProfile = onOpenParentProfile,
                 onOpenProtectedApps = onOpenProtectedApps,
+            )
+
+            // Stage 6: OEM / battery compatibility guidance. Recommended reliability
+            // steps, kept separate from the *required* capabilities above so the two
+            // are never confused. Every action resolves its page before launching and
+            // falls back to the app's own settings.
+            DeviceReliabilityCard(
+                state = state,
+                onOpenBatterySettings = {
+                    context.openFirstSettingsOrFallback(viewModel.batteryOptimizationIntents())
+                },
+                onOpenOemBackground = {
+                    context.openFirstSettingsOrFallback(viewModel.oemBackgroundIntents())
+                },
             )
 
             EmergencyCard(
@@ -255,6 +306,30 @@ fun ProtectionScreen(
             )
         }
     }
+
+    // Google Play User Data policy (Accessibility API): clear in-app disclosure +
+    // affirmative consent before enabling the service. The disclosure states what the
+    // service does and which data it accesses; consent is the explicit confirm action.
+    if (showAccessibilityDisclosure) {
+        AlertDialog(
+            onDismissRequest = { showAccessibilityDisclosure = false },
+            title = { Text(stringResource(R.string.accessibility_disclosure_title)) },
+            text = { Text(stringResource(R.string.accessibility_disclosure_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showAccessibilityDisclosure = false
+                    context.openSettingsOrFallback(viewModel.accessibilitySettingsIntent())
+                }) {
+                    Text(stringResource(R.string.accessibility_disclosure_agree))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAccessibilityDisclosure = false }) {
+                    Text(stringResource(R.string.accessibility_disclosure_decline))
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -279,26 +354,12 @@ private fun MasterToggleCard(enabled: Boolean, onToggle: (Boolean) -> Unit) {
 
 @Composable
 private fun StatusCard(state: ProtectionRuntimeState) {
-    val title: String
-    val detail: String
-    when {
-        !state.enabled -> {
-            title = stringResource(R.string.protection_status_inactive)
-            detail = stringResource(R.string.protection_status_inactive_hint)
-        }
-        !state.active -> {
-            title = stringResource(R.string.protection_status_no_account)
-            detail = stringResource(R.string.protection_status_no_account_hint)
-        }
-        !state.ready -> {
-            title = stringResource(R.string.protection_status_setup_needed)
-            detail = stringResource(R.string.protection_status_setup_hint)
-        }
-        else -> {
-            title = stringResource(R.string.protection_status_active)
-            detail = stringResource(R.string.protection_status_active_hint)
-        }
-    }
+    // Stage 8: the verdict comes from the honest readiness model, never the on/off
+    // setting alone, so "Protection: ON" can never be shown while a critical capability
+    // is missing.
+    val readiness = state.readiness
+    val title = stringResource(protectionReadinessLabelRes(readiness))
+    val detail = stringResource(protectionReadinessHintRes(readiness))
 
     val stateLabel = when (state.protectionState) {
         ProtectionState.UNPROTECTED -> stringResource(R.string.protection_state_unprotected)
@@ -309,13 +370,47 @@ private fun StatusCard(state: ProtectionRuntimeState) {
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.protection_toggle_label), style = MaterialTheme.typography.titleLarge)
+            Text(title, style = MaterialTheme.typography.titleMedium)
             Text(detail, style = MaterialTheme.typography.bodyMedium)
             Text(
                 stringResource(R.string.protection_status_state, stateLabel),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+/**
+ * Stage 8: camera-interruption feedback. Shown only while Stage 5's bounded camera
+ * recovery is running, or when it is exhausted — a distinct state from "no camera
+ * permission" and from "camera unavailable". The retry action is idempotent.
+ */
+@Composable
+private fun CameraRecoveryCard(
+    recovering: Boolean,
+    onRetry: () -> Unit,
+) {
+    if (!recovering) return
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                stringResource(R.string.protection_camera_recovery_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                stringResource(R.string.protection_camera_recovery_body),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                stringResource(R.string.protection_camera_recovery_unavailable),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedButton(onClick = onRetry) {
+                Text(stringResource(R.string.protection_camera_recovery_retry))
+            }
         }
     }
 }
@@ -334,39 +429,52 @@ private fun RequirementsCard(
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.protection_requirements_title), style = MaterialTheme.typography.titleMedium)
+            // Stage 8: every row states *why* the capability is needed, in parent
+            // language, before sending the parent to a system settings page.
+            Text(
+                stringResource(R.string.protection_requirements_required_group),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
 
             RequirementRow(
-                label = stringResource(R.string.protection_req_camera),
+                label = stringResource(R.string.protection_capability_camera),
+                why = stringResource(protectionCapabilityWhyRes(ProtectionCapability.CAMERA)),
                 satisfied = cameraGranted,
                 actionLabel = stringResource(R.string.protection_req_grant),
                 onAction = onGrantCamera,
             )
             RequirementRow(
-                label = stringResource(R.string.protection_req_usage),
+                label = stringResource(R.string.protection_capability_usage_access),
+                why = stringResource(protectionCapabilityWhyRes(ProtectionCapability.USAGE_ACCESS)),
                 satisfied = state.usageAccessGranted,
                 actionLabel = stringResource(R.string.protection_req_grant),
                 onAction = onGrantUsage,
             )
             RequirementRow(
-                label = stringResource(R.string.protection_req_overlay),
+                label = stringResource(R.string.protection_capability_overlay),
+                why = stringResource(protectionCapabilityWhyRes(ProtectionCapability.OVERLAY)),
                 satisfied = state.overlayGranted,
                 actionLabel = stringResource(R.string.protection_req_grant),
                 onAction = onGrantOverlay,
             )
             RequirementRow(
-                label = stringResource(R.string.protection_req_accessibility),
+                label = stringResource(R.string.protection_capability_accessibility),
+                why = stringResource(protectionCapabilityWhyRes(ProtectionCapability.ACCESSIBILITY)),
                 satisfied = state.accessibilityEnabled,
                 actionLabel = stringResource(R.string.protection_req_open),
                 onAction = onOpenAccessibility,
             )
             RequirementRow(
                 label = stringResource(R.string.protection_req_parent_face),
+                why = stringResource(R.string.protection_capability_why_camera),
                 satisfied = state.parentFaceEnrolled,
                 actionLabel = stringResource(R.string.protection_req_open),
                 onAction = onOpenParentProfile,
             )
             RequirementRow(
                 label = stringResource(R.string.protection_req_protected_apps),
+                why = stringResource(R.string.protection_capability_why_usage_access),
                 satisfied = state.protectedCount > 0,
                 actionLabel = stringResource(R.string.protection_req_open),
                 onAction = onOpenProtectedApps,
@@ -378,6 +486,7 @@ private fun RequirementsCard(
 @Composable
 private fun RequirementRow(
     label: String,
+    why: String,
     satisfied: Boolean,
     actionLabel: String,
     onAction: () -> Unit,
@@ -388,21 +497,110 @@ private fun RequirementRow(
             color = if (satisfied) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyLarge,
         )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
+        Column(
             modifier = Modifier
                 .weight(1f)
                 .padding(start = 8.dp),
-        )
+        ) {
+            Text(text = label, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = why,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         if (!satisfied) {
             OutlinedButton(onClick = onAction) { Text(actionLabel) }
         } else {
             Text(
-                text = stringResource(R.string.protection_req_ok),
+                text = stringResource(R.string.protection_capability_state_ready),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary,
             )
+        }
+    }
+}
+
+@Composable
+private fun DeviceReliabilityCard(
+    state: ProtectionRuntimeState,
+    onOpenBatterySettings: () -> Unit,
+    onOpenOemBackground: () -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                stringResource(R.string.settings_device_reliability),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(R.string.settings_device_reliability_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Spacer(Modifier.height(12.dp))
+            Text(
+                stringResource(R.string.settings_battery_optimization),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+                stringResource(R.string.settings_battery_optimization_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                stringResource(
+                    when (state.batteryOptimizationIgnored) {
+                        true -> R.string.settings_battery_optimization_ignored
+                        false -> R.string.settings_battery_optimization_active
+                        null -> R.string.settings_battery_optimization_unavailable
+                    },
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (state.batteryOptimizationIgnored == false) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+            if (state.batteryOptimizationIgnored == false) {
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(onClick = onOpenBatterySettings) {
+                    Text(stringResource(R.string.settings_open_settings))
+                }
+            }
+
+            // OEM background/autostart guidance is shown only for families known to
+            // restrict background work, and always ends in a page that resolves.
+            if (state.oemFamily.hasKnownBackgroundRestrictions) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    stringResource(R.string.settings_oem_background),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    stringResource(R.string.settings_oem_background_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    stringResource(
+                        if (state.oemGuidanceAvailable) {
+                            R.string.settings_oem_background_known
+                        } else {
+                            R.string.settings_oem_background_generic
+                        },
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(onClick = onOpenOemBackground) {
+                    Text(stringResource(R.string.settings_open_settings))
+                }
+            }
         }
     }
 }

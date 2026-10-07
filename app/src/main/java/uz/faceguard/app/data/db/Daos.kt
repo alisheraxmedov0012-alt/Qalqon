@@ -534,15 +534,27 @@ interface ScheduleDao {
 
     @Query("DELETE FROM schedule_app_targets WHERE accountId = :accountId AND childId = :childId")
     suspend fun deleteTargetsForChild(accountId: Long, childId: Long): Int
+
+    /**
+     * Full-reset only. Schedules are per child, so there is no per-account shortcut to
+     * clear them; the full local wipe (the only "delete everything" action) is the sole
+     * caller, and it removes the rows of every account at once.
+     */
+    @Query("DELETE FROM schedule_rules")
+    suspend fun deleteAll()
+
+    /** Full-reset only; clears the schedule→package relation table (see [deleteAll]). */
+    @Query("DELETE FROM schedule_app_targets")
+    suspend fun deleteAllTargets()
 }
 
 /**
  * Phase 6 Step 3: a child's eye-safety configuration.
  *
  * Every statement is scoped by `accountId` + `childId`, which is also the composite primary key,
- * so one child's settings can never be read, overwritten or deleted as another's. There is no
- * `deleteAll`/global statement: configuration is per child, and a stray global statement would be
- * the one way to cross the boundary.
+ * so one child's settings can never be read, overwritten or deleted as another's. The only global
+ * statement is [deleteAll], which exists solely for the full local wipe (reset) and is never
+ * reachable from a per-child path.
  */
 @Dao
 interface ChildEyeSafetyDao {
@@ -560,4 +572,12 @@ interface ChildEyeSafetyDao {
     /** Returns the number of rows deleted (0 when this child had no configuration). */
     @Query("DELETE FROM child_eye_safety WHERE accountId = :accountId AND childId = :childId")
     suspend fun delete(accountId: Long, childId: Long): Int
+
+    /**
+     * Full-reset only: the sole global statement, used by the full local wipe so a
+     * deleted account leaves no eye-safety configuration behind. Never called from a
+     * per-child path.
+     */
+    @Query("DELETE FROM child_eye_safety")
+    suspend fun deleteAll()
 }

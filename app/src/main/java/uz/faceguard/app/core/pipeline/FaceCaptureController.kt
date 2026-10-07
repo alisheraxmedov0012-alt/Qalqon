@@ -58,6 +58,22 @@ class FaceCaptureController(
     private var errorListener: ((Throwable) -> Unit)? = null
     fun setErrorListener(listener: (Throwable) -> Unit) { errorListener = listener }
 
+    /**
+     * Stage 5: reports the outcome of the most recent bind. Called with `true`
+     * once the use cases are bound, and with `false` when the bind fails (camera
+     * unavailable/in use, no owner, platform error) so a process-scoped owner can
+     * attempt a bounded rebind instead of silently losing recognition.
+     */
+    private var bindStateListener: ((Boolean) -> Unit)? = null
+    fun setBindStateListener(listener: (Boolean) -> Unit) { bindStateListener = listener }
+
+    private fun reportBindState(bound: Boolean) {
+        val listener = bindStateListener ?: return
+        // The bind callback runs on the main executor; a throwing observer must not
+        // abort the camera path.
+        runCatching { listener(bound) }
+    }
+
     @Volatile
     private var lastErrorAt = 0L
 
@@ -122,6 +138,7 @@ class FaceCaptureController(
                 val owner = lifecycleOwner
                 if (owner == null) {
                     reportError(IllegalStateException("LifecycleOwner is not attached"))
+                    reportBindState(false)
                     return@addListener
                 }
 
@@ -132,8 +149,10 @@ class FaceCaptureController(
                 provider.bindToLifecycle(owner, CameraSelector.DEFAULT_FRONT_CAMERA, preview, analysis)
                 // Q-1: record ownership so teardown releases only these use cases.
                 rememberBound(preview, analysis)
+                reportBindState(true)
             } catch (t: Throwable) {
                 reportError(t)
+                reportBindState(false)
             }
         }, ContextCompat.getMainExecutor(context))
     }
@@ -152,14 +171,17 @@ class FaceCaptureController(
                 val owner = lifecycleOwner
                 if (owner == null) {
                     reportError(IllegalStateException("LifecycleOwner is not attached"))
+                    reportBindState(false)
                     return@addListener
                 }
                 val analysis = buildAnalysis(null)
                 provider.bindToLifecycle(owner, CameraSelector.DEFAULT_FRONT_CAMERA, analysis)
                 // Q-1: record ownership so teardown releases only this use case.
                 rememberBound(analysis)
+                reportBindState(true)
             } catch (t: Throwable) {
                 reportError(t)
+                reportBindState(false)
             }
         }, ContextCompat.getMainExecutor(context))
     }
@@ -187,14 +209,26 @@ class FaceCaptureController(
                             .addOnSuccessListener { faces ->
                                 try {
                                     val primary = faces.firstOrNull()
-                                    val features = primary?.let { extractEmbedding(upright, it) }
+                                    // Stage 2: embed every detected face (bounded) so the
+                                    // identity policy sees all of them, not just the first.
+                                    val faceFeatures = faces.take(MAX_ANALYZED_FACES).mapNotNull { face ->
+                                        extractEmbedding(upright, face)?.let {
+                                            FaceFeature(it.values, it.source)
+                                        }
+                                    }
                                     val liveProbability = primary?.let { runAntiSpoof(upright, it) }
                                     val frame = FrameEvent(
                                         image = input,
                                         faceCount = faces.size,
-                                        features = features,
+                                        // features/embeddingSource stay the primary face for
+                                        // enrollment guidance and liveness; `faces` carries all
+                                        // faces for the identity policy.
+                                        features = faceFeatures.firstOrNull()?.values,
                                         quality = buildQuality(faces, primary, upright),
                                         liveProbability = liveProbability,
+                                        embeddingSource = faceFeatures.firstOrNull()?.source
+                                            ?: EmbeddingSource.MODEL,
+                                        faces = faceFeatures,
                                     )
                                     recognizer?.publish(frame)
                                     callback?.onFaceFrame(frame)
@@ -211,21 +245,36 @@ class FaceCaptureController(
                 }
             }
 
-    /** TFLite embedding when ready; geometry vector as the offline fallback. */
-    private fun extractEmbedding(bitmap: Bitmap, face: Face): FloatArray? {
+    /**
+     * A frame's feature vector together with where it came from, so the recogniser can
+     * refuse to treat a non-identity-grade geometry vector as an identity.
+     */
+    private data class FeatureVector(val values: FloatArray, val source: EmbeddingSource)
+
+    /**
+     * TFLite embedding when ready; geometry vector as the offline fallback.
+     *
+     * Stage 1: the returned vector is tagged with its [EmbeddingSource] — a real model
+     * embedding is identity-grade, the geometry fallback is not.
+     */
+    private fun extractEmbedding(bitmap: Bitmap, face: Face): FeatureVector? {
         try {
             val model = embeddingModel
             if (model != null && model.isReady()) {
                 val crop = FaceImageUtils.cropFace(bitmap, face.boundingBox)
                 if (crop != null) {
                     val embedding = model.embed(crop)
-                    if (embedding != null && embedding.isNotEmpty()) return embedding
+                    if (embedding != null && embedding.isNotEmpty()) {
+                        return FeatureVector(embedding, EmbeddingSource.MODEL)
+                    }
                 }
             }
         } catch (t: Throwable) {
             reportError(t)
         }
-        return runCatching { FaceFeatureExtractor.extract(face, bitmap.width, bitmap.height) }.getOrNull()
+        return runCatching { FaceFeatureExtractor.extract(face, bitmap.width, bitmap.height) }
+            .getOrNull()
+            ?.let { FeatureVector(it, EmbeddingSource.GEOMETRY) }
     }
 
     /**
@@ -380,5 +429,11 @@ class FaceCaptureController(
         const val ERROR_THROTTLE_MS = 3_000L
         /** Pixel step used for both luminance and gradient sampling. */
         const val SHARPNESS_STRIDE = 8
+        /**
+         * Stage 2: the maximum number of faces embedded per frame. One MobileFaceNet
+         * inference per face is not free, so a frame that somehow reports a crowd is
+         * bounded; the policy still sees up to this many faces and never depends on order.
+         */
+        const val MAX_ANALYZED_FACES = 5
     }
 }

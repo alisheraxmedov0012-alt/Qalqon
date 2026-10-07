@@ -2,6 +2,12 @@
 <resources>
     <string name="app_name">Qalqon</string>
     <string name="accessibility_service_description">Qalqon himoyalangan ilovalarni kuzatib, ota-ona qoidalarini qo\'llaydi.</string>
+    <!-- Stage 8: Google Play User Data policy requires a clear in-app disclosure and
+         affirmative consent before enabling the AccessibilityService API. -->
+    <string name="accessibility_disclosure_title">Fondagi ilovalarni kuzatish xizmati</string>
+    <string name="accessibility_disclosure_body">Qalqon himoyalangan ilova ochilganini aniqlash uchun maxsus imkoniyatlar xizmatidan foydalanadi. Xizmat faqat qaysi ilova ekranda ekanini (paket nomini) biladi; ekran matni, parollar yoki bildirishnomalar hech qachon o\'qilmaydi. Bu ma\'lumot faqat shu qurilmada, ota-ona nazorati uchun ishlatiladi va hech qayerga yuborilmaydi.</string>
+    <string name="accessibility_disclosure_agree">Roziman — sozlamalarni ochish</string>
+    <string name="accessibility_disclosure_decline">Bekor qilish</string>
     <string name="protection_req_accessibility">Fondagi ilovalarni kuzatish xizmati</string>
     <string name="splash_tagline">Bolalar uchun yuzli himoya</string>
     <string name="welcome_title">Qalqonga xush kelibsiz</string>
@@ -75,6 +81,18 @@
     <string name="settings_no_face_policy">Yuz ko\'rinmasa</string>
     <string name="settings_low_battery">Kam batareyada</string>
     <string name="settings_low_battery_toggle">Kam batareyada cheklashni o\'chirish</string>
+    <string name="settings_device_reliability">Qurilma ishonchliligi</string>
+    <string name="settings_device_reliability_hint">Baʼzi qurilmalarda tizim fon rejimidagi himoyani cheklashi mumkin. Ishonchlilikni oshirish uchun quyidagi sozlamalarni tekshiring.</string>
+    <string name="settings_battery_optimization">Batareya optimallashtirish</string>
+    <string name="settings_battery_optimization_hint">Tavsiya etiladi. Optimallashtirish yoqilgan bo\'lsa, tizim fon ishini to\'xtatib qo\'yishi mumkin.</string>
+    <string name="settings_battery_optimization_ignored">O\'chirilgan — himoya cheklanmaydi</string>
+    <string name="settings_battery_optimization_active">Yoqilgan — himoya cheklanishi mumkin</string>
+    <string name="settings_battery_optimization_unavailable">Bu qurilmada mavjud emas</string>
+    <string name="settings_oem_background">Avtomatik ishga tushish va fon rejimi</string>
+    <string name="settings_oem_background_hint">Baʼzi ishlab chiqaruvchilar ilovani fonda cheklaydi. QALQON bu cheklov holatini o\'zi aniqlay olmaydi.</string>
+    <string name="settings_oem_background_known">Qurilmangiz uchun tegishli sozlamalar sahifasi mavjud.</string>
+    <string name="settings_oem_background_generic">Ilova sozlamalari orqali fon rejimini tekshiring.</string>
+    <string name="settings_open_settings">Sozlamalarni ochish</string>
     <string name="papps_title">Himoya qilingan ilovalar</string>
     <string name="papps_subtitle">Bola uchun yopiq bo\'lishi kerak bo\'lgan ilovalarni tanlang</string>
     <string name="papps_empty">Hozircha mos ilovalar topilmadi</string>
@@ -227,9 +245,30 @@
     <string name="protection_req_grant">Ruxsat berish</string>
     <string name="protection_req_open">Ochish</string>
     <string name="protection_req_ok">Tayyor</string>
+    <string name="protection_readiness_label_off">Himoya o\'chirilgan</string>
+    <string name="protection_readiness_label_not_ready">Sozlash kerak</string>
+    <string name="protection_readiness_label_limited">Qisman himoya</string>
+    <string name="protection_readiness_label_ready">Himoya tayyor</string>
+    <string name="protection_readiness_hint_off">Himoya o\'chirilgan. Yoqish uchun yuqoridagi tugmadan foydalaning.</string>
+    <string name="protection_readiness_hint_not_ready">Himoya to\'liq ishlashi uchun sozlamani tugating: ota-ona yuzi va himoyalangan ilovalar kerak.</string>
+    <string name="protection_readiness_hint_limited">Himoya ishlayapti, lekin ba\'zi ruxsatlar yetishmayapti. To\'liq himoya uchun ularni yoqing.</string>
+    <string name="protection_readiness_hint_ready">Barcha kerakli ruxsatlar berilgan. QALQON himoyaga tayyor.</string>
+    <string name="protection_requirements_required_group">To\'liq himoya uchun kerak</string>
+    <string name="protection_capability_why_camera">QALQON kim qarayotganini kameradan aniqlaydi.</string>
+    <string name="protection_capability_why_usage_access">QALQON qaysi ilova ekranda ochiq ekanini biladi.</string>
+    <string name="protection_capability_why_accessibility">Telefon ekranini bolaga ko\'rsatishni cheklash uchun kerak.</string>
+    <string name="protection_capability_why_overlay">Himoya ekranini boshqa ilovalar ustida ko\'rsatish uchun kerak.</string>
+    <string name="protection_capability_state_ready">Tayyor</string>
+    <string name="protection_capability_state_missing">Yoqilmagan</string>
+    <string name="protection_capability_state_unavailable">Bu qurilmada mavjud emas</string>
+    <string name="protection_camera_recovery_title">Kamera qayta ishga tushirilmoqda</string>
+    <string name="protection_camera_recovery_body">Kamerani tiklamoqdamiz. Bu bir necha soniya olishi mumkin.</string>
+    <string name="protection_camera_recovery_unavailable">Kamera ishlamayapti. Boshqa ilova kameradan foydalanayotgan bo\'lishi mumkin.</string>
+    <string name="protection_camera_recovery_retry">Qayta urinish</string>
+    <string name="protection_camera_recovery_restored">Kamera tiklandi, himoya davom etmoqda.</string>
     <string name="protection_emergency_hint">Blokni vaqtincha ochish uchun PIN-kodni kiriting.</string>
     <string name="protection_tech_title">Texnik ma\'lumotlar</string>
-    <string name="protection_limit_note">Himoya hozircha Qalqon ochiq turganda to\'liq ishlaydi. Qalqon fonda bo\'lganda kamerani ishlatish uchun tizim xizmati keyingi bosqichda qo\'shiladi.</string>
+    <string name="protection_limit_note">Himoya tizim xizmati orqali fonda ham ishlaydi. Kamera Qalqon ochilganda ishga tushadi va keyin fonda tanib olishni davom ettiradi; qayta ishga tushgandan so\'ng, Qalqonni keyingi ochganingizda davom etadi.</string>
     <string name="parent_details_title">Ma\'lumotlaringiz</string>
     <string name="parent_details_subtitle">Bu ma\'lumotlar sizni bolalardan ajratish uchun ishlatiladi.</string>
     <string name="parent_phone_label">Telefon raqami: %1$s</string>
@@ -245,6 +284,7 @@
     <string name="settings_no_face_policy_hint">Kamera yuzni ko\'rmasa nima qilishini tanlaydi.</string>
     <string name="settings_low_battery_hint">Batareya kam bo\'lganda tekshirishni sekinlashtiradi.</string>
     <string name="error_generic">Xatolik: %1$s</string>
+    <string name="error_unexpected">Kutilmagan xatolik yuz berdi. Iltimos, qayta urinib ko\'ring.</string>
     <string name="enroll_hint_no_face">Yuzingizni kameraga qarating</string>
     <string name="enroll_hint_look_straight">To\'g\'riga qarang</string>
     <string name="enroll_hint_too_far">Yaqinroq keling</string>
@@ -567,6 +607,9 @@
     <string name="health_status_warning">Ogohlantirish</string>
     <string name="health_status_failed">Xato</string>
     <string name="health_status_unknown">Noma\'lum</string>
+    <string name="health_check_battery_optimization">Batareya optimallashtirish</string>
+    <string name="health_check_oem_background">Ishlab chiqaruvchi fon cheklovi</string>
+    <string name="health_status_unavailable">Mavjud emas</string>
 
     <!-- Robust frontal multi-frame enrollment (Uzbek Latin, default) -->
     <string name="enroll_hint_initial">Yuzingizni kameraga to\'g\'ri qarating va bir necha lahza tabiiy holatda turing.</string>
@@ -838,4 +881,51 @@
     <string name="help_assistant_ctx_no_children">Hozircha bola profili qo‘shilmagan. Uni Bolalar bo‘limidan qo‘shing.</string>
     <string name="help_assistant_ctx_no_children_followup">Bolalar bo‘limini ochib, “Qo‘shish” (＋) tugmasini bosing.</string>
     <string name="help_assistant_ctx_notifications_off">Qalqon uchun bildirishnomalar hozir o‘chirilgan, shuning uchun ogohlantirishlar ko‘rsatilmaydi. Qurilma sozlamalarida bildirishnoma ruxsatini tekshiring.</string>
+
+    <!-- Stage 7: subscription + 3-day trial. Prices are shown dynamically from Google Play. -->
+    <string name="settings_category_subscription">Obuna</string>
+    <string name="settings_category_subscription_desc">Premium obuna va 3 kunlik bepul sinov</string>
+    <string name="settings_group_subscription">Obuna</string>
+    <string name="subscription_title">Obuna</string>
+    <string name="subscription_plan_name">Qalqon Premium</string>
+    <string name="subscription_trial_badge">3 kun bepul</string>
+    <string name="subscription_price_after_trial">So‘ng oyiga %1$s</string>
+    <string name="subscription_price_unavailable">Narx yuklanmoqda…</string>
+    <string name="subscription_billing_frequency">Oylik avtomatik yangilanadigan obuna</string>
+    <string name="subscription_auto_renew_notice">Sinovdan so‘ng obuna avtomatik boshlanadi va har oy yangilanadi.</string>
+    <string name="subscription_cancel_notice">Istalgan vaqtda bekor qilishingiz mumkin; joriy davr oxirigacha premium saqlanadi.</string>
+    <string name="subscription_start_trial">3 kunlik bepul sinovni boshlash</string>
+    <string name="subscription_manage">Obunani boshqarish</string>
+    <string name="subscription_restore">Xaridni tiklash</string>
+    <string name="subscription_refresh">Yangilash</string>
+    <string name="subscription_loading">Yuklanmoqda…</string>
+    <string name="subscription_restored">Obuna tiklandi</string>
+    <string name="subscription_offline_note">Premium holati oxirgi tekshiruvga asoslanadi; internetga ulanmaganingizda ham saqlanadi.</string>
+    <string name="subscription_benefits_title">Premium nimalarni beradi</string>
+    <string name="subscription_benefit_multi_child">Bir nechta bola profili</string>
+    <string name="subscription_benefit_schedules">Jadvallar</string>
+    <string name="subscription_benefit_screen_time">Ekran vaqti cheklovlari</string>
+    <string name="subscription_benefit_eye_safety">Ko‘z xavfsizligi</string>
+    <string name="subscription_benefit_requests">Qo‘shimcha vaqt so‘rovlari</string>
+    <string name="subscription_benefit_activity">Faoliyat tarixi</string>
+    <string name="subscription_free_note">Asosiy himoya (ilovalarni bloklash, yuzni tanish, PIN) bepul.</string>
+    <string name="subscription_status_none">Obuna yo‘q</string>
+    <string name="subscription_status_trial">Bepul sinov faol</string>
+    <string name="subscription_status_active">Faol</string>
+    <string name="subscription_status_canceled">Bekor qilingan; davr oxirigacha faol</string>
+    <string name="subscription_status_grace">To‘lovda muammo; premium hozircha faol</string>
+    <string name="subscription_status_hold">To‘lov muammosi; premium to‘xtatilgan</string>
+    <string name="subscription_status_expired">Muddati tugagan</string>
+    <string name="subscription_status_revoked">Bekor qilingan</string>
+    <string name="subscription_status_pending">To‘lov kutilmoqda</string>
+    <string name="subscription_status_unavailable">Google Play mavjud emas</string>
+    <string name="subscription_status_unknown">Holat noma’lum</string>
+    <string name="subscription_error_user_canceled">Xarid bekor qilindi</string>
+    <string name="subscription_error_billing_unavailable">Google Play hozir mavjud emas. Keyinroq urinib ko‘ring.</string>
+    <string name="subscription_error_item_unavailable">Obuna hozir mavjud emas.</string>
+    <string name="subscription_error_already_owned">Siz allaqachon obuna bo‘lgansiz. “Xaridni tiklash”ni bosing.</string>
+    <string name="subscription_error_network">Tarmoq xatosi. Ulanishni tekshirib, qayta urinib ko‘ring.</string>
+    <string name="subscription_error_pending">To‘lov kutilmoqda.</string>
+    <string name="subscription_error_unexpected">Kutilmagan xatolik. Keyinroq urinib ko‘ring.</string>
+    <string name="subscription_manage_open_failed">Obunani boshqarish sahifasini ochib bo‘lmadi.</string>
 </resources>

@@ -69,6 +69,26 @@ class SystemHealthEvaluator {
                 } else {
                     ok(check)
                 }
+
+            // Stage 6: battery optimization is *recommended*, never required. Its
+            // absence is a warning at most; a platform without the concept is
+            // UNAVAILABLE rather than a false judgement.
+            DiagnosticCheck.BATTERY_OPTIMIZATION -> when {
+                !s.protectionEnabled -> unknown(check, PROTECTION_OFF)
+                s.batteryOptimizationIgnored == null -> unavailable(check, BATTERY_NOT_APPLICABLE)
+                s.batteryOptimizationIgnored -> ok(check)
+                else -> warning(check, BATTERY_OPTIMIZED)
+            }
+
+            // Stage 6: OEM background management cannot be read by the app, so this is
+            // guidance only — a warning for families known to restrict background work,
+            // never a failure, and OK where no restriction surface is known.
+            DiagnosticCheck.OEM_BACKGROUND -> when {
+                !s.protectionEnabled -> unknown(check, PROTECTION_OFF)
+                !s.oemFamily.hasKnownBackgroundRestrictions -> ok(check)
+                s.oemGuidanceAvailable -> warning(check, OEM_RESTRICTION_KNOWN)
+                else -> warning(check, OEM_RESTRICTION_GENERIC)
+            }
         }
 
     private fun levelOf(findings: List<DiagnosticFinding>): SystemHealthLevel = when {
@@ -87,6 +107,9 @@ class SystemHealthEvaluator {
     private fun unknown(check: DiagnosticCheck, detail: String) =
         DiagnosticFinding(check, DiagnosticStatus.UNKNOWN, detail)
 
+    private fun unavailable(check: DiagnosticCheck, detail: String) =
+        DiagnosticFinding(check, DiagnosticStatus.UNAVAILABLE, detail)
+
     private companion object {
         const val NOT_SIGNED_IN = "not_signed_in"
         const val PROTECTION_OFF = "protection_off"
@@ -98,5 +121,9 @@ class SystemHealthEvaluator {
         const val NOTIFICATIONS_OFF = "notifications_disabled"
         const val BOOT_RESTORE_MISSING = "boot_completed_receiver_missing"
         const val SCHEDULE_SYNC_MISSING = "no_schedule_sync_mechanism"
+        const val BATTERY_NOT_APPLICABLE = "battery_optimization_not_applicable"
+        const val BATTERY_OPTIMIZED = "battery_optimization_active"
+        const val OEM_RESTRICTION_KNOWN = "oem_background_restriction_known"
+        const val OEM_RESTRICTION_GENERIC = "oem_background_restriction_generic"
     }
 }

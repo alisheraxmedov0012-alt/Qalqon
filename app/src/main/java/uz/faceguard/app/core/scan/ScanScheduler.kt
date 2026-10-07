@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -143,8 +144,12 @@ class ScanScheduler(
             }
         }
         val filter = IntentFilter(Intent.ACTION_SCREEN_ON)
+        // Stage 7: ACTION_SCREEN_ON is a protected system broadcast, so
+        // RECEIVER_NOT_EXPORTED is correct and explicit; ContextCompat supplies the
+        // export flag only where the platform requires it (API 34+), so the call is
+        // valid across API 26–36.
         screenReceiver = try {
-            context.registerReceiver(receiver, filter)
+            ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
             receiver
         } catch (_: Exception) {
             null

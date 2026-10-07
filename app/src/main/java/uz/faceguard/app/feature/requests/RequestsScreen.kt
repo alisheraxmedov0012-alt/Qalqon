@@ -48,6 +48,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import uz.faceguard.app.R
+import uz.faceguard.app.core.compat.PlatformCompat
 import uz.faceguard.app.core.notification.AppLabelResolver
 import uz.faceguard.app.domain.notification.AppNotificationDispatcher
 import uz.faceguard.app.domain.notification.DefaultNotificationPolicy
@@ -120,7 +121,7 @@ fun canRequestNotificationPermission(sdkInt: Int, notificationsEnabled: Boolean)
     sdkInt >= NOTIFICATION_PERMISSION_SDK && !notificationsEnabled
 
 /** Android 13 / API 33: the first version where POST_NOTIFICATIONS is a runtime permission. */
-const val NOTIFICATION_PERMISSION_SDK = 33
+const val NOTIFICATION_PERMISSION_SDK = PlatformCompat.NOTIFICATION_PERMISSION_API
 
 @HiltViewModel
 class RequestsViewModel @Inject constructor(

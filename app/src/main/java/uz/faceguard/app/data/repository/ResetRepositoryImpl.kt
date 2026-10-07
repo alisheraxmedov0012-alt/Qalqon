@@ -34,6 +34,15 @@ class ResetRepositoryImpl @Inject constructor(
         // Phase 4 Step 1B-6: a snapshot baseline is meaningless without the account it
         // belongs to, so it goes with the rest of the wipe.
         db.usageSnapshotCheckpointDao().deleteAll()
+        // Stage 4: every remaining table is cleared too, so a "full reset" really does
+        // leave no residual child data behind. These were previously missed, which left
+        // screen-time history and per-child schedule/eye-safety configuration on disk
+        // after the UI had told the user all local data was deleted.
+        db.dailyAppUsageDao().deleteAll()
+        db.childScreenTimeLimitDao().deleteAll()
+        db.scheduleDao().deleteAll()
+        db.scheduleDao().deleteAllTargets()
+        db.childEyeSafetyDao().deleteAll()
         settingsStore.clearAll()
         pinAttemptStore.clearAll()
         sessionManager.clearSession()

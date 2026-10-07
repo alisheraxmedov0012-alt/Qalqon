@@ -22,6 +22,21 @@ interface ProtectionActionExecutor {
 
     fun execute(action: ProtectionAction)
 
+    /**
+     * Stage 4: re-assert the *enforcement surface* of [action] while the engine stays in a
+     * blocked state, without repeating the one-shot side effects of [execute].
+     *
+     * This is the self-heal path: if the blocking overlay is lost without the engine's
+     * state changing — an accessibility-service reconnect (new window owner), a transient
+     * WindowManager detach, or the overlay removed out-of-band — neither [execute] nor
+     * [clear] runs again, so without this the child would sit in front of an "enforced"
+     * app with nothing actually blocking it. Re-asserting the overlay every evaluation
+     * makes the block self-healing within one tick. It must be idempotent and cheap (no
+     * re-mute, no re-log); the default is a no-op so an executor that owns no re-assertable
+     * surface (e.g. a test double) is unaffected.
+     */
+    fun reassert(action: ProtectionAction) = Unit
+
     fun clear()
 
     fun mute()
@@ -41,10 +56,10 @@ class OverlayProtectionActionExecutor(
         when (action) {
             ProtectionAction.ALLOW -> clear()
 
-            ProtectionAction.SOFT_BLOCK -> overlay.show()
+            ProtectionAction.SOFT_BLOCK -> safeOverlay { overlay.show() }
 
             ProtectionAction.HARD_BLOCK -> {
-                overlay.show()
+                safeOverlay { overlay.show() }
                 mute()
             }
 
@@ -60,9 +75,37 @@ class OverlayProtectionActionExecutor(
         }
     }
 
+    /**
+     * Stage 4 self-heal: re-show the blocking overlay for a restricting action. Idempotent
+     * (the controller and the accessibility overlay are both idempotent) and deliberately
+     * does **not** re-mute, so the per-evaluation call is cheap and never spams the audio
+     * system or the log. A mute that drifted would be re-applied by the next real block.
+     */
+    override fun reassert(action: ProtectionAction) {
+        when (action) {
+            ProtectionAction.SOFT_BLOCK,
+            ProtectionAction.HARD_BLOCK,
+            -> safeOverlay { overlay.show() }
+
+            else -> Unit
+        }
+    }
+
     override fun clear() {
-        overlay.hide()
+        // Same isolation as mute/unmute below: a failing overlay teardown must not
+        // crash the evaluation loop that calls this.
+        safeOverlay { overlay.hide() }
         unmute()
+    }
+
+    /**
+     * A blocking-window failure is a runtime condition (an invalid window token, a
+     * window already gone), not a programming error: it is isolated and reported,
+     * so it can never take the protection engine — and therefore the whole app —
+     * down with it.
+     */
+    private inline fun safeOverlay(block: () -> Unit) {
+        runCatching { block() }.onFailure { Log.w(TAG, "overlay action failed", it) }
     }
 
     override fun mute() {

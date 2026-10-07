@@ -2,6 +2,12 @@
 <resources>
     <string name="app_name">Qalqon</string>
     <string name="accessibility_service_description">Qalqon отслеживает защищённые приложения и применяет родительские правила.</string>
+    <!-- Stage 8: Google Play User Data policy requires a clear in-app disclosure and
+         affirmative consent before enabling the AccessibilityService API. -->
+    <string name="accessibility_disclosure_title">Служба фонового мониторинга приложений</string>
+    <string name="accessibility_disclosure_body">Qalqon использует службу спец. возможностей, чтобы определять, когда открыто защищённое приложение. Служба узнаёт только имя пакета приложения на экране; текст экрана, пароли и уведомления никогда не читаются. Эти данные используются только на этом устройстве для родительского контроля и никуда не отправляются.</string>
+    <string name="accessibility_disclosure_agree">Согласен — открыть настройки</string>
+    <string name="accessibility_disclosure_decline">Отмена</string>
     <string name="protection_req_accessibility">Служба фонового мониторинга приложений</string>
     <string name="splash_tagline">Защита детей по распознаванию лица</string>
     <string name="welcome_title">Добро пожаловать в Qalqon</string>
@@ -74,6 +80,18 @@
     <string name="settings_no_face_policy">Если лицо не видно</string>
     <string name="settings_low_battery">Низкий заряд</string>
     <string name="settings_low_battery_toggle">Отключать при низком заряде</string>
+    <string name="settings_device_reliability">Надёжность устройства</string>
+    <string name="settings_device_reliability_hint">Некоторые устройства ограничивают фоновую защиту. Проверьте настройки ниже для повышения надёжности.</string>
+    <string name="settings_battery_optimization">Оптимизация батареи</string>
+    <string name="settings_battery_optimization_hint">Рекомендуется. Если оптимизация включена, система может останавливать фоновую работу.</string>
+    <string name="settings_battery_optimization_ignored">Отключена — защита не ограничена</string>
+    <string name="settings_battery_optimization_active">Включена — защита может быть ограничена</string>
+    <string name="settings_battery_optimization_unavailable">Недоступно на этом устройстве</string>
+    <string name="settings_oem_background">Автозапуск и фон</string>
+    <string name="settings_oem_background_hint">Некоторые производители ограничивают приложения в фоне. QALQON не может определить это ограничение сам.</string>
+    <string name="settings_oem_background_known">Для вашего устройства доступна соответствующая страница настроек.</string>
+    <string name="settings_oem_background_generic">Проверьте фоновые настройки в настройках приложения.</string>
+    <string name="settings_open_settings">Открыть настройки</string>
     <string name="papps_title">Защищённые приложения</string>
     <string name="papps_subtitle">Выберите приложения, которые должны оставаться закрытыми для ребёнка</string>
     <string name="papps_empty">Подходящие приложения пока не найдены</string>
@@ -226,9 +244,30 @@
     <string name="protection_req_grant">Разрешить</string>
     <string name="protection_req_open">Открыть</string>
     <string name="protection_req_ok">Готово</string>
+    <string name="protection_readiness_label_off">Защита выключена</string>
+    <string name="protection_readiness_label_not_ready">Нужна настройка</string>
+    <string name="protection_readiness_label_limited">Частичная защита</string>
+    <string name="protection_readiness_label_ready">Защита готова</string>
+    <string name="protection_readiness_hint_off">Защита выключена. Включите её переключателем выше.</string>
+    <string name="protection_readiness_hint_not_ready">Завершите настройку, чтобы защита работала: нужны лицо родителя и хотя бы одно защищённое приложение.</string>
+    <string name="protection_readiness_hint_limited">Защита работает, но некоторых разрешений не хватает. Включите их для полной защиты.</string>
+    <string name="protection_readiness_hint_ready">Все необходимые разрешения выданы. QALQON готова защищать.</string>
+    <string name="protection_requirements_required_group">Требуется для полной защиты</string>
+    <string name="protection_capability_why_camera">QALQON использует камеру, чтобы определить, кто смотрит на телефон.</string>
+    <string name="protection_capability_why_usage_access">QALQON нужно знать, какое приложение открыто на экране.</string>
+    <string name="protection_capability_why_accessibility">Нужно, чтобы ограничить, что ребёнок может открыть на экране телефона.</string>
+    <string name="protection_capability_why_overlay">Нужно, чтобы показывать экран защиты поверх других приложений.</string>
+    <string name="protection_capability_state_ready">Готово</string>
+    <string name="protection_capability_state_missing">Не включено</string>
+    <string name="protection_capability_state_unavailable">Недоступно на этом устройстве</string>
+    <string name="protection_camera_recovery_title">Перезапуск камеры</string>
+    <string name="protection_camera_recovery_body">Восстанавливаем камеру. Это может занять несколько секунд.</string>
+    <string name="protection_camera_recovery_unavailable">Камера не работает. Возможно, её использует другое приложение.</string>
+    <string name="protection_camera_recovery_retry">Повторить</string>
+    <string name="protection_camera_recovery_restored">Камера восстановлена, защита продолжается.</string>
     <string name="protection_emergency_hint">Введите PIN, чтобы временно снять блокировку.</string>
     <string name="protection_tech_title">Технические данные</string>
-    <string name="protection_limit_note">Сейчас защита полностью работает, пока Qalqon открыт. Для работы камеры в фоне на следующем этапе потребуется системная служба.</string>
+    <string name="protection_limit_note">Защита продолжает работать в фоне через системную службу. Камера включается при открытии Qalqon и затем продолжает распознавание в фоне; после перезапуска она возобновляется при следующем открытии Qalqon.</string>
     <string name="parent_details_title">Ваши данные</string>
     <string name="parent_details_subtitle">Эти данные используются, чтобы отличать вас от ребёнка.</string>
     <string name="parent_phone_label">Номер телефона: %1$s</string>
@@ -244,6 +283,7 @@
     <string name="settings_no_face_policy_hint">Что делать, если камера не видит лицо.</string>
     <string name="settings_low_battery_hint">Замедляет проверку при низком заряде батареи.</string>
     <string name="error_generic">Ошибка: %1$s</string>
+    <string name="error_unexpected">Произошла непредвиденная ошибка. Попробуйте ещё раз.</string>
     <string name="enroll_hint_no_face">Посмотрите в камеру</string>
     <string name="enroll_hint_look_straight">Смотрите прямо</string>
     <string name="enroll_hint_too_far">Подойдите ближе</string>
@@ -566,6 +606,9 @@
     <string name="health_status_warning">Предупреждение</string>
     <string name="health_status_failed">Ошибка</string>
     <string name="health_status_unknown">Неизвестно</string>
+    <string name="health_check_battery_optimization">Оптимизация батареи</string>
+    <string name="health_check_oem_background">Фоновое ограничение производителя</string>
+    <string name="health_status_unavailable">Недоступно</string>
 
     <!-- Robust frontal multi-frame enrollment -->
     <string name="enroll_hint_initial">Направьте лицо в камеру и побудьте несколько мгновений естественно.</string>
@@ -837,4 +880,51 @@
     <string name="help_assistant_ctx_no_children">Профиль ребёнка ещё не добавлен. Добавьте его на вкладке Дети.</string>
     <string name="help_assistant_ctx_no_children_followup">Откройте вкладку Дети и нажмите Добавить (＋).</string>
     <string name="help_assistant_ctx_notifications_off">Уведомления для Qalqon сейчас отключены, поэтому оповещения не показываются. Проверьте разрешение на уведомления в настройках устройства.</string>
+
+    <!-- Stage 7: subscription + 3-day trial. Prices are shown dynamically from Google Play. -->
+    <string name="settings_category_subscription">Подписка</string>
+    <string name="settings_category_subscription_desc">Премиум-подписка и 3-дневный бесплатный период</string>
+    <string name="settings_group_subscription">Подписка</string>
+    <string name="subscription_title">Подписка</string>
+    <string name="subscription_plan_name">Qalqon Premium</string>
+    <string name="subscription_trial_badge">3 дня бесплатно</string>
+    <string name="subscription_price_after_trial">Затем %1$s в месяц</string>
+    <string name="subscription_price_unavailable">Загрузка цены…</string>
+    <string name="subscription_billing_frequency">Ежемесячная подписка с автопродлением</string>
+    <string name="subscription_auto_renew_notice">После пробного периода подписка запускается автоматически и продлевается ежемесячно.</string>
+    <string name="subscription_cancel_notice">Отменить можно в любое время; премиум сохраняется до конца текущего периода.</string>
+    <string name="subscription_start_trial">Начать 3-дневный бесплатный период</string>
+    <string name="subscription_manage">Управлять подпиской</string>
+    <string name="subscription_restore">Восстановить покупку</string>
+    <string name="subscription_refresh">Обновить</string>
+    <string name="subscription_loading">Загрузка…</string>
+    <string name="subscription_restored">Подписка восстановлена</string>
+    <string name="subscription_offline_note">Статус премиума основан на последней проверке и сохраняется даже офлайн.</string>
+    <string name="subscription_benefits_title">Что входит в премиум</string>
+    <string name="subscription_benefit_multi_child">Несколько профилей детей</string>
+    <string name="subscription_benefit_schedules">Расписания</string>
+    <string name="subscription_benefit_screen_time">Лимиты экранного времени</string>
+    <string name="subscription_benefit_eye_safety">Защита зрения</string>
+    <string name="subscription_benefit_requests">Запросы доп. времени</string>
+    <string name="subscription_benefit_activity">История активности</string>
+    <string name="subscription_free_note">Базовая защита (блокировка приложений, распознавание лица, PIN) бесплатна.</string>
+    <string name="subscription_status_none">Подписки нет</string>
+    <string name="subscription_status_trial">Пробный период активен</string>
+    <string name="subscription_status_active">Активна</string>
+    <string name="subscription_status_canceled">Отменена; активна до конца периода</string>
+    <string name="subscription_status_grace">Проблема с оплатой; премиум пока активен</string>
+    <string name="subscription_status_hold">Проблема с оплатой; премиум приостановлен</string>
+    <string name="subscription_status_expired">Истекла</string>
+    <string name="subscription_status_revoked">Отозвана</string>
+    <string name="subscription_status_pending">Ожидается оплата</string>
+    <string name="subscription_status_unavailable">Google Play недоступен</string>
+    <string name="subscription_status_unknown">Статус неизвестен</string>
+    <string name="subscription_error_user_canceled">Покупка отменена</string>
+    <string name="subscription_error_billing_unavailable">Google Play сейчас недоступен. Попробуйте позже.</string>
+    <string name="subscription_error_item_unavailable">Подписка сейчас недоступна.</string>
+    <string name="subscription_error_already_owned">Вы уже подписаны. Нажмите «Восстановить покупку».</string>
+    <string name="subscription_error_network">Ошибка сети. Проверьте соединение и повторите.</string>
+    <string name="subscription_error_pending">Ожидается оплата.</string>
+    <string name="subscription_error_unexpected">Произошла непредвиденная ошибка. Попробуйте позже.</string>
+    <string name="subscription_manage_open_failed">Не удалось открыть страницу управления подпиской.</string>
 </resources>

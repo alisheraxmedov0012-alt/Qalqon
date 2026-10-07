@@ -12,7 +12,7 @@ import uz.faceguard.app.core.eyesafety.eyeSafetyFrameOf
 import uz.faceguard.app.core.liveness.LivenessEvaluator
 import uz.faceguard.app.core.liveness.LivenessFrame
 import uz.faceguard.app.core.liveness.LivenessResult
-import uz.faceguard.app.core.monitor.ForegroundAppMonitor
+import uz.faceguard.app.core.monitor.ForegroundAppSource
 import uz.faceguard.app.core.pipeline.FrameEvent
 import uz.faceguard.app.core.policy.ActivationDelayGate
 import uz.faceguard.app.core.recognition.RecognitionResult
@@ -55,7 +55,7 @@ data class ProtectionDecision(
  */
 class ProtectionEngine(
     private val recognizer: Recognizer,
-    private val monitor: ForegroundAppMonitor,
+    private val monitor: ForegroundAppSource,
     private val actions: ProtectionActionExecutor,
     private val policyEvaluator: PolicyEvaluator,
     /**
@@ -169,6 +169,27 @@ class ProtectionEngine(
 
     /** Activity-log hook; set by the caller to persist events. */
     var onEvent: (ActivityEventType, String?) -> Unit = { _, _ -> }
+
+    /**
+     * Reports a failed recognition call or protection side effect (overlay, audio).
+     *
+     * A blocking-window or platform failure is a runtime condition, not a
+     * programming error, so it must never propagate out of [evaluate] into the
+     * engine's tick coroutine: an uncaught throw there crashes the process and
+     * takes protection down with it. The runtime wires this to diagnostics; the
+     * default is a no-op so an un-wired engine still cannot crash.
+     */
+    var onEngineError: (Throwable) -> Unit = { }
+
+    /** Runs a side effect isolated: a failure is reported, never propagated. */
+    private inline fun safeSideEffect(block: () -> Unit) {
+        runCatching { block() }.onFailure { reportEngineError(it) }
+    }
+
+    /** Error reporting is observability: a failing hook must never break protection. */
+    private fun reportEngineError(t: Throwable) {
+        runCatching { onEngineError(t) }
+    }
 
     fun updateSettings(settings: ProtectionSettings, policy: PolicySettings) {
         this.settings = settings
@@ -307,6 +328,31 @@ class ProtectionEngine(
         resetEyeSafety()
     }
 
+    /**
+     * Stage 5: the camera stream was interrupted — the screen turned off, the
+     * binding was lost, or the session is being rebound.
+     *
+     * Drops the last frame and the in-progress multi-frame confirmation so a
+     * pre-interruption recognition can never be treated as current, and clears the
+     * published identity and liveness signals. The protection **state** is
+     * deliberately left untouched: releasing the block on a lost camera would be
+     * fail-open, so the existing no-face policy continues to govern from the next
+     * tick (and a still-blocked cycle keeps self-healing its overlay).
+     *
+     * Must run on the same dispatcher as [tick] (the session's main-dispatcher
+     * scope), since it touches the confirmation buffer the tick also owns.
+     */
+    fun onCameraInterrupted() {
+        latestFrame = null
+        pending.clear()
+        emptyFaceStreak = 0
+        recentConfidences.clear()
+        lastEvaluateNow = 0L
+        // A stale identity/liveness must never be presented as a current reading.
+        _identity.value = null
+        resetLiveness()
+    }
+
     private fun tick(now: Long) {
         val foreground = monitor.current.value
         val protectedNow = foreground != null && foreground in protectedPackages
@@ -314,7 +360,16 @@ class ProtectionEngine(
             if (foreground != lastLoggedForeground) {
                 safeLog(ActivityEventType.PROTECTED_APP_ENTERED, foreground)
             }
-            // Re-arms a scan after a cooldown; no-op while scanning or cooling down.
+            // Keep asking for a scan window on every tick while a protected app is in
+            // the foreground. `requestScan` itself ignores the call while a window is
+            // open or a cooldown is running, so this simply re-arms the scan as soon
+            // as the cooldown expires. Requesting only on *entry* left the scheduler
+            // idle after the first window+cooldown, and `evaluate` then early-returns
+            // for the rest of the time the child stayed inside the protected app —
+            // i.e. recognition silently stopped enforcing, with no error and no UI
+            // signal. Re-requesting per tick keeps the documented battery model
+            // (a bounded scan window followed by a cooldown) while guaranteeing that
+            // evaluation always resumes.
             scanScheduler?.onProtectedAppOpened()
         }
         lastLoggedForeground = if (protectedNow) foreground else null
@@ -356,7 +411,25 @@ class ProtectionEngine(
         if (now - lastStableAt < debounceMs) return
         if (scanScheduler != null && scanScheduler?.scanning?.value == false) return
 
-        val raw = frame?.let { recognizer.evaluate(it, parent, children) } ?: RecognitionResult.NoFace
+        val raw = frame?.let { f ->
+            // A recognition failure (ML Kit / TFLite / template decode) must not crash
+            // the evaluation loop. The deterministic fallback is NoFace, which then
+            // follows the parent's configured no-face policy — so a failure can never
+            // silently *allow* a protected app when the policy fails closed.
+            runCatching {
+                // Stage 2: evaluate every detected face and aggregate them deterministically.
+                // The per-child action for the foreground app is passed so that, when several
+                // children are recognised at once, the most restrictive one is chosen (and its
+                // identity — child id — is preserved for the downstream per-child policy).
+                recognizer.evaluateAll(f, parent, children) { childId ->
+                    foreground?.let { appPolicyLookup(childId, it) }?.action
+                }.result
+            }
+                .getOrElse { error ->
+                    reportEngineError(error)
+                    RecognitionResult.NoFace
+                }
+        } ?: RecognitionResult.NoFace
         val result = classify(raw)
 
         // multi-frame confirmation: need N consecutive same-class results
@@ -595,6 +668,13 @@ class ProtectionEngine(
                     // request target, the parent-facing "blocked app", a later release)
                     // is derived from the previous app.
                     if (foreground != _blockedApp.value) _blockedApp.value = foreground
+                    // Stage 4: the block is still required, so re-assert its enforcement
+                    // surface. This self-heals an overlay lost without a state change (an
+                    // accessibility reconnect, a transient WindowManager detach, an
+                    // out-of-band removal) within one tick instead of leaving the app
+                    // "blocked" with nothing on screen. Idempotent and isolated, so it
+                    // neither duplicates the overlay nor risks the evaluation loop.
+                    safeSideEffect { actions.reassert(decision.action) }
                     return
                 }
 
@@ -605,7 +685,9 @@ class ProtectionEngine(
                 _blockedApp.value = foreground
 
                 transition(target, decision.reason, now, result.confidenceOrNull())
-                actions.execute(decision.action)
+                // The side effect is isolated: a failing overlay/audio target must not
+                // crash the evaluation loop (and with it the whole process).
+                safeSideEffect { actions.execute(decision.action) }
                 // Recorded after the action was applied, so a block that never
                 // reached the executor does not appear in the log. The executor
                 // is fire-and-forget, hence this states the outcome rather than
@@ -758,7 +840,9 @@ class ProtectionEngine(
     }
 
     private fun clearBlock() {
-        actions.clear()
+        // Isolated for the same reason as execute(): a failing overlay teardown must
+        // not crash the caller (which may be the tick, a recovery timer or unlock).
+        safeSideEffect { actions.clear() }
         // Phase 9: the protection cycle is over, so its best-effort restoration
         // target is dropped with it and any pending release is invalidated.
         _blockedApp.value = null

@@ -32,12 +32,12 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
     and unpack to `/opt/jdk` (Debian 13 only ships openjdk-21/25, which also compile).
   - `curl -sSL -o /tmp/cmdtools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip`
     then unpack into `$HOME/Android/Sdk/cmdline-tools/latest`
-  - `sdkmanager --licenses`, then install `platform-tools platforms;android-35 build-tools;35.0.0`
-  - write gitignored `local.properties` with `sdk.dir=$HOME/Android/Sdk`
+  - `sdkmanager --licenses`, then install `platform-tools platforms;android-36 build-tools;36.0.0`
+  - write gitignored `local.properties` with `sdk.dir=<sdk>` (this session used `/opt/android-sdk`)
 - Build env for every command: `HOME=/home/openhands`, `ANDROID_HOME=$HOME/Android/Sdk`,
   `JAVA_HOME=$JAVA_HOME` (JDK 17), `PATH=$JAVA_HOME/bin:$PATH`.
-  AGP 8.7.2 / Kotlin 2.3.21 / KSP 2.3.6 / Hilt 2.58 / Room 2.7.2 /
-  Compose BOM 2024.12.01 / Gradle 9.7.1 / SDK 35, min SDK 26, Java+Kotlin target 17.
+  AGP 8.13.2 / Kotlin 2.3.21 / KSP 2.3.6 / Hilt 2.58 / Room 2.7.2 /
+  Compose BOM 2024.12.01 / Gradle 9.5.1 / SDK 36, min SDK 26, Java+Kotlin target 17.
   CI pins JDK 17 (temurin); JDK 21 also compiles but is not the target.
 - `gradlew` IS executable now (mode 100755, commit `build: mark gradlew executable`).
   Run `./gradlew <task>` directly; CI's `chmod +x` is a harmless no-op.
@@ -396,3 +396,381 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   it warns and skips when the secrets are not configured, so existing CI is
   unaffected. No Room/DataStore/migration/schema change - an APK update is not an
   uninstall, so all local data is preserved.
+
+- Stage 3 (Android System/OEM compatibility) deliverable:
+  `docs/STAGE3_DEVICE_COMPATIBILITY_MATRIX.md`. No device/emulator/KVM in the
+  dev container, so real-device and OEM rows are honestly `NOT TESTED`; the
+  Android API rows are static platform-contract analysis. One deterministic P1
+  code bug was fixed: the legacy `TYPE_APPLICATION_OVERLAY` scrim is a
+  Service-hosted `ComposeView`, which throws `ViewTreeLifecycleOwner not found`
+  on attach unless the three ViewTree owners are installed first. It now installs
+  `setViewTreeLifecycleOwner` / `setViewTreeViewModelStoreOwner` /
+  `setViewTreeSavedStateRegistryOwner` from a real owner torn down with the
+  window (`OverlayWindowOwner`, idempotent create/destroy). JVM total 1834 ->
+  1839, 0 failures/skipped (`LegacyOverlayHostTest`). `START_NOT_STICKY` was
+  deliberately left unchanged (needs real-device evidence). `assembleDebug` PASS;
+  `assembleRelease` compiles but packaging still fails at the intentional signing
+  gate. Instrumented tests compile in `assembleDebug` but cannot execute locally
+  (no emulator/KVM); they run in CI. CI run `37210605668` on this commit:
+  `build` + `Instrumented tests (API 35)` both PASS.
+
+
+- Stage 4 (Security & Privacy Hardening) docs:
+  `docs/STAGE4_SECURITY_PRIVACY_AUDIT.md`, `docs/STAGE4_BIOMETRIC_DATA_LIFECYCLE.md`,
+  `docs/STAGE4_THREAT_MODEL.md`; `SECURITY.md` extended (§3.11 backup/D2D, §3.12
+  deletion). Two confirmed P2 issues fixed: (1) `ResetRepositoryImpl.resetAll()`
+  cleared only 9/14 Room tables, leaving screen-time usage, per-child schedules and
+  eye-safety config on disk after the UI promised a full wipe — it now clears all 14
+  (added `deleteAll()` to `ScheduleDao`/`ChildEyeSafetyDao`, plus the existing
+  daily-usage/limit deletes); (2) `allowBackup="false"` does not cover Android 12+
+  device-to-device transfer, so `res/xml/data_extraction_rules.xml` now excludes every
+  domain from `cloud-backup` and `device-transfer`. No biometric egress exists (no
+  INTERNET permission, no network code, on-device only). JVM total 1839 -> 1844
+  (`Stage4DeletionAndBackupTest`); instrumented `SecurityPersistenceTest` gained a
+  full-wipe table test. Deferred/known (documented, not code): child-delete leaves
+  per-child config rows (P3), R8 off (P3). Signing gate unchanged; no secrets added.
+
+
+- Stage 5 (Anti-Spoofing / Liveness) audit deliverable:
+  `docs/STAGE5_ANTI_SPOOFING_LIVENESS.md`. Finding: the build is **Level 1**
+  (heuristic anti-spoof signals) and *decision-inert* — no `AntiSpoofModel`
+  implementation exists, `setAntiSpoofModel` is never called, so
+  `FrameEvent.liveProbability` is always null and `LivenessState.SPOOF` (the only
+  liveness state that changes a policy decision) is unreachable. The heuristic in
+  `TemporalLivenessDetector` uses only head-pose range (yaw/pitch): >=3deg LIVE,
+  <=0.8deg UNKNOWN, else UNSTABLE; it never emits SPOOF. Photo/screen/video-replay
+  attacks are NOT stopped; no FAR/FRR/APCER/BPCER measured. Minimal hardening only:
+  `livenessLabelRes` is now source-gated (a LIVE verdict is surfaced only for
+  `LivenessSource.MODEL`, so the motion heuristic is never shown as "Real face");
+  `DashboardUiState` carries `livenessSource`. New JVM test
+  `Stage5LivenessHardeningTest` (8 tests). No model integrated, no threshold
+  changed, no recognition/policy/camera behaviour changed, no cloud/network. JVM
+  total 1844 -> 1852. Recommendation for a later stage: a validated offline
+  anti-spoof model behind the existing seam, optionally + a random active
+  challenge. Real-device spoof testing NOT TESTED (Stage 10).
+
+
+- Stage 6 (UX / Product Quality) audit deliverable:
+  `docs/STAGE6_UX_PRODUCT_QUALITY.md`. The finished 7-phase UI/UX redesign was
+  audited (not redesigned): 31 screens, 793 strings with exact uz/en/ru parity,
+  no hardcoded user-facing strings, paired empty/hint states, 66 a11y
+  semantics/onClickLabel usages. UX score 82/100. Two P2 fixes: (1) the
+  Parent profile and Face enrollment ViewModels surfaced a raw `Throwable`
+  message / class name to the user via a Toast — now logged (`Log.w`) and the UI
+  gets the new generic localized `error_unexpected` (both `_errorMessage` fields
+  are `Int?` resource ids); (2) `protection_limit_note` falsely claimed background
+  camera "will need a system service in a later phase" though the FGS already
+  exists — corrected in all three locales. New JVM source-contract test
+  `polish/Stage6UxClarityTest` (6 tests). Accessbility = static/source-contract
+  audit only (no TalkBack), real-device QA deferred to Stage 10. No security,
+  schema, dependency, network or legacy-name change. JVM total 1852 -> 1858.
+
+
+- Stage 7 (Subscription & 3-Day Trial) deliverable:
+  `docs/STAGE7_SUBSCRIPTION_BILLING.md`. Architecture: CLIENT-ONLY Google Play Billing
+  (`com.android.billingclient:billing:9.1.0`) + an account-scoped entitlement cache,
+  behind `BillingGateway`/`EntitlementStore` seams. Billing talks to Play over IPC, so
+  the offline-first/no-INTERNET contract is preserved: the merged manifest still removes
+  INTERNET/ACCESS_NETWORK_STATE and adds only `com.android.vending.BILLING`
+  (no location permission injected). Product `qalqon_premium` / base plan `monthly` /
+  offer `trial-3-day` (`ProductCatalog`); prices come from `ProductDetails`, never
+  hardcoded. `PremiumEntitlement`/`EntitlementState` (11 states), `PremiumAccessEvaluator`
+  (central gate; core protection stays free), `OfflineEntitlementPolicy` (72h staleness;
+  a failed query never downgrades a paying user). `SubscriptionManager` is the single
+  entitlement writer (account-scoped, idempotent acknowledge, no purchase-token logging).
+  UI: `feature/subscription/SubscriptionScreen` + ViewModel, Settings category
+  `SUBSCRIPTION`, route `SETTINGS_SUBSCRIPTION` (PIN-gated), strings x3 locales.
+  Client-only limitations (documented): no server verification; expiry/grace/hold/revoke
+  not client-derivable; Play entitlements are per Google account. Real Google Play
+  purchase/renewal/refund/restore = NOT TESTED (mock-verified lifecycle only). New tests:
+  `billing/*` (33). `testOptions.unitTests.isReturnDefaultValues = true` added so the
+  deferred-ack `Log.w` path does not throw in JVM tests. JVM total 1858 -> 1891.
+
+
+- Stage 8 (Google Play compliance) deliverable:
+  `docs/STAGE8_GOOGLE_PLAY_COMPLIANCE_AUDIT.md` +
+  `docs/STAGE8_PLAY_CONSOLE_ACTION_ITEMS.md`. Code fixes: (1) target API 36
+  migration — AGP 8.7.2 -> 8.13.2, Gradle wrapper 9.7.1 -> 9.5.1 (AGP 8.x is
+  incompatible with Gradle >= 9.6, which removed `InternalProblems`), compileSdk/
+  targetSdk 35 -> 36; (2) AccessibilityService in-app disclosure + affirmative
+  consent before enabling the service (Play User Data policy requires it for
+  non-accessibility-tool apps); strings x3 locales. `isAccessibilityTool` stays
+  unset (QALQON is not a disability tool). New JVM test
+  `compliance/PlayComplianceContractTest`. BLOCKERS requiring Play Console / web
+  hosting (NOT VERIFIED, cannot be done from the repo): external web account-deletion
+  resource (P0) and hosted privacy-policy URL (P1); plus Data safety, accessibility
+  declaration, target audience/content rating, subscription config, store assets,
+  reviewer access. JVM total 1891 -> 1900. Everything Stage 2-7 preserved.
+
+
+- Stage 8 REMEDIATION (submission-readiness completion; NOT a new stage). Added the
+  full Play Console/docs pack under `docs/STAGE8_*.md` (privacy policy text + hosting
+  requirements, account deletion, accessibility declaration, usage-access, overlay,
+  FGS, data-safety answer sheet, child/family compliance, subscription Play Console
+  setup + test plan, store listing draft, store assets plan, reviewer access, Play
+  Console master checklist + action pack, hosting requirements). Strengthened
+  `compliance/PlayComplianceContractTest` (now also pins: billing wired / no
+  location / no QUERY_ALL_PACKAGES, FGS types + specialUse subtype, no biometric
+  VALUE logged, account reset deletes key+session+settings, BIND_ACCESSIBILITY_SERVICE
+  guard). No production-code change (target API 36 and the accessibility
+  disclosure/consent already shipped in the Stage 8 code commit). HOSTING/Play Console
+  remain `MANUAL ACTION REQUIRED`; no fake URL/status was invented.
+
+
+- Stage 10 (Real Device QA & 72-Hour Soak) — **BLOCKED, not executed**: no physical
+  Android device and no emulator in the container (`adb devices` empty, `/dev/bus/usb`
+  absent, `/dev/kvm` absent, emulator package not installed). Per the no-fake-pass policy,
+  no real-device or soak result is reported as PASS. Deliverables:
+  `docs/STAGE10_REAL_DEVICE_QA_72H_SOAK.md` (executable runbook + full test matrix, every
+  real-device row BLOCKED with the exact reason, unblock criteria, soak heartbeat method)
+  and `docs/STAGE10_DEVICE_FAILURE_LOG.md` (verified environment block + failure/heartbeat
+  templates). Verified installable artifact: `app-debug.apk` package `uz.faceguard.app`,
+  targetSdk 36, SHA-256 `76b19e62…`. No code change (no device -> no device bug -> no fix).
+  JVM suite re-verified 1917 / 0 / 0 / 0; debug APK builds; CI green.
+
+
+- Stage 10 continuation (2026-10-05): physical-device gate re-verified at HEAD
+  `e995abed…` — STILL BLOCKED (0 devices; `adb devices` empty, `adb get-state` fails,
+  `/dev/bus/usb` and `/dev/kvm` absent, 0 virt flags, no emulator/AVD, local `adb connect`
+  refused). No fake pass. Added a turnkey QA harness `tools/device-qa/device_qa.sh`
+  (read-mostly adb wrapper: gate/inventory/state/install/launch/stop/reboot/logcat/
+  crash-scan/mem/battery/heartbeat; syntax-checked with `bash -n`; `gate` verified to fail
+  cleanly with no device; never collects secrets/biometrics) and
+  `docs/STAGE10_DEVICE_EVIDENCE.md` (fresh gate evidence + harness usage + evidence
+  rules). Updated `STAGE10_REAL_DEVICE_QA_72H_SOAK.md` and `STAGE10_DEVICE_FAILURE_LOG.md`
+  with the fresh verification. No Kotlin/product change.
+
+
+- Stage 10 special-permission/OEM compatibility fix (Redmi Note 14 blocker: Usage
+  Access, draw-over-other-apps and accessibility never turned "Tayyor"). Generic,
+  OEM-independent fixes: (1) settings deep-links now go through
+  `core/permission/ProtectionCapabilities.kt`'s failure-safe
+  `Context.openSettingsOrFallback` (resolveActivity + try/catch + app-details fallback),
+  so a page with no handler can never crash/dead-end; (2) `AndroidUsageAccess` uses the
+  non-deprecated `unsafeCheckOpNoThrow` on API 29+ and `ForegroundAppMonitor.hasUsageAccess`
+  now delegates to it (single source of truth); (3) accessibility enabled-state matches
+  Qalqon's own component via `ComponentName(service.packageName, service.name)`;
+  (4) `ProtectionRuntime` reads the three capabilities through a `ProtectionCapabilitySource`
+  seam and does a **bounded post-resume re-probe** (3 × 700ms, stops early) so an OEM
+  app-op/secure-setting update that lands just after resume is caught without a restart —
+  and never reports a false Ready. No Xiaomi hardcoding; no legacy rename; no
+  DB/subscription/network change. New `permission/SpecialPermissionCompatibilityTest`
+  (+10). JVM 1917 -> 1927, 0/0/0; lint + assembleDebug pass. **Device re-test BLOCKED**
+  (no physical device / adb in the container). Docs:
+  `docs/STAGE10_SPECIAL_PERMISSION_OEM_COMPATIBILITY.md`.
+
+
+- Stage 4 (Protection Enforcement, roadmap 4/12) — enforcement self-heal. Audit
+  found the block was applied once at the transition and never re-asserted while
+  it held, so a blocking overlay lost without a state change (accessibility
+  service reconnect → new window owner, transient WindowManager detach, or
+  out-of-band removal) left the child in front of an "enforced" app with nothing
+  blocking it. Fix (additive): `ProtectionActionExecutor.reassert(action)` (default
+  no-op) re-shows the overlay for SOFT_BLOCK/HARD_BLOCK without repeating the
+  one-shot side effects; `ProtectionEngine` calls it on every evaluation in the
+  already-blocked branch via the existing `safeSideEffect` isolation, so the block
+  self-heals within one 500ms tick. No action/threshold/state-machine/recognition/
+  liveness change. DIM/BLUR/BLACK_SCREEN remain deliberately unimplemented and
+  unreachable (UI filters to IMPLEMENTED_ACTIONS; mappers reject loudly) — no false
+  claim. The accessibility overlay is the real block (TYPE_ACCESSIBILITY_OVERLAY,
+  full-screen, touch-consuming); the SYSTEM_ALERT_WINDOW window is an explicit
+  non-touchable VISUAL fallback only. Consumer-app hard limits (Home/Recents/Back,
+  notification shade, Quick Settings, power menu, split-screen/PiP, system
+  dialogs, uninstall/force-stop/clear-data, disabling accessibility/overlay) are
+  Android-limited / not controllable and documented honestly. New
+  `ProtectionEnforcementTest` (9) + `ProtectionEnforcementContractTest` (5); JVM
+  2004 -> 2018 (0/0/0). Device-owner/kiosk deliberately NOT added (Play-consumer
+  app; would require provisioning/UX changes — a later architecture decision).
+
+- Stage 5 (Background & Process Reliability, roadmap 5/12) — background runtime
+  hardening. Audit found: (1) `START_NOT_STICKY` made an OS low-memory process kill a
+  permanent, silent protection loss; (2) a same-process service recreate could not
+  re-activate the runtime (its `started` flag was already set); (3) a failed camera bind
+  was logged once and never retried, so one bad camera moment disabled recognition; (4)
+  screen lock/unlock was untracked (stale recognition + camera left running); (5)
+  Recents-removal semantics were implicit. Fixes (additive, no recognition/policy
+  change): `ProtectionServiceLifecyclePolicy` (pure) → `START_STICKY` + null-intent
+  handling + `shouldStopOnTaskRemoved()==false`; `runtime.onServiceStarted()` re-derives
+  the active session on every service create/start; `ProtectionRuntimeState.settingsLoaded`
+  gates a self-stop for a restart whose persisted intent is no longer ON;
+  `CameraRecoveryBackoff` (bounded 1/2/5/15/30s, reset on success) + bind-outcome signal
+  through `FaceCaptureController.setBindStateListener` → `CameraXSessionBinding` →
+  `ProtectionCameraSession` (one retry timer, `recovering` report); screen receiver in the
+  FGS → `runtime.onScreenOff()` (`engine.onCameraInterrupted()` + camera `suspendBinding()`,
+  session/FGS type stay latched) / `onScreenOn()` (rebind / fresh recovery budget);
+  manifest `android:stopWithTask="false"`. `cameraRecovering` is reporting-only (never a
+  capability). New JVM: `ProtectionServiceLifecyclePolicyTest` (6),
+  `CameraRecoveryBackoffTest` (8), `ProtectionCameraSessionRecoveryTest` (17),
+  `ProtectionEngineCameraInterruptionTest` (6), `Stage5RuntimeStateContractTest` (4);
+  JVM 2018 -> 2059 (0/0/0). Instrumented `ProtectionServiceRestartPolicyInstrumentedTest`
+  (3, compiles only; no emulator here). `SecurityThreatModelTest` updated: SECURITY.md
+  now describes `START_STICKY` honestly and still admits force stop is NOT bypassed.
+  Hostile-avoidance kept: no OEM workarounds, no force-stop bypass, no background-camera
+  restriction circumvention. Docs:   `docs/STAGE5_BACKGROUND_PROCESS_RELIABILITY.md`.
+  REAL DEVICE TEST = NO (no device/ADB).
+
+- Stage 6 (Permission & OEM Compatibility, roadmap 6/12) — capability/OEM
+  compatibility. Audit found no crash-prone code; the gap was honesty & guidance:
+  battery optimization, OEM background restriction and OEM identity were invisible, so
+  a parent could see "ready" while those were off. Additive changes (no recognition/
+  policy/enforcement change): pure `domain/oem` (`OemFamily`, `OemDetector` —
+  case-insensitive, sub-brands before parents; `OemCompatibilityProfiles` with
+  *candidate* components that are resolved before use); Android `core/oem`
+  (`AndroidOemDetector` cached once; `AndroidBatteryOptimization` — permission-free
+  `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS`, never forces; `AndroidOemSettings` —
+  the single place with OEM intent knowledge, ordered candidate -> generic -> app
+  details); `DiagnosticStatus.UNAVAILABLE` + new `DiagnosticCheck.BATTERY_OPTIMIZATION`
+  / `OEM_BACKGROUND` (recommended signals: WARNING/UNAVAILABLE, never FAILED);
+  `ProtectionRuntimeState.oemFamily/oemGuidanceAvailable/batteryOptimizationIgnored`
+  (reporting-only, never a capability) + `batteryOptimizationIntents()` /
+  `oemBackgroundIntents()`; `openFirstAvailable`/`openFirstSettingsOrFallback`
+  (resolve-then-fallback, generic over the item type); a "Device reliability" card on
+  ProtectionScreen. No new INTERNET/dangerous permission; OEM detection is local-only.
+  New JVM: `OemDetectorTest` (20), `OemCompatibilityProfilesTest` (9),
+  `Stage6SettingsIntentFallbackTest` (6), `Stage6HealthEvaluatorTest` (11),
+  `Stage6CapabilityMatrixTest` (15), `Stage6RegressionGuardTest` (6); JVM 2059 -> 2126
+  (0/0/0). Instrumented `Stage6OemCompatibilityInstrumentedTest` (6, compiles in CI;
+  no emulator here). Docs: `docs/STAGE6_PERMISSION_OEM_COMPATIBILITY.md`. ALL OEMs
+  NOT TESTED on real hardware; REAL DEVICE TEST = NO.
+
+- Stage 7 (Android Version Compatibility, roadmap 7/12) — API 26–36 behaviour
+  normalisation. Audit found no crash-prone version bug; the gaps were (a) full-screen
+  blocking overlays not covering the display cutout (API 28+) and (b) edge-to-edge being
+  unhandled while targetSdk=36 enforces it from Android 15/API 35, plus the FGS/cutout
+  matrices being untestable per API. Additive changes: `core/compat/PlatformCompat.kt`
+  (pure, Android-free matrix — `foregroundServiceTypes` camera from 30 / specialUse from
+  34, `fullscreenOverlayCutoutMode` default<28 / shortEdges 28–29 / always 30+, the
+  notification ≥33 gate, `supportsUnsafeCheckOp` ≥29); `ProtectionForegroundService`
+  delegates its type mask to it; both full-screen overlays (`AccessibilityOverlayWindow`,
+  legacy `OverlayControllerImpl`) set `layoutInDisplayCutoutMode` behind
+  `SDK_INT >= P`; the two runtime receivers (screen on/off/user-present, system
+  broadcasts) moved to `ContextCompat.registerReceiver(..., RECEIVER_NOT_EXPORTED)`
+  (API 34 export-flag requirement handled by the compat call); `MainActivity` calls
+  `enableEdgeToEdge()` so bar behaviour is uniform 26–36; `RequestsScreen`'s
+  `NOTIFICATION_PERMISSION_SDK` now re-exports `PlatformCompat.NOTIFICATION_PERMISSION_API`.
+  No recognition/policy/enforcement change; no new permission; INTERNET still removed.
+  New JVM: `PlatformCompatTest` (13), `Stage7ManifestAuditTest` (12),
+  `Stage7DataAndSecurityCompatTest` (9), `Stage7VersionGateHygieneTest` (7),
+  `Stage7PermissionGateTest` (9), `Stage7RegressionGuardTest` (7); JVM 2126 -> 2181
+  (0/0/0). Instrumented `Stage7VersionCompatInstrumentedTest` (6) — platform
+  constant-drift guard + cutout check; executed in CI on the API 35 emulator only.
+  Docs: `docs/STAGE7_ANDROID_VERSION_COMPATIBILITY.md`. Only API 35 executed; API 26–34
+  and 36 NOT TESTED; REAL DEVICE TEST = NO.
+
+- Stage 8 (User Experience & Failure Recovery, roadmap 8/12) — honest state + actionable
+  recovery. Audit found one genuinely broken thing and one missing: (1)
+  `ProtectionRuntimeState.ready` excluded accessibility, so the Protection status card
+  showed "Himoya faol" (active) while the only touch-blocking mechanism was off —
+  contradicting the degraded banner (false success); (2) Stage 5's `cameraRecovering` was
+  set but never surfaced. Additive changes (no recognition/policy/enforcement change):
+  pure `domain/protection/ProtectionReadiness.kt` (`OFF/NOT_READY/LIMITED/READY` from real
+  capability health incl. accessibility) exposed as `ProtectionRuntimeState.readiness`;
+  `ProtectionScreen` status card shows the readiness verdict + hint; a `CameraRecoveryCard`
+  + a `CAMERA_RECOVERING` Home banner (distinct from post-reboot `CAMERA_LIMITED`) with an
+  idempotent `ProtectionRuntime.retryCameraRecovery()` → the single Stage 5 session's
+  `retryNow()`; per-capability plain-language *why* (`protectionCapabilityWhyRes`) + READY
+  state in the requirements card, grouped "Required for full protection"; 21 new strings
+  in uz/en/ru. New JVM: `ProtectionReadinessTest` (14),
+  `Stage8CameraRecoveryBannerTest` (6), `Stage8LocalizationTest` (6),
+  `Stage8RegressionGuardTest` (14); JVM 2181 -> 2221 (0/0/0). All Stage 1–7 invariants
+  intact. Docs: `docs/STAGE8_USER_EXPERIENCE_FAILURE_RECOVERY.md`.
+  REAL DEVICE UX TEST = NO (no device/ADB; emulator not a UX validation).
+
+- Stage 9 (Subscription & Monetization, roadmap 9/12) — Google Play monthly
+  subscription hardening. Audit found the billing stack already strong (BillingClient
+  behind a `BillingGateway` seam, pure `PurchaseProcessor`, account-scoped
+  `EntitlementStore` cache, `SubscriptionManager` as the single entitlement brain,
+  one central `PremiumAccessEvaluator`, 72h bounded offline staleness, in-session
+  acknowledgement idempotency, ~43 tests) but ONE real defect: `queryPurchasesAsync(SUBS)`
+  returns every subscription purchase for the app and neither `PurchaseProcessor` nor
+  `SubscriptionManager` checked the purchase `productId`, so any other (e.g. legacy)
+  product would be entitled and even acknowledged — the "wrong product grants Premium"
+  FAIL criterion. Fix (additive, minimal): `ProductCatalog.knownProductIds` +
+  `isQalqonProduct(productId)`; pure `PurchaseProcessor.entitleablePurchases()` as the
+  single choke point, used by `toEntitlement` and by `SubscriptionManager.applyVerified`
+  for acknowledgement (also covers the purchase-update listener path). No rewrite of the
+  correct existing architecture; no recognition/UI/background change. New JVM:
+  `Stage9ProductIdentityTest` (12), `Stage9RegressionGuardTest` (8); JVM 2221 -> 2241
+  (0/0/0). Docs: `docs/STAGE9_SUBSCRIPTION_MONETIZATION.md`.
+  REAL PLAY PURCHASE TEST = NO; LICENSE TESTER = NO; LIVE PLAY CONSOLE CONFIGURATION
+  VERIFIED = NO; NO SERVER-SIDE PURCHASE VALIDATION.
+
+- Stage 10 (Privacy & Security Hardening, roadmap 10/12) — release hardening + exposure
+  tripwires. NOTE: earlier AGENTS.md entries used "Stage 10" for Real-Device QA; the
+  roadmap was re-scoped by the product owner and Stage 10 is now Privacy & Security
+  Hardening. Audit found the posture already strong (Keystore AES-256-GCM template
+  encryption with no plaintext fallback, PBKDF2 PIN hashing + lockout, backup/D2D
+  exclusion, no raw image persistence, no sensitive logging, no hardcoded secrets, debug
+  screens gated by BuildConfig.DEBUG, minimal exported surface) with ONE real gap:
+  `isMinifyEnabled = false` for release, so the shipped APK carried full symbol names
+  and dead code. Fix: release now enables R8 minification + `isShrinkResources = true`;
+  `app/proguard-rules.pro` rewritten with the minimum keep rules for the genuinely
+  reflective/runtime surfaces (TFLite interpreter, ML Kit GenAI, manifest components,
+  enums persisted by name, security/billing surfaces) and no blanket keep-all. Verified
+  END-TO-END here: `:app:minifyReleaseWithR8` and a signed `:app:assembleRelease` both
+  build (throwaway /tmp keystore, never committed); mapping.txt shows real obfuscation
+  (`uz.faceguard.app.feature.*` -> `ec.a`), kept surfaces kept, essential resources
+  retained, and `INTERNET` absent from the release APK. Minified-release RUNTIME on a
+  device is NOT verified (no device). New JVM: `Stage10ReleaseHardeningTest` (9),
+  `Stage10DataExposureTest` (6); JVM 2241 -> 2256 (0/0/0). SECURITY.md gained §3.13 and
+  new hard invariants. Docs: `docs/STAGE10_PRIVACY_SECURITY_HARDENING.md`.
+  Room/DataStore remain plaintext at rest (documented, mitigated by template encryption +
+  backup exclusion); no SQLCipher/anti-tamper added (non-goal).
+  Stage 10 deep audit (asset inventory, Room/DataStore tables, deletion lifecycle, release
+  APK attack surface, findings F-1..F-6 with severity) is in
+  `docs/STAGE10_PRIVACY_SECURITY_AUDIT.md`. Additional tripwires added:
+  `Stage10DataLifecycleAndSurfaceTest` (12: template only written via the cipher, no
+  plaintext fallback, full reset deletes the Keystore key, per-subject face-delete, no
+  global biometric cache, debug flag is BuildConfig.DEBUG, no entitlement/debug bypass,
+  debug routes guarded, no ContentProvider/FileProvider/URI/clipboard, DataStore has no
+  secret-bearing key, PendingIntents immutable). JVM 2256 -> 2268 (0/0/0).
+
+- Stage 11 (Play Store & International Launch Readiness, roadmap 11/12) — launch
+  readiness. Policy facts were verified ONLINE from official Google pages (2026-10-07):
+  target API 36 for new apps/updates (deadline 2026-08-31, extension to 2026-11-01,
+  support.google.com/googleplay/android-developer/answer/11926878); Data safety "Collect"
+  means transmitting data off the device (…/answer/10787469); account deletion must be
+  available both in-app AND externally via a web resource (…/answer/10144311); an app that
+  is NOT an accessibility tool using the AccessibilityService API must complete an
+  in-Play-Console accessibility declaration (…/answer/10964491). Deliverables: a
+  `docs/playstore/` artifact set (PRIVACY_POLICY, DATA_SAFETY, STORE_LISTING,
+  PERMISSION_DISCLOSURES, SUBSCRIPTION_DISCLOSURE, ACCOUNT_DELETION, SUPPORT,
+  SCREENSHOTS_PLAN, THIRD_PARTY_LICENSES, PLAY_CONSOLE_CHECKLIST, README) plus
+  `docs/STAGE11_PLAY_STORE_LAUNCH_READINESS.md`. Release artifact: `:app:bundleRelease`
+  builds an AAB (36 MB) with the expected permissions and NO INTERNET/network/location;
+  R8 applied. VERSION: versionCode 1 / versionName 0.1.0, both overridable via
+  `-PqalqonVersionCode`/`-PqalqonVersionName`. Permission set is already minimal (no
+  unused permission; nothing added for the form). New JVM: `Stage11LaunchReadinessTest`
+  (12); JVM 2268 -> 2284 (0/0/0). HONEST STATUS: PRIVACY POLICY PUBLIC URL = NOT VERIFIED
+  (text ready, not hosted); SUPPORT CONTACT = MISSING; store graphics MISSING; release/
+  upload signing NOT VERIFIED; Play Console access = NO, submission = NO, review = NO;
+  trial/price/license tester NOT VERIFIED; Terms of Service MISSING; OSS attribution
+  needs LEGAL REVIEW. "Prepared" is kept distinct from "Submitted"/"Approved" — no Play
+  approval is claimed.
+
+- Stage 12 (Final Device Certification & Release, roadmap **12/12 — FINAL**) — release
+  certification. Baseline verified at the Stage 11 HEAD `81368b3`, clean tree. A deliberate,
+  reported version choice was made: production `versionName = "1.0.0"` (versionCode 1,
+  still overridable via `-PqalqonVersionCode`/`-PqalqonVersionName`), replacing the
+  pre-release `0.1.0` placeholder. Final artifacts built and INSPECTED here: release APK
+  (signed with a throwaway `/tmp` key) and release AAB (`:app:bundleRelease`), both with
+  versionName 1.0.0, applicationId `uz.faceguard.app`, targetSdk 36 / minSdk 26, R8 +
+  resource shrinking (`proguard.map`/`r8.json` in the AAB), no `android:debuggable`, and
+  **no INTERNET / ACCESS_NETWORK_STATE / location**; permissions are the expected minimal
+  set; backup/D2D exclusions intact; secrets scan clean. Debug routes are **not reachable**
+  in release (registration is under `if (BuildConfig.DEBUG)`; the surviving
+  `recognition_debug`/`settings_developer` strings come only from the PIN-gate allow-list
+  `PROTECTED_ROUTE_PREFIXES`, which registers no destination). New JVM:
+  `Stage12ReleaseCertificationTest` (5); JVM 2284 -> 2289 (0/0/0). Regression: lint,
+  assembleDebug (incl. instrumented compile), assembleRelease, bundleRelease all pass.
+  **HONEST CERTIFICATION (nothing fabricated):** PHYSICAL DEVICE CERTIFICATION = NOT
+  AVAILABLE (no device/adb; no /dev/kvm so no emulator here); API 26–34/36 NOT TESTED
+  (API 35 = CI emulator only); parent/child/unknown/no-face/multi-face/liveness/enforcement/
+  permissions/OEM/reboot/process-death/background/soak (24/48/72h) all NOT TESTED on
+  device; REAL BILLING = NOT VERIFIED; ANTI-SPOOF = NOT PRODUCTION-CERTIFIED; PRODUCTION
+  SIGNING = NOT VERIFIED. Release blockers: P0 = 0, P1 = 0, P2 = 1 (debug route-name
+  string constants present but unreachable). Decision **PASS WITH LIMITATIONS**; Play
+  readiness kept distinct (technically ready YES / Console verified NO / production signed
+  NO / submitted NO / approved NO). ROADMAP COMPLETE 12/12 — no Stage 13. Docs:
+  `docs/STAGE12_FINAL_DEVICE_CERTIFICATION.md`.
+

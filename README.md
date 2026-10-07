@@ -79,6 +79,17 @@ tests via a deterministic per-frame model score), so photo/screen/replay
 resilience is *architecturally implemented and tested*, not proven against real
 attacks.
 
+**Stage 5 (Anti-Spoofing / Liveness) assessment:** the current subsystem is
+**Level 1 — heuristic anti-spoof signals**, and it is *decision-inert*: `SPOOF`
+is unreachable without a model, so liveness never changes a block/allow decision
+today. Photo, screen and video-replay attacks are **not** stopped. No
+FAR/FRR/APCER/BPCER was measured, so none is claimed. The dashboard's liveness
+label is now **source-gated**: a `LIVE` verdict is only shown when a real
+`AntiSpoofModel` produced it, never for the motion heuristic (which a replay also
+satisfies). Full audit, taxonomy, strategy and model requirements:
+[`docs/STAGE5_ANTI_SPOOFING_LIVENESS.md`](docs/STAGE5_ANTI_SPOOFING_LIVENESS.md).
+
+
 ### Protected app selection reliability
 
 Refresh no longer resets protection choices. `refreshFromDevice()` merges the
@@ -693,12 +704,47 @@ sync; the app remains fully functional with sync disabled or absent.
   `AntiSpoofModel` seam), but no anti-spoofing model is bundled and the heuristic
   is a weak signal: printed photos, phone screens and video replays are **not**
   reliably detected — see the Group 9 section and "Biometric capability" above.
-- **Accessibility-service blocking is not implemented.** Protection runs as an
-  app-scoped session (`ProtectionRuntime`) driven by `protectionEnabled`; it
-  works while the Qalqon process is alive and the overlay permission is
-  granted. It is not a guaranteed background guard: a production app needs a
-  foreground service plus an AccessibilityService (or Device Admin) to overlay
-  other apps reliably while backgrounded.
+- **Background protection is best-effort, not guaranteed.** Protection runs as an
+  app-scoped session (`ProtectionRuntime`) driven by `protectionEnabled`, kept alive
+  by a foreground service that owns a process-scoped camera session and an
+  accessibility-service touch-blocking overlay. It survives Home, app switching and
+  Recents removal, and the OS *may* restart the service after a low-memory process
+  kill (`START_STICKY`, best effort). It does **not** survive a user force stop, and
+  after a reboot recognition stays limited until the app is opened once (Android 15
+  foreground-service/camera rules). See
+  `docs/STAGE5_BACKGROUND_PROCESS_RELIABILITY.md`.
+- **OEM background restrictions are guidance-only.** QALQON detects the device's OEM
+  family locally and, for families known to restrict background apps, offers the
+  relevant settings page (battery optimization / autostart). It cannot read or bypass
+  the OEM's own restriction state, and never forces a change. See
+  `docs/STAGE6_PERMISSION_OEM_COMPATIBILITY.md`.
+- **The app never claims more than it is doing.** The Protection screen shows an honest
+  readiness verdict (OFF / Setup needed / Partial protection / Protection ready) derived
+  from real capability health, so "Protection: ON" is never presented as full protection
+  while a critical permission is missing; a camera interruption is shown explicitly. See
+  `docs/STAGE8_USER_EXPERIENCE_FAILURE_RECOVERY.md`.
+- **Subscriptions are client-verified only.** Premium comes from Google Play Billing
+  (over IPC — no `INTERNET` permission); the local cache is a bounded cache of a
+  Play-verified state, never the authority, and only QALQON's own product can grant
+  Premium. There is **no server-side purchase validation**, and grace period / account
+  hold / revocation are not exposed by the client library. See
+  `docs/STAGE9_SUBSCRIPTION_MONETIZATION.md`.
+- **The release build is minified (R8) and resource-shrunk.** Face templates are
+  Keystore-encrypted, raw face images are never written to disk, and no secret is logged
+  or hardcoded. Room/DataStore themselves remain plaintext at rest (documented
+  limitation, mitigated by template encryption and backup exclusion). See
+  `docs/STAGE10_PRIVACY_SECURITY_HARDENING.md` and `SECURITY.md`.
+- **Play Store readiness: technically prepared, not submitted.** Launch artifacts
+  (privacy policy, Data safety, store listing, permission/subscription disclosures,
+  account-deletion content, Play Console checklist) are in `docs/playstore/`. The release
+  AAB builds. Still required before submission: public HTTPS privacy/support URLs, store
+  graphics, release/upload signing, Play Console declarations, and a real purchase test.
+  No Play approval is claimed. See `docs/STAGE11_PLAY_STORE_LAUNCH_READINESS.md`.
+- **Supported Android range is API 26–36 (Android 8.0–16).** Cross-version decisions
+  live in `core/compat/PlatformCompat` and are asserted for every level on the JVM;
+  full-screen blocks cover the display cutout (API 28+) and the UI is edge-to-edge on
+  every version (Android 15 enforces it). Only API 35 is executed in CI; other levels
+  are not device-verified. See `docs/STAGE7_ANDROID_VERSION_COMPATIBILITY.md`.
 - **Migrations are explicit.** Room is at schema v10 with an additive
   migration chain (v3 → v10); a destructive fallback is not used, so a release
   build must keep adding a migration for every schema change.

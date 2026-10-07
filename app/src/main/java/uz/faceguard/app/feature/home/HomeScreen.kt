@@ -92,6 +92,7 @@ import kotlinx.coroutines.launch
 import java.time.ZoneId
 import uz.faceguard.app.R
 import uz.faceguard.app.core.debug.DebugFlags
+import uz.faceguard.app.core.permission.openSettingsOrFallback
 import uz.faceguard.app.core.protection.ProtectionRuntime
 import uz.faceguard.app.core.protection.ProtectionRuntimeState
 import uz.faceguard.app.core.theme.QalqonDimens
@@ -184,6 +185,12 @@ class HomeViewModel @Inject constructor(
 
     /** Re-probes capabilities (called when Home resumes) so a revoked one surfaces at once. */
     fun refreshProtectionCapabilities() = runtime.refreshPermissions()
+
+    /**
+     * Stage 8: the Home retry after a camera interruption. Idempotent — repeated taps
+     * cannot open a second camera or session.
+     */
+    fun retryCameraRecovery() = runtime.retryCameraRecovery()
 
     /** The system settings page that fixes [capability], for the degraded banner's action. */
     fun capabilitySettingsIntent(capability: ProtectionCapability): Intent =
@@ -440,14 +447,16 @@ fun HomeScreen(
                             state = dashboard,
                             degradedCapabilities = protectionState.degradedCapabilities,
                             cameraLimitedAfterBoot = protectionState.cameraLimitedAfterBoot,
+                            cameraRecovering = protectionState.cameraRecovering,
                         ),
                         degradedCapabilities = protectionState.degradedCapabilities,
                         onFixCapability = { capability ->
-                            context.startActivity(viewModel.capabilitySettingsIntent(capability))
+                            context.openSettingsOrFallback(viewModel.capabilitySettingsIntent(capability))
                         },
-                        onEnableNotifications = { context.startActivity(notificationSettingsIntent(context)) },
+                        onEnableNotifications = { context.openSettingsOrFallback(notificationSettingsIntent(context)) },
                         onOpenRequests = onOpenRequests,
                         onOpenChildren = onOpenChildren,
+                        onRetryCamera = viewModel::retryCameraRecovery,
                     )
                 }
 
@@ -791,6 +800,7 @@ private fun HomeBannerArea(
     onEnableNotifications: () -> Unit,
     onOpenRequests: () -> Unit,
     onOpenChildren: () -> Unit,
+    onRetryCamera: () -> Unit,
 ) {
     if (banners.isEmpty()) return
 
@@ -820,6 +830,18 @@ private fun HomeBannerArea(
                 HomeBannerKind.CAMERA_LIMITED -> QalqonStatusBanner(
                     text = stringResource(R.string.protection_after_boot_camera),
                     severity = banner.severity,
+                )
+
+                HomeBannerKind.CAMERA_RECOVERING -> QalqonStatusBanner(
+                    title = stringResource(R.string.protection_camera_recovery_title),
+                    text = stringResource(R.string.protection_camera_recovery_body),
+                    severity = banner.severity,
+                    action = {
+                        HomeBannerButton(
+                            stringResource(R.string.protection_camera_recovery_retry),
+                            onClick = onRetryCamera,
+                        )
+                    },
                 )
 
                 HomeBannerKind.NOTIFICATIONS_DISABLED -> QalqonStatusBanner(

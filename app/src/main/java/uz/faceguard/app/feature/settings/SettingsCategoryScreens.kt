@@ -529,6 +529,7 @@ private fun healthColor(status: DiagnosticStatus): Color = when (status) {
     DiagnosticStatus.WARNING -> QalqonTheme.colors.warning
     DiagnosticStatus.FAILED -> MaterialTheme.colorScheme.error
     DiagnosticStatus.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
+    DiagnosticStatus.UNAVAILABLE -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 
 @Composable

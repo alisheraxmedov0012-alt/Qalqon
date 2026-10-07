@@ -161,6 +161,13 @@ enum class HomeBannerKind {
     /** Restored after a reboot but the camera type is not claimed yet (limited until opened). */
     CAMERA_LIMITED,
 
+    /**
+     * Stage 8: Stage 5's bounded camera recovery is running or exhausted, so recognition
+     * is temporarily limited. Distinct from CAMERA_LIMITED (a post-reboot state) and from
+     * a missing camera permission.
+     */
+    CAMERA_RECOVERING,
+
     /** The OS would not deliver our notifications. */
     NOTIFICATIONS_DISABLED,
 
@@ -195,9 +202,15 @@ fun homeBanners(
     state: DashboardUiState,
     degradedCapabilities: Set<ProtectionCapability> = emptySet(),
     cameraLimitedAfterBoot: Boolean = false,
+    cameraRecovering: Boolean = false,
 ): List<HomeBanner> = buildList {
     if (degradedCapabilities.isNotEmpty()) {
         add(HomeBanner(HomeBannerKind.PROTECTION_DEGRADED, QalqonAlertSeverity.WARNING))
+    }
+    // Stage 8: an in-progress/exhausted camera recovery is its own honest state, listed
+    // before the post-reboot limit because it is the more immediate fact.
+    if (cameraRecovering) {
+        add(HomeBanner(HomeBannerKind.CAMERA_RECOVERING, QalqonAlertSeverity.WARNING))
     }
     if (cameraLimitedAfterBoot) {
         add(HomeBanner(HomeBannerKind.CAMERA_LIMITED, QalqonAlertSeverity.WARNING))

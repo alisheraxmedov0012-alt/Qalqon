@@ -2,10 +2,11 @@ package uz.faceguard.app.core.recognition
 
 import kotlinx.coroutines.flow.MutableSharedFlow
 import uz.faceguard.app.core.embed.FaceEmbeddingCodec
+import uz.faceguard.app.core.pipeline.FaceFeature
 import uz.faceguard.app.core.pipeline.FrameEvent
 import uz.faceguard.app.domain.model.ChildProfile
 import uz.faceguard.app.domain.model.ParentProfile
-import uz.faceguard.app.domain.similarity.CosineSimilarity
+import uz.faceguard.app.domain.policy.ProtectionAction
 
 /**
  * Cosine-similarity acceptance thresholds on L2-normalized embeddings.
@@ -30,11 +31,14 @@ sealed class RecognitionResult {
 /**
  * Matches a live frame against persisted on-device templates.
  *
- * Templates are the face vectors produced during enrollment (TFLite
- * MobileFaceNet embeddings when available, otherwise geometry fallback) and
- * stored in `ParentProfile.faceTemplateRef` / `ChildProfile.faceTemplateRef`.
- * The parent template is evaluated first so the parent identity can never be
- * misreported as a child.
+ * Templates are the face vectors produced during enrollment (TFLite MobileFaceNet
+ * embeddings when available, otherwise geometry fallback) and stored in
+ * `ParentProfile.faceTemplateRef` / `ChildProfile.faceTemplateRef`.
+ *
+ * Stage 1: the decision itself lives in the pure, order-independent
+ * [IdentityDecisionEngine] (documented there), so the recogniser is a thin adapter
+ * that only decodes stored templates and delegates. Identity is accepted only from a
+ * real model embedding whose dimension matches the stored template.
  */
 class Recognizer(
     private var thresholds: Thresholds = Thresholds(),
@@ -46,46 +50,69 @@ class Recognizer(
 
     fun updateThresholds(new: Thresholds) { thresholds = new }
 
-    fun evaluate(frame: FrameEvent, parent: ParentProfile?, children: List<ChildProfile>): RecognitionResult {
-        val frameFeatures = frame.features ?: return RecognitionResult.NoFace
-        if (frameFeatures.isEmpty()) return RecognitionResult.NoFace
-
-        parent?.faceTemplateRef?.let { ref ->
-            FaceEmbeddingCodec.decode(ref)?.let { template ->
-                val score = cosine(frameFeatures, template)
-                if (score >= thresholds.parent) return RecognitionResult.ParentRecognized(score)
-            }
+    /**
+     * Stage 2: evaluates **every** detected face in the frame into a per-face
+     * [IdentityDecision], then aggregates them with the deterministic [MultiFacePolicyEngine].
+     * The result no longer depends on the detector's face order.
+     *
+     * [childActionOf] resolves the configured action for a recognised child and the current
+     * foreground app, so multiple recognised children are resolved to the most restrictive
+     * one; it defaults to "no policy" so a caller without app context still gets a
+     * deterministic result.
+     */
+    fun evaluateAll(
+        frame: FrameEvent,
+        parent: ParentProfile?,
+        children: List<ChildProfile>,
+        childActionOf: (childId: Long) -> ProtectionAction? = { null },
+    ): MultiFaceDecision {
+        val faces = frame.faceFeatures()
+        if (faces.isEmpty()) {
+            return MultiFaceDecision(RecognitionResult.NoFace, emptyList(), null, frame.faceCount)
         }
 
-        var bestChild: Pair<ChildProfile, Double>? = null
-        for (child in children) {
-            val ref = child.faceTemplateRef ?: continue
-            val template = FaceEmbeddingCodec.decode(ref) ?: continue
-            val score = cosine(frameFeatures, template)
-            if (score >= thresholds.child && (bestChild == null || score > bestChild!!.second)) {
-                bestChild = child to score
-            }
-        }
-        if (bestChild != null) {
-            return RecognitionResult.ChildRecognized(bestChild!!.first.id, bestChild!!.first.childName, bestChild!!.second)
-        }
-
-        return RecognitionResult.Unknown(bestScore(frameFeatures, parent, children))
-    }
-
-    private fun bestScore(frameFeatures: FloatArray, parent: ParentProfile?, children: List<ChildProfile>): Double {
-        var best = 0.0
-        parent?.faceTemplateRef?.let { ref ->
-            FaceEmbeddingCodec.decode(ref)?.let { best = maxOf(best, cosine(frameFeatures, it)) }
-        }
-        children.forEach { child ->
+        val parentTemplate = parent?.faceTemplateRef?.let { FaceEmbeddingCodec.decode(it) }
+        val childTemplates = children.mapNotNull { child ->
             child.faceTemplateRef?.let { ref ->
-                FaceEmbeddingCodec.decode(ref)?.let { best = maxOf(best, cosine(frameFeatures, it)) }
+                FaceEmbeddingCodec.decode(ref)?.let { template ->
+                    ChildTemplate(childId = child.id, childName = child.childName, template = template)
+                }
             }
         }
-        return best
+
+        val candidates = faces.map { face ->
+            IdentityDecisionEngine.decide(
+                live = face.values,
+                source = face.source,
+                parentTemplate = parentTemplate,
+                children = childTemplates,
+                thresholds = thresholds,
+            )
+        }
+        return MultiFacePolicyEngine.decide(candidates, childActionOf)
     }
 
-    /** Delegates to the single shared implementation; identical maths. */
-    private fun cosine(a: FloatArray, b: FloatArray): Double = CosineSimilarity.of(a, b)
+    /**
+     * Single-result convenience over [evaluateAll], kept for the debug screen and any caller
+     * that only needs the final identity. Behaviour is identical to Stage 1 for one face.
+     */
+    fun evaluate(
+        frame: FrameEvent,
+        parent: ParentProfile?,
+        children: List<ChildProfile>,
+        childActionOf: (childId: Long) -> ProtectionAction? = { null },
+    ): RecognitionResult = evaluateAll(frame, parent, children, childActionOf).result
+
+    /**
+     * The per-face feature vectors for this frame.
+     *
+     * Prefers the multi-face [FrameEvent.faces] list. When it is empty — a single-face frame,
+     * or a caller that only populated [FrameEvent.features] — it falls back to that single
+     * vector, so pre-Stage-2 behaviour is preserved exactly.
+     */
+    private fun FrameEvent.faceFeatures(): List<FaceFeature> = when {
+        faces.isNotEmpty() -> faces
+        features != null && features.isNotEmpty() -> listOf(FaceFeature(features, embeddingSource))
+        else -> emptyList()
+    }
 }

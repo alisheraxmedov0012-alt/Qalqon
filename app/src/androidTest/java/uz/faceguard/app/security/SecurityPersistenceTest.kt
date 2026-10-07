@@ -21,7 +21,12 @@ import uz.faceguard.app.core.security.KeystoreBiometricTemplateCipher
 import uz.faceguard.app.core.security.SecurityState
 import uz.faceguard.app.core.security.SecurityStateHolder
 import uz.faceguard.app.data.db.ChildProfileEntity
+import uz.faceguard.app.data.db.ChildScreenTimeLimitEntity
+import uz.faceguard.app.data.db.ChildEyeSafetyEntity
+import uz.faceguard.app.data.db.DailyAppUsageEntity
 import uz.faceguard.app.data.db.FaceGuardDatabase
+import uz.faceguard.app.data.db.ScheduleAppTargetEntity
+import uz.faceguard.app.data.db.ScheduleRuleEntity
 import uz.faceguard.app.data.prefs.PinAttemptStore
 import uz.faceguard.app.data.prefs.SessionManager
 import uz.faceguard.app.data.prefs.SettingsStore
@@ -214,6 +219,71 @@ class SecurityPersistenceTest {
         assertTrue(db.childProfileDao().observeAll(1L).first().isEmpty())
         // The key is gone too, so the old ciphertext is worthless even if a copy existed.
         assertEquals(TemplateRecovery.Unavailable, cipher.recover(encryptedBeforeReset))
+    }
+
+    @Test
+    fun aFullResetClearsEveryTableNotJustBiometrics() = runBlocking {
+        // Stage 4: seed the tables the reset used to miss and prove the wipe is complete
+        // (deletion verification, not a bare "reset returned").
+        val accountId = 7L
+        val childId = db.childProfileDao().insert(
+            ChildProfileEntity(accountId = accountId, childName = "Vali", restrictionLevel = "HIGH"),
+        )
+        db.dailyAppUsageDao().insertIfAbsent(
+            DailyAppUsageEntity(accountId, childId, "2026-01-01", "com.example", 60_000, "OTHER", 1L),
+        )
+        db.childScreenTimeLimitDao().upsert(
+            ChildScreenTimeLimitEntity(accountId, childId, "TOTAL", "", 120, 1L),
+        )
+        val scheduleId = db.scheduleDao().insert(
+            ScheduleRuleEntity(
+                accountId = accountId,
+                childId = childId,
+                name = "School",
+                mode = "BLOCK",
+                enabled = true,
+                startMinuteOfDay = 480,
+                endMinuteOfDay = 900,
+                daysMask = 0b11111,
+                priority = 0,
+                action = "HARD_BLOCK",
+            ),
+        )
+        db.scheduleDao().insertTargets(
+            listOf(ScheduleAppTargetEntity(accountId, childId, scheduleId, "com.example")),
+        )
+        db.childEyeSafetyDao().upsert(
+            ChildEyeSafetyEntity(
+                accountId = accountId,
+                childId = childId,
+                enabled = true,
+                warningEnterThresholdPercent = 30,
+                warningExitThresholdPercent = 25,
+                dangerEnterThresholdPercent = 45,
+                dangerExitThresholdPercent = 40,
+                confirmFrames = 3,
+                warningAction = "WARNING",
+                dangerAction = "HARD_BLOCK",
+                updatedAt = 1L,
+            ),
+        )
+
+        val reset = ResetRepositoryImpl(
+            db = db,
+            settingsStore = SettingsStore(context.settingsDataStore, SessionManager(context)),
+            sessionManager = SessionManager(context),
+            pinAttemptStore = PinAttemptStore(context),
+            keyProvider = keyProvider,
+        )
+        reset.resetAll()
+
+        assertTrue(db.childScreenTimeLimitDao().limits(accountId, childId).isEmpty())
+        assertTrue(db.scheduleDao().schedules(accountId, childId).isEmpty())
+        assertTrue(db.childEyeSafetyDao().config(accountId, childId) == null)
+        // The usage rows are queryable only aggregate-style, so verify the table is empty
+        // by re-inserting and confirming the deleteAll path left nothing: read via the
+        // total for the (now deleted) child, which must be zero/absent.
+        assertNull(db.dailyAppUsageDao().totalUsedMs(accountId, childId, "2026-01-01"))
     }
 
     private companion object {

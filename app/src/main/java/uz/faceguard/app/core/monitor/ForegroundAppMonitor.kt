@@ -1,20 +1,20 @@
 package uz.faceguard.app.core.monitor
 
-import android.app.AppOpsManager
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
-
-import android.os.Process
+import android.util.Log
 import android.provider.Settings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import uz.faceguard.app.core.usage.AndroidUsageAccess
 
 /**
  * Polling foreground monitor. Best-practical MVP: uses UsageStats events
@@ -26,10 +26,10 @@ import kotlinx.coroutines.launch
  * transitions are authoritative and the usage-stats poll no longer overwrites
  * them (it would otherwise clobber a real package with a stale/null value).
  */
-class ForegroundAppMonitor(private val context: Context) {
+class ForegroundAppMonitor(private val context: Context) : ForegroundAppSource {
 
     private val _current = MutableStateFlow<String?>(null)
-    val current: StateFlow<String?> = _current
+    override val current: StateFlow<String?> = _current
 
     private var job: Job? = null
     private var lastFallbackAt = 0L
@@ -38,24 +38,32 @@ class ForegroundAppMonitor(private val context: Context) {
     @Volatile
     private var accessibilityActive = false
 
-    fun hasUsageAccess(): Boolean {
-        val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-        val mode = appOps.checkOpNoThrow(
-            AppOpsManager.OPSTR_GET_USAGE_STATS,
-            Process.myUid(),
-            context.packageName,
-        )
-        return mode == AppOpsManager.MODE_ALLOWED
-    }
+    /**
+     * Whether Usage Access is held. Delegates to the single source of truth
+     * ([AndroidUsageAccess]) so the foreground monitor and the capability/UI checks can
+     * never disagree, and so the modern app-op API is used consistently.
+     */
+    fun hasUsageAccess(): Boolean = AndroidUsageAccess.isGranted(context)
 
     fun usageAccessIntent(): Intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
 
     fun start(scope: CoroutineScope, intervalMs: Long = 2_000L) {
         if (job != null) return
         job = scope.launch(Dispatchers.Default) {
-            while (true) {
+            while (isActive) {
                 // Accessibility, when bound, is the authoritative source.
-                if (!accessibilityActive) _current.value = pollForeground()
+                if (!accessibilityActive) {
+                    // UsageStats can throw a SecurityException when the special access
+                    // is revoked mid-session, and some OEM implementations throw from
+                    // queryEvents/queryUsageStats. An uncaught throw here would crash
+                    // the process (and with it protection), so a failed poll is
+                    // isolated: the last known package is kept rather than flapping to
+                    // null, and the loop keeps running so it recovers on its own once
+                    // the access is restored.
+                    runCatching { pollForeground() }
+                        .onSuccess { _current.value = it }
+                        .onFailure { Log.w(TAG, "foreground app poll failed", it) }
+                }
                 delay(intervalMs)
             }
         }
@@ -107,6 +115,7 @@ class ForegroundAppMonitor(private val context: Context) {
     }
 
     private companion object {
+        const val TAG = "ForegroundAppMonitor"
         const val EVENT_WINDOW_MS = 5 * 60_000L
         const val STATS_WINDOW_MS = 24 * 60 * 60_000L
         const val FALLBACK_THROTTLE_MS = 10_000L

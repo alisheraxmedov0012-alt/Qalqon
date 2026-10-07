@@ -58,4 +58,43 @@ data class FrameEvent(
      */
     val liveProbability: Float? = null,
     val timestamp: Long = System.currentTimeMillis(),
+    /**
+     * Where [features] came from.
+     *
+     * Stage 1: only a real model embedding may authorise a Parent/Child identity.
+     * The 19-d geometry fallback is a detection/quality signal, not identity-grade,
+     * so [EmbeddingSource.GEOMETRY] frames are never matched for identity. Defaults to
+     * [EmbeddingSource.MODEL] so a frame built without an explicit source keeps the
+     * pre-Stage-1 recognition behaviour (the tests that construct frames directly).
+     */
+    val embeddingSource: EmbeddingSource = EmbeddingSource.MODEL,
+    /**
+     * Stage 2: the feature vector of every detected face in the frame, each tagged with
+     * its [EmbeddingSource]. The recogniser evaluates all of them so the identity policy
+     * never depends on the order the detector returned faces in.
+     *
+     * Empty means "no per-face evidence was supplied", in which case the recogniser falls
+     * back to the single [features]/[embeddingSource] pair — this keeps single-face frames
+     * (and callers that only populate [features]) behaving exactly as before.
+     */
+    val faces: List<FaceFeature> = emptyList(),
 )
+
+/**
+ * One detected face's feature vector and its provenance, so the recogniser can decide on
+ * every face independently while still refusing to treat a non-identity-grade geometry
+ * vector as an identity.
+ */
+data class FaceFeature(
+    val values: FloatArray,
+    val source: EmbeddingSource = EmbeddingSource.MODEL,
+)
+
+/**
+ * Provenance of a frame's [FrameEvent.features].
+ *
+ * - [MODEL] — a real on-device face embedding (TFLite MobileFaceNet). Identity-grade.
+ * - [GEOMETRY] — the 19-d geometry fallback (pose/size/landmarks). NOT identity-grade;
+ *   it must never be used to accept a Parent or Child identity.
+ */
+enum class EmbeddingSource { MODEL, GEOMETRY }

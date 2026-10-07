@@ -5,9 +5,11 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
@@ -24,9 +26,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import uz.faceguard.app.R
+import uz.faceguard.app.core.compat.PlatformCompat
 
 /**
  * Background protection foundation and — since Phase 7.1 — the owner of the
@@ -70,28 +74,61 @@ class ProtectionForegroundService : Service() {
         // the service crashes here instead of silently reporting itself as running.
         startForegroundCompat(includeCamera = false)
         _running.value = true
-        runtime.start()
+        // Stage 5: re-derive the active session from the persisted intent. On a
+        // same-process recreate this re-activates protection that a previous
+        // onDestroy had deactivated; on a system restart it rebuilds the runtime.
+        runtime.onServiceStarted()
+        // Stage 5: the bounded camera-rebind retries run on the service scope.
+        cameraSession.attachRecoveryScope(scope)
         // A background start (e.g. the post-boot restore) cannot claim the camera
         // foreground type until a legal while-in-use moment, so recognition is limited
         // until the app is next opened. Report that honestly; a foreground start
         // leaves readiness untouched so the UI never flashes a false warning.
         if (!runtime.uiForeground.value) runtime.setCameraForegroundReady(false)
         observeCameraSession()
+        registerScreenStateReceiver()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // Idempotent: repeated starts keep exactly one runtime and one notification,
         // and never downgrade the camera type held by a live camera session.
-        runtime.start()
+        runtime.onServiceStarted()
         startForegroundCompat(includeCamera = cameraTypeClaimed)
-        // Not sticky: a system restart from the background would be rejected by
-        // Android 12+ start restrictions, so no guaranteed resurrection is claimed.
-        return START_NOT_STICKY
+        // Stage 5: a null intent means the system recreated the service after killing
+        // the process (sticky restart). Protection should have been enabled when that
+        // happened, but confirm once the persisted settings are observed, and end a
+        // restart that is no longer wanted instead of showing a false "protected".
+        if (intent == null) {
+            scope.launch {
+                runtime.state.first { it.settingsLoaded }
+                if (!runtime.protectionWanted()) stopSelf()
+            }
+        }
+        // Stage 5: START_STICKY lets the OS recreate the service (and the runtime) after
+        // an OS-initiated process kill. It is best-effort, never a force-stop bypass, and
+        // disabling protection stops the service so it is not restarted.
+        return if (ProtectionServiceLifecyclePolicy.restartMode == ServiceRestartMode.STICKY) {
+            START_STICKY
+        } else {
+            START_NOT_STICKY
+        }
+    }
+
+    /**
+     * Stage 5: Recents removal must not end protection. Android keeps a started
+     * service running and only notifies it here; QALQON relies on that default, so
+     * this is intentionally a no-op — calling `stopSelf()` (or declaring
+     * `android:stopWithTask="true"`) would let a child disable protection by
+     * swiping the app away.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        if (ProtectionServiceLifecyclePolicy.shouldStopOnTaskRemoved()) stopSelf()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        unregisterScreenStateReceiver()
         // Close the process-scoped camera session before the process lifecycle goes.
         scope.cancel()
         cameraSession.stop()
@@ -100,6 +137,46 @@ class ProtectionForegroundService : Service() {
         // the runtime's settings/account observers, which stay the source of truth.
         runtime.stop()
         super.onDestroy()
+    }
+
+    /** Stage 5: the runtime-registered screen-state receiver, unregistered with the service. */
+    private var screenStateReceiver: BroadcastReceiver? = null
+
+    /**
+     * Stage 5: screen off/on handling. Registered at runtime (not in the manifest) so
+     * it only exists while the service — and therefore protection — is alive, and is
+     * unregistered with the service, so it can neither leak nor fire when protection
+     * is off. It never bypasses a platform restriction: it only releases/rebinds the
+     * camera of a session that is already latched.
+     */
+    private fun registerScreenStateReceiver() {
+        if (screenStateReceiver != null) return
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                when (intent?.action) {
+                    Intent.ACTION_SCREEN_OFF -> runtime.onScreenOff()
+                    Intent.ACTION_SCREEN_ON, Intent.ACTION_USER_PRESENT -> runtime.onScreenOn()
+                }
+            }
+        }
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_USER_PRESENT)
+        }
+        // Stage 7: these are protected *system* broadcasts only, so RECEIVER_NOT_EXPORTED
+        // is correct and explicit. ContextCompat passes the export flag where the
+        // platform requires it (Android 14 / API 34+) and omits it below, so the same
+        // call is valid across API 26–36.
+        screenStateReceiver = runCatching {
+            ContextCompat.registerReceiver(this, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+            receiver
+        }.getOrNull()
+    }
+
+    private fun unregisterScreenStateReceiver() {
+        screenStateReceiver?.let { runCatching { unregisterReceiver(it) } }
+        screenStateReceiver = null
     }
 
     /**
@@ -163,20 +240,14 @@ class ProtectionForegroundService : Service() {
     }
 
     /**
-     * The runtime type bitmask. `specialUse` is only a real type from API 34; the
-     * camera type from API 30. Below those the corresponding bit is omitted so the
-     * platform is never handed a type it does not define.
+     * The runtime type bitmask. Delegated to the pure [PlatformCompat] matrix, so
+     * every supported API level (26–36) is asserted on the JVM: `specialUse` is only
+     * a real type from API 34 and `camera` from API 30, and below those the
+     * corresponding bit is omitted so the platform is never handed a type it does
+     * not define.
      */
-    private fun foregroundTypes(includeCamera: Boolean): Int {
-        var types = 0
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-        }
-        if (includeCamera && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
-        }
-        return types
-    }
+    private fun foregroundTypes(includeCamera: Boolean): Int =
+        PlatformCompat.foregroundServiceTypes(Build.VERSION.SDK_INT, includeCamera)
 
     private fun ensureChannel() {
         val manager = getSystemService(NotificationManager::class.java) ?: return

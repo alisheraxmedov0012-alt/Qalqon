@@ -3,6 +3,7 @@ package uz.faceguard.app.core.diagnostics
 import uz.faceguard.app.core.protection.ProtectionRuntimeState
 import uz.faceguard.app.domain.diagnostics.ScheduleSyncMechanism
 import uz.faceguard.app.domain.diagnostics.SystemHealthSnapshot
+import uz.faceguard.app.domain.oem.OemFamily
 
 /**
  * Phase 12: static facts about how this build is wired, verified against the
@@ -47,6 +48,9 @@ object RuntimeHealthMapper {
         accessibilityEnabled: Boolean,
         usageAccessGranted: Boolean,
         notificationsEnabled: Boolean,
+        batteryOptimizationIgnored: Boolean? = true,
+        oemFamily: OemFamily = OemFamily.UNKNOWN,
+        oemGuidanceAvailable: Boolean = false,
         bootRestoreWired: Boolean = PlatformCapabilities.BOOT_RESTORE_WIRED,
         scheduleSyncMechanism: ScheduleSyncMechanism = PlatformCapabilities.SCHEDULE_SYNC_MECHANISM,
     ): SystemHealthSnapshot = SystemHealthSnapshot(
@@ -59,17 +63,25 @@ object RuntimeHealthMapper {
         notificationsEnabled = notificationsEnabled,
         bootRestoreWired = bootRestoreWired,
         scheduleSyncMechanism = scheduleSyncMechanism,
+        batteryOptimizationIgnored = batteryOptimizationIgnored,
+        oemFamily = oemFamily,
+        oemGuidanceAvailable = oemGuidanceAvailable,
     )
 
     /**
      * The runtime-facing mapping: every runtime signal comes from the one
      * [ProtectionRuntimeState] the app already publishes, so the audit can never
-     * disagree with what the parent-facing protection screen shows.
+     * disagree with what the parent-facing protection screen shows. (OEM/battery
+     * signals are supplied by the caller because they are probed by the OEM layer,
+     * not part of the protection runtime state.)
      */
     fun snapshot(
         runtime: ProtectionRuntimeState,
         signedIn: Boolean,
         foregroundServiceRunning: Boolean,
+        batteryOptimizationIgnored: Boolean? = true,
+        oemFamily: OemFamily = OemFamily.UNKNOWN,
+        oemGuidanceAvailable: Boolean = false,
         bootRestoreWired: Boolean = PlatformCapabilities.BOOT_RESTORE_WIRED,
         scheduleSyncMechanism: ScheduleSyncMechanism = PlatformCapabilities.SCHEDULE_SYNC_MECHANISM,
     ): SystemHealthSnapshot = snapshot(
@@ -80,6 +92,9 @@ object RuntimeHealthMapper {
         accessibilityEnabled = runtime.accessibilityEnabled,
         usageAccessGranted = runtime.usageAccessGranted,
         notificationsEnabled = runtime.notificationsEnabled,
+        batteryOptimizationIgnored = batteryOptimizationIgnored,
+        oemFamily = oemFamily,
+        oemGuidanceAvailable = oemGuidanceAvailable,
         bootRestoreWired = bootRestoreWired,
         scheduleSyncMechanism = scheduleSyncMechanism,
     )

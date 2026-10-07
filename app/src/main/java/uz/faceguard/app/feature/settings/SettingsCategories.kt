@@ -77,6 +77,12 @@ enum class SettingsCategory(
         R.string.settings_category_support_desc,
         Icons.Filled.Email,
     ),
+    SUBSCRIPTION(
+        Routes.SETTINGS_SUBSCRIPTION,
+        R.string.settings_category_subscription,
+        R.string.settings_category_subscription_desc,
+        Icons.Filled.Star,
+    ),
     DEVELOPER(
         Routes.SETTINGS_DEVELOPER,
         R.string.settings_category_developer,
@@ -105,6 +111,7 @@ enum class SettingsGroup(@StringRes val labelRes: Int) {
     PRIVACY_SECURITY(R.string.settings_group_privacy_security),
     APPEARANCE(R.string.settings_group_appearance),
     SUPPORT(R.string.settings_group_support),
+    SUBSCRIPTION(R.string.settings_group_subscription),
     DEVELOPER(R.string.settings_group_developer),
 }
 
@@ -121,6 +128,7 @@ fun settingsGroups(debugScreensEnabled: Boolean): List<Pair<SettingsGroup, List<
         SettingsGroup.PRIVACY_SECURITY to listOf(SettingsCategory.PRIVACY, SettingsCategory.SECURITY),
         SettingsGroup.APPEARANCE to listOf(SettingsCategory.APPEARANCE),
         SettingsGroup.SUPPORT to listOf(SettingsCategory.SUPPORT),
+        SettingsGroup.SUBSCRIPTION to listOf(SettingsCategory.SUBSCRIPTION),
         SettingsGroup.DEVELOPER to listOf(SettingsCategory.DEVELOPER),
     )
     return groups.mapNotNull { (group, categories) ->

@@ -139,7 +139,9 @@ class SubscriptionManager @Inject constructor(
 
         // Acknowledge any purchased-but-unacknowledged purchase (INVARIANT 8). A token
         // already acknowledged this session is not acknowledged again (idempotent).
-        purchases
+        // Stage 9: only QALQON's own products are acknowledged — a purchase of another
+        // product must never be touched (same filter the entitlement mapping uses).
+        PurchaseProcessor.entitleablePurchases(purchases)
             .filter { it.state == BillingPurchaseState.PURCHASED && !it.acknowledged }
             .filterNot { it.purchaseToken in acknowledgedTokens }
             .forEach { purchase ->

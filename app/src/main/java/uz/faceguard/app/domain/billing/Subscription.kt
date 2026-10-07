@@ -24,6 +24,21 @@ object ProductCatalog {
     const val TRIAL_DAYS = 3
 
     val premium = BillingProduct(PRODUCT_ID, BASE_PLAN_ID, TRIAL_OFFER_ID)
+
+    /**
+     * Stage 9: every subscription product QALQON sells.
+     *
+     * `queryPurchasesAsync(SUBS)` returns *all* of this app's subscription purchases, so
+     * an entitlement must be derived only from a purchase of a product QALQON actually
+     * sells. Without this check a purchase of any other (e.g. legacy/deprecated) product
+     * in the app's catalog would grant Premium — the "wrong product grants Premium"
+     * failure criterion. Extend this set when a new QALQON product is added on Play.
+     */
+    val knownProductIds: Set<String> = setOf(PRODUCT_ID)
+
+    /** True when [productId] is one of QALQON's own subscription products. */
+    fun isQalqonProduct(productId: String?): Boolean =
+        !productId.isNullOrBlank() && productId in knownProductIds
 }
 
 /**

@@ -16,11 +16,25 @@ import uz.faceguard.app.domain.billing.ProductCatalog
 object PurchaseProcessor {
 
     /**
+     * Stage 9: keeps only the purchases that belong to a QALQON product.
+     *
+     * `queryPurchasesAsync(SUBS)` returns every subscription purchase for the app, so
+     * this is the single choke point that stops a purchase of some other product from
+     * being entitled (or acknowledged). Pure and shared by the entitlement mapping and
+     * the acknowledgement path, so the two can never disagree.
+     */
+    fun entitleablePurchases(purchases: List<BillingPurchase>): List<BillingPurchase> =
+        purchases.filter { ProductCatalog.isQalqonProduct(it.productId) }
+
+    /**
      * Chooses the entitlement for [purchases] (the active subscriptions Play returned).
      *
      * A pending purchase wins only when nothing is purchased; a purchased purchase is
      * authoritative. [hadEntitlementBefore] distinguishes "never subscribed" (NONE)
      * from "was subscribed, now gone" (EXPIRED), so the UI can say "expired".
+     *
+     * Only purchases of a QALQON product are considered: a purchase of any other product
+     * is ignored (it neither grants Premium nor marks the account as ever-entitled).
      */
     fun toEntitlement(
         purchases: List<BillingPurchase>,
@@ -28,10 +42,11 @@ object PurchaseProcessor {
         source: EntitlementSource,
         hadEntitlementBefore: Boolean,
     ): PremiumEntitlement {
-        val purchased = purchases.firstOrNull { it.state == BillingPurchaseState.PURCHASED }
+        val owned = entitleablePurchases(purchases)
+        val purchased = owned.firstOrNull { it.state == BillingPurchaseState.PURCHASED }
         if (purchased != null) return fromPurchase(purchased, now, source)
 
-        val pending = purchases.firstOrNull { it.state == BillingPurchaseState.PENDING }
+        val pending = owned.firstOrNull { it.state == BillingPurchaseState.PENDING }
         if (pending != null) {
             return PremiumEntitlement(
                 state = EntitlementState.PENDING,

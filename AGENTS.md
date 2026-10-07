@@ -676,3 +676,22 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   intact. Docs: `docs/STAGE8_USER_EXPERIENCE_FAILURE_RECOVERY.md`.
   REAL DEVICE UX TEST = NO (no device/ADB; emulator not a UX validation).
 
+- Stage 9 (Subscription & Monetization, roadmap 9/12) — Google Play monthly
+  subscription hardening. Audit found the billing stack already strong (BillingClient
+  behind a `BillingGateway` seam, pure `PurchaseProcessor`, account-scoped
+  `EntitlementStore` cache, `SubscriptionManager` as the single entitlement brain,
+  one central `PremiumAccessEvaluator`, 72h bounded offline staleness, in-session
+  acknowledgement idempotency, ~43 tests) but ONE real defect: `queryPurchasesAsync(SUBS)`
+  returns every subscription purchase for the app and neither `PurchaseProcessor` nor
+  `SubscriptionManager` checked the purchase `productId`, so any other (e.g. legacy)
+  product would be entitled and even acknowledged — the "wrong product grants Premium"
+  FAIL criterion. Fix (additive, minimal): `ProductCatalog.knownProductIds` +
+  `isQalqonProduct(productId)`; pure `PurchaseProcessor.entitleablePurchases()` as the
+  single choke point, used by `toEntitlement` and by `SubscriptionManager.applyVerified`
+  for acknowledgement (also covers the purchase-update listener path). No rewrite of the
+  correct existing architecture; no recognition/UI/background change. New JVM:
+  `Stage9ProductIdentityTest` (12), `Stage9RegressionGuardTest` (8); JVM 2221 -> 2241
+  (0/0/0). Docs: `docs/STAGE9_SUBSCRIPTION_MONETIZATION.md`.
+  REAL PLAY PURCHASE TEST = NO; LICENSE TESTER = NO; LIVE PLAY CONSOLE CONFIGURATION
+  VERIFIED = NO; NO SERVER-SIDE PURCHASE VALIDATION.
+

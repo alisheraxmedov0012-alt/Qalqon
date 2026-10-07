@@ -723,6 +723,12 @@ sync; the app remains fully functional with sync disabled or absent.
   from real capability health, so "Protection: ON" is never presented as full protection
   while a critical permission is missing; a camera interruption is shown explicitly. See
   `docs/STAGE8_USER_EXPERIENCE_FAILURE_RECOVERY.md`.
+- **Subscriptions are client-verified only.** Premium comes from Google Play Billing
+  (over IPC — no `INTERNET` permission); the local cache is a bounded cache of a
+  Play-verified state, never the authority, and only QALQON's own product can grant
+  Premium. There is **no server-side purchase validation**, and grace period / account
+  hold / revocation are not exposed by the client library. See
+  `docs/STAGE9_SUBSCRIPTION_MONETIZATION.md`.
 - **Supported Android range is API 26–36 (Android 8.0–16).** Cross-version decisions
   live in `core/compat/PlatformCompat` and are asserted for every level on the JVM;
   full-screen blocks cover the display cutout (API 28+) and the UI is edge-to-edge on

@@ -695,3 +695,25 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   REAL PLAY PURCHASE TEST = NO; LICENSE TESTER = NO; LIVE PLAY CONSOLE CONFIGURATION
   VERIFIED = NO; NO SERVER-SIDE PURCHASE VALIDATION.
 
+- Stage 10 (Privacy & Security Hardening, roadmap 10/12) — release hardening + exposure
+  tripwires. NOTE: earlier AGENTS.md entries used "Stage 10" for Real-Device QA; the
+  roadmap was re-scoped by the product owner and Stage 10 is now Privacy & Security
+  Hardening. Audit found the posture already strong (Keystore AES-256-GCM template
+  encryption with no plaintext fallback, PBKDF2 PIN hashing + lockout, backup/D2D
+  exclusion, no raw image persistence, no sensitive logging, no hardcoded secrets, debug
+  screens gated by BuildConfig.DEBUG, minimal exported surface) with ONE real gap:
+  `isMinifyEnabled = false` for release, so the shipped APK carried full symbol names
+  and dead code. Fix: release now enables R8 minification + `isShrinkResources = true`;
+  `app/proguard-rules.pro` rewritten with the minimum keep rules for the genuinely
+  reflective/runtime surfaces (TFLite interpreter, ML Kit GenAI, manifest components,
+  enums persisted by name, security/billing surfaces) and no blanket keep-all. Verified
+  END-TO-END here: `:app:minifyReleaseWithR8` and a signed `:app:assembleRelease` both
+  build (throwaway /tmp keystore, never committed); mapping.txt shows real obfuscation
+  (`uz.faceguard.app.feature.*` -> `ec.a`), kept surfaces kept, essential resources
+  retained, and `INTERNET` absent from the release APK. Minified-release RUNTIME on a
+  device is NOT verified (no device). New JVM: `Stage10ReleaseHardeningTest` (9),
+  `Stage10DataExposureTest` (6); JVM 2241 -> 2256 (0/0/0). SECURITY.md gained §3.13 and
+  new hard invariants. Docs: `docs/STAGE10_PRIVACY_SECURITY_HARDENING.md`.
+  Room/DataStore remain plaintext at rest (documented, mitigated by template encryption +
+  backup exclusion); no SQLCipher/anti-tamper added (non-goal).
+

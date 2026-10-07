@@ -729,6 +729,11 @@ sync; the app remains fully functional with sync disabled or absent.
   Premium. There is **no server-side purchase validation**, and grace period / account
   hold / revocation are not exposed by the client library. See
   `docs/STAGE9_SUBSCRIPTION_MONETIZATION.md`.
+- **The release build is minified (R8) and resource-shrunk.** Face templates are
+  Keystore-encrypted, raw face images are never written to disk, and no secret is logged
+  or hardcoded. Room/DataStore themselves remain plaintext at rest (documented
+  limitation, mitigated by template encryption and backup exclusion). See
+  `docs/STAGE10_PRIVACY_SECURITY_HARDENING.md` and `SECURITY.md`.
 - **Supported Android range is API 26–36 (Android 8.0–16).** Cross-version decisions
   live in `core/compat/PlatformCompat` and are asserted for every level on the JVM;
   full-screen blocks cover the display cutout (API 28+) and the UI is edge-to-edge on

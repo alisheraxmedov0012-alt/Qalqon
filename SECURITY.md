@@ -145,10 +145,27 @@ a one-tap deep link to the right settings page, and posts a parent notification
 * **Residual risk:** **Low — accepted.** Deletion is verified at the SQL level; a rooted
   attacker may still recover deleted pages from the SQLite file until vacuum.
 
+### 3.13 Reading the shipped APK (reverse engineering)
+* **Current mitigation (Stage 10):** the release build enables **R8 minification and
+  resource shrinking** (`isMinifyEnabled = true`, `isShrinkResources = true`), so the
+  shipped APK no longer carries full symbol names, dead code or unused resources. The
+  keep rules (`app/proguard-rules.pro`) cover only the genuinely reflective/runtime
+  surfaces (TFLite, ML Kit GenAI, the manifest components, enums persisted by name, the
+  security/billing surfaces) and deliberately contain no blanket keep-all. Debug/test
+  variants are unaffected. A signed release APK was built end-to-end with a throwaway
+  test key to verify the pipeline; the minified APK's **runtime on a device is NOT
+  verified** here.
+* **Residual risk:** **Medium — accepted.** Minification raises the cost of reverse
+  engineering but is not secrecy: a determined attacker can still read a decompiled
+  APK. The app relies on Android's app sandbox and Keystore — not on obfuscation — to
+  protect data, and claims no anti-tamper guarantee.
+
 > Stage 4 (Security & Privacy Hardening) added the threat-model detail in
 > [`docs/STAGE4_THREAT_MODEL.md`](docs/STAGE4_THREAT_MODEL.md), the biometric lifecycle
 > in [`docs/STAGE4_BIOMETRIC_DATA_LIFECYCLE.md`](docs/STAGE4_BIOMETRIC_DATA_LIFECYCLE.md)
 > and the audit in [`docs/STAGE4_SECURITY_PRIVACY_AUDIT.md`](docs/STAGE4_SECURITY_PRIVACY_AUDIT.md).
+> Stage 10 added the release-build hardening in
+> [`docs/STAGE10_PRIVACY_SECURITY_HARDENING.md`](docs/STAGE10_PRIVACY_SECURITY_HARDENING.md).
 
 ## 4. Explicit non-goals
 
@@ -174,3 +191,9 @@ expected behaviour.
   only in the data layer (`UserAccountEntity`).
 * The UI lock never controls protection: protection keeps running while the parent UI is
   locked (`AppLockProtectionIndependenceTest`).
+* Raw face images are never written to disk: frames are processed in memory and
+  recycled, and no storage/media permission is declared (`Stage10DataExposureTest`).
+* No log line interpolates a purchase token, PIN, face template or embedding
+  (`Stage10DataExposureTest`).
+* The release build ships minified and resource-shrunk (R8), with no blanket keep-all
+  in `app/proguard-rules.pro` (`Stage10ReleaseHardeningTest`).

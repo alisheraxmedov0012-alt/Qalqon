@@ -86,7 +86,19 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // Stage 10 (Privacy & Security Hardening): R8 minification + resource
+            // shrinking are ENABLED for release. They are the single largest
+            // attack-surface reduction available to a consumer app: without them the
+            // release APK ships full symbol names, dead code and unused resources, which
+            // makes reverse engineering the recognition/billing/licensing surfaces
+            // trivial. Debug/test variants are unaffected (minify is release-only).
+            //
+            // The R8 step is verified by `:app:minifyReleaseWithR8` in the build gate.
+            // The *runtime* of the minified release APK is NOT device-verified here
+            // (release signing secrets and a device are unavailable) — see
+            // `docs/STAGE10_PRIVACY_SECURITY_HARDENING.md`.
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // A permanent release identity, deliberately separate from the debug
             // key, so successive release APKs update over one another.

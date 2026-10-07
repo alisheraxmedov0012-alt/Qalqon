@@ -1,5 +1,10 @@
 # QALQON — Support & Contact
 
+> **Canonical published pages (Release Block 2): `docs/legal/en/support.html` and
+> `docs/legal/en/delete-account.html`.** The app now links to these through the centralized
+> `LegalLinks` source (wired into Settings → Privacy and Settings → Support), showing an honest
+> "not available yet" state until hosting exists.
+
 > **Status: PREPARED — NOT PUBLISHED.** Real contact details are **MISSING** in this
 > repository; placeholders must be filled and a public support page hosted before
 > submission. Do not invent an email or domain.

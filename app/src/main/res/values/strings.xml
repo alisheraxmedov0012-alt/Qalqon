@@ -178,6 +178,17 @@
     <string name="privacy_point_no_upload">Yuz rasmlari hech qayerga yuklanmaydi va saqlanmaydi; faqat matematik shablon saqlanadi.</string>
     <string name="privacy_point_battery">Kamera faqat kerakli paytda qisqa vaqtga yoqiladi.</string>
     <string name="privacy_reset_hint">Barcha ma\'lumotlarni Sozlamalar → Ma\'lumotlar bo\'limidan o\'chirishingiz mumkin.</string>
+    <string name="legal_section_title">Yuridik va yordam</string>
+    <string name="legal_section_subtitle">Maxfiylik siyosati, foydalanish shartlari va yordam</string>
+    <string name="legal_privacy_policy">Maxfiylik siyosati</string>
+    <string name="legal_terms_of_service">Foydalanish shartlari</string>
+    <string name="legal_delete_account">Akkountni o\'chirish</string>
+    <string name="legal_delete_account_note">Akkountni o\'chirish Google Play obunasini avtomatik bekor qilmaydi. Obunani Google Play orqali boshqaring.</string>
+    <string name="legal_support_title">Yordam</string>
+    <string name="legal_support_page">Yordam sahifasi</string>
+    <string name="legal_contact_support">Yordamga murojaat</string>
+    <string name="legal_contact_support_unavailable">Aloqa manzili hozircha mavjud emas</string>
+    <string name="legal_link_unavailable">Hujjat hozircha mavjud emas</string>
     <string name="help_title">Yordam</string>
     <string name="help_version">%1$s — MVP namoyish versiyasi</string>
     <string name="activity_title">Faoliyat jurnali</string>

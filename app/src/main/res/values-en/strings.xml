@@ -177,6 +177,17 @@
     <string name="privacy_point_no_upload">Face images are never uploaded or stored; only a mathematical template is kept.</string>
     <string name="privacy_point_battery">The camera only turns on briefly when needed.</string>
     <string name="privacy_reset_hint">You can delete all data in Settings → Data.</string>
+    <string name="legal_section_title">Legal &amp; Support</string>
+    <string name="legal_section_subtitle">Privacy policy, terms of service and support</string>
+    <string name="legal_privacy_policy">Privacy Policy</string>
+    <string name="legal_terms_of_service">Terms of Service</string>
+    <string name="legal_delete_account">Delete Account</string>
+    <string name="legal_delete_account_note">Deleting your account does not automatically cancel your Google Play subscription. Manage the subscription through Google Play.</string>
+    <string name="legal_support_title">Support</string>
+    <string name="legal_support_page">Support page</string>
+    <string name="legal_contact_support">Contact support</string>
+    <string name="legal_contact_support_unavailable">Contact address is not available yet</string>
+    <string name="legal_link_unavailable">This document is not available yet</string>
     <string name="help_title">Help</string>
     <string name="help_version">%1$s — MVP demo build</string>
     <string name="activity_title">Activity log</string>

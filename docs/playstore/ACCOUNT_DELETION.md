@@ -1,5 +1,9 @@
 # QALQON — Account Deletion (in-app + external resource)
 
+> **Canonical published page (Release Block 2): `docs/legal/en/delete-account.html`** (with `uz`/`ru`
+> translations). The app links to it through the centralized `LegalLinks` source and reports
+> honestly that it is not available until hosting exists.
+>
 > **Status: In-app deletion IMPLEMENTED; external web resource NOT PUBLISHED.**
 > Play's Account Deletion Requirement needs **both**.
 

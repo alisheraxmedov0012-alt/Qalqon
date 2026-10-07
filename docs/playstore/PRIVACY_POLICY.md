@@ -1,5 +1,9 @@
 # QALQON — Privacy Policy (final text, ready to host)
 
+> **Canonical published page (Release Block 2): `docs/legal/en/privacy-policy.html`** — the
+> deploy-ready HTML version of this policy (English authoritative; `uz`/`ru` translations
+> alongside). This Markdown file remains the working draft. Public hosting is still pending.
+
 > **Status: PREPARED — NOT PUBLISHED.** This text matches QALQON's real behavior
 > (verified in Stages 4–10). It is **not legal advice**; a lawyer should review before
 > publication. **PRIVACY POLICY PUBLIC URL = NOT VERIFIED** (no public HTTPS host exists

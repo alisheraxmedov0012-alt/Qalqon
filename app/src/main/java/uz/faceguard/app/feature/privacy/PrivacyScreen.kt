@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import uz.faceguard.app.R
+import uz.faceguard.app.feature.legal.LegalDocumentsSection
 
 /** Static privacy explainer; all copy lives in string resources. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,6 +69,8 @@ fun PrivacyScreen(onBack: () -> Unit) {
                 stringResource(R.string.privacy_reset_hint),
                 style = MaterialTheme.typography.bodySmall,
             )
+            // Release Block 2: the public legal resources linked from the privacy explainer.
+            LegalDocumentsSection()
         }
     }
 }

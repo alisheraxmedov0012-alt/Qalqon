@@ -177,6 +177,17 @@
     <string name="privacy_point_no_upload">Фото лица никуда не загружаются и не хранятся; сохраняется только математический шаблон.</string>
     <string name="privacy_point_battery">Камера включается ненадолго и только при необходимости.</string>
     <string name="privacy_reset_hint">Все данные можно удалить в Настройки → Данные.</string>
+    <string name="legal_section_title">Правовая информация и поддержка</string>
+    <string name="legal_section_subtitle">Политика конфиденциальности, условия использования и поддержка</string>
+    <string name="legal_privacy_policy">Политика конфиденциальности</string>
+    <string name="legal_terms_of_service">Условия использования</string>
+    <string name="legal_delete_account">Удалить аккаунт</string>
+    <string name="legal_delete_account_note">Удаление аккаунта не отменяет автоматически подписку Google Play. Управляйте подпиской через Google Play.</string>
+    <string name="legal_support_title">Поддержка</string>
+    <string name="legal_support_page">Страница поддержки</string>
+    <string name="legal_contact_support">Связаться с поддержкой</string>
+    <string name="legal_contact_support_unavailable">Контактный адрес пока недоступен</string>
+    <string name="legal_link_unavailable">Документ пока недоступен</string>
     <string name="help_title">Помощь</string>
     <string name="help_version">%1$s — демо-версия MVP</string>
     <string name="activity_title">Журнал активности</string>

@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import uz.faceguard.app.core.billing.BillingProductDetails
 import uz.faceguard.app.domain.billing.ProductCatalog
-import uz.faceguard.app.feature.subscription.LegalLinks
+import uz.faceguard.app.core.legal.LegalLinks
 import uz.faceguard.app.feature.subscription.SubscriptionConsent
 
 /**

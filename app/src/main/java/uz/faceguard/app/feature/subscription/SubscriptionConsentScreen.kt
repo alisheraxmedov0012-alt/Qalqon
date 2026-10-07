@@ -1,11 +1,6 @@
 package uz.faceguard.app.feature.subscription
 
 import android.app.Activity
-import android.content.ActivityNotFoundException
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -40,6 +35,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import uz.faceguard.app.R
+import uz.faceguard.app.core.legal.LegalLinks
+import uz.faceguard.app.core.legal.openLegalLink
 import uz.faceguard.app.core.theme.QalqonDimens
 import uz.faceguard.app.core.ui.qalqon.QalqonCard
 import uz.faceguard.app.core.ui.qalqon.QalqonSectionHeader
@@ -185,17 +182,28 @@ fun SubscriptionConsentScreen(
                 }
             }
 
-            // Legal: Privacy Policy + Terms. URLs are supplied by Block 2; when a URL is not
-            // configured an honest "not available yet" state is shown instead of a fake link.
+            // Legal: Privacy Policy + Terms. URLs come from the single legal source
+            // (LegalLinks); when a URL is not configured an honest "not available yet"
+            // state is shown instead of a fake link.
             QalqonCard(modifier = Modifier.fillMaxWidth()) {
                 QalqonSectionHeader(title = stringResource(R.string.subscription_consent_section_legal))
                 TextButton(
-                    onClick = { openOrReport(context, LegalLinks.PRIVACY_POLICY_URL) },
+                    onClick = {
+                        context.openLegalLink(
+                            LegalLinks.PRIVACY_POLICY_URL,
+                            R.string.subscription_consent_legal_unavailable,
+                        )
+                    },
                 ) {
                     Text(stringResource(R.string.subscription_consent_privacy_policy))
                 }
                 TextButton(
-                    onClick = { openOrReport(context, LegalLinks.TERMS_OF_SERVICE_URL) },
+                    onClick = {
+                        context.openLegalLink(
+                            LegalLinks.TERMS_OF_SERVICE_URL,
+                            R.string.subscription_consent_legal_unavailable,
+                        )
+                    },
                 ) {
                     Text(stringResource(R.string.subscription_consent_terms_of_service))
                 }
@@ -261,22 +269,5 @@ fun SubscriptionConsentScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-    }
-}
-
-/**
- * Opens a legal document, or reports honestly that it is not published yet. No fake URL is
- * ever opened; an unhandled link falls back to the same message instead of crashing.
- */
-private fun openOrReport(context: Context, url: String?) {
-    if (url.isNullOrBlank()) {
-        Toast.makeText(context, R.string.subscription_consent_legal_unavailable, Toast.LENGTH_LONG).show()
-        return
-    }
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    try {
-        context.startActivity(intent)
-    } catch (e: ActivityNotFoundException) {
-        Toast.makeText(context, R.string.subscription_consent_legal_unavailable, Toast.LENGTH_LONG).show()
     }
 }

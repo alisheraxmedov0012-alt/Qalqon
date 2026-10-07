@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — QALQON</title>
+<meta name="description" content="How the QALQON Android app handles your data: fully on-device, encrypted face templates, no Internet permission.">
+<style>*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.55;color:#1a1c1e;background:#eef3fb}
+header{background:#1e5b9e;padding:18px 16px}
+header a{color:#fff;text-decoration:none;font-weight:700;letter-spacing:.02em}
+main{max-width:840px;margin:0 auto;background:#fff;padding:24px 18px 48px}
+h1{font-size:1.7rem;margin:.2rem 0 .3rem}
+h2{font-size:1.18rem;margin:1.8rem 0 .5rem;border-bottom:1px solid #d6dbe1;padding-bottom:.25rem}
+h3{font-size:1.02rem;margin:1.1rem 0 .3rem}
+ul{padding-left:1.2rem}
+table{border-collapse:collapse;width:100%;margin:.6rem 0;font-size:.95rem}
+th,td{border:1px solid #d6dbe1;padding:8px;text-align:left;vertical-align:top}
+th{background:#f1f4f9}
+.meta{color:#5a6068;font-size:.9rem;margin:.2rem 0}
+.note{background:#f1f4f9;border:1px solid #d6dbe1;border-radius:12px;padding:12px 14px;margin:1rem 0}
+nav.crumbs{font-size:.9rem;margin-bottom:.6rem}
+footer{max-width:840px;margin:0 auto;padding:18px;color:#5a6068;font-size:.85rem}
+a{color:#1d61e0}
+.card{display:block;border:1px solid #d6dbe1;border-radius:14px;padding:14px 16px;margin:.6rem 0;text-decoration:none;color:inherit;background:#fbfcfe}
+.card b{display:block;font-size:1.05rem;margin-bottom:.15rem}
+@media (prefers-color-scheme:dark){body{background:#121417;color:#e2e2e5}main{background:#1b1e22}h2{border-color:#3a4048}th,td{border-color:#3a4048}th{background:#2a2f35}.note{background:#1f2328;border-color:#3a4048}.card{background:#1f2328;border-color:#3a4048}a{color:#9ec5f5}}</style>
+</head>
+<body>
+<header><a href="../index.html">QALQON</a></header>
+<main>
+<nav class="crumbs"><a href="../index.html">Legal &amp; Support</a></nav>
+<h1>Privacy Policy</h1>
+<p class="meta">QALQON &middot; v1.0 &middot; Effective date: 7 October 2026</p>
+
+<p>QALQON ("the app", "we") is an on-device parental-control application for Android
+(package <code>uz.faceguard.app</code>). This policy explains what data the app processes,
+where it is stored, how long it is kept and how it is deleted. Contact: <a href="mailto:[[SUPPORT_EMAIL]]">[[SUPPORT_EMAIL]]</a>.</p>
+
+<h2>1. Introduction</h2>
+<p>QALQON is privacy-first and offline-first by design. It runs entirely on your device, has
+<strong>no Internet permission</strong>, and does not operate a user account server. This policy
+applies to the QALQON Android app and to the QALQON legal and support pages. It is written to
+match the app's actual behaviour (verified against the code); it is not a marketing claim and
+not legal advice.</p>
+
+<h2>2. Summary</h2>
+<ul>
+<li>QALQON works fully offline and cannot transmit your data over the network.</li>
+<li>All data (parent profile, child profiles, face templates, settings, activity) is stored
+only on your device.</li>
+<li>Face processing happens entirely on the device; face templates are stored encrypted and
+are never transmitted off the device.</li>
+<li>There are no advertising, analytics or crash-reporting SDKs.</li>
+<li>You can delete your account and all associated data in the app at any time, and request
+deletion externally.</li>
+</ul>
+
+<h2>3. Information we process</h2>
+<table>
+<tr><th>Data</th><th>Source</th><th>Where stored</th><th>Purpose</th></tr>
+<tr><td>Parent name, phone number</td><td>You enter it at registration</td><td>Device-local database (Room)</td><td>Identify the account and the parent</td></tr>
+<tr><td>PIN</td><td>You set it</td><td>Device-local, only as a salted hash (never the raw PIN)</td><td>Unlock the parent controls</td></tr>
+<tr><td>Parent profile / face template</td><td>You enroll it</td><td>Device-local; the template is encrypted</td><td>Recognise the parent</td></tr>
+<tr><td>Child profiles (name, restriction level, enrollment status)</td><td>You enter it</td><td>Device-local database</td><td>Apply parental rules to the child</td></tr>
+<tr><td>Face template (embedding) for a child</td><td>Derived on device from a detected face</td><td>Device-local; encrypted</td><td>Recognise the enrolled child</td></tr>
+<tr><td>Camera frames</td><td>Your device camera</td><td>Memory only, transient (per frame)</td><td>Detect and recognise a face</td></tr>
+<tr><td>Foreground app package name</td><td>Usage Access / Accessibility service</td><td>Memory / device-local logs</td><td>Detect when a protected app is open</td></tr>
+<tr><td>Protected apps, policies, schedules, screen-time limits and usage, eye-safety configuration</td><td>You configure them</td><td>Device-local database / DataStore</td><td>Apply your rules</td></tr>
+<tr><td>Activity log (protection events)</td><td>Generated by the app</td><td>Device-local database</td><td>Show the parent what happened</td></tr>
+<tr><td>Settings</td><td>You configure them</td><td>Device-local DataStore</td><td>Apply your preferences</td></tr>
+<tr><td>Subscription status</td><td>Google Play Billing</td><td>Device-local cache</td><td>Show your plan; Google Play holds the purchase</td></tr>
+</table>
+
+<h2>4. Face and biometric-related data</h2>
+<ul>
+<li>The camera is used only to detect a face and compute a <strong>face template</strong> (an
+embedding) for parent/child recognition.</li>
+<li><strong>Raw camera frames are processed in memory and are not written to disk</strong> or
+to the media gallery.</li>
+<li>A face template is stored <strong>only on your device</strong> and is
+<strong>encrypted</strong> with a key held in the Android Keystore (device-bound). It is never
+sent to us or to any third party.</li>
+<li>You can delete a parent or child face template at any time; deleting the account deletes
+the templates and the encryption key.</li>
+<li>Child face data is enrolled and controlled by the <strong>parent/guardian</strong>; the
+child has no account of their own.</li>
+</ul>
+<p class="note">The legal classification of "biometric data" differs between jurisdictions.
+This section describes the technical facts of how face data is handled; it does not assert a
+particular legal classification.</p>
+
+<h2>5. Local (on-device) processing</h2>
+<p>"On-device" means face detection, embedding and matching run locally using models bundled in
+the app (ML Kit face detection and a TensorFlow Lite face-recognition model). Because the app
+has <strong>no Internet permission</strong>, no face or other personal data can be transmitted
+off the device. If a future version were to add networking, this policy would be updated before
+that version is released.</p>
+
+<h2>6. Encryption of stored face templates</h2>
+<p>Stored face templates are protected with <strong>AES-256-GCM</strong> using a key generated
+and held in the <strong>Android Keystore</strong>. A fresh random nonce is used for every
+encryption, the ciphertext is authenticated, and there is no plaintext fallback: a decryption
+failure is treated as an integrity problem, not silently accepted. We do not claim this is
+unbreakable; it is a standard, well-understood protection.</p>
+
+<h2>7. Storage</h2>
+<ul>
+<li><strong>Biometric-related templates:</strong> stored encrypted at rest (see section 6).</li>
+<li><strong>Other app data</strong> (account, profiles, protected apps, schedules, screen-time
+data, activity log, settings): stored in the app's private storage (a Room database and
+DataStore). This data is <strong>not additionally encrypted by QALQON</strong>; it relies on
+the Android app sandbox and the device's own storage encryption.</li>
+</ul>
+
+<h2>8. Retention</h2>
+<ul>
+<li>Face templates are retained until you delete the face, the child, or the account.</li>
+<li>Account and profile data are retained until you delete the account.</li>
+<li>Child profiles are retained until you delete the child or the account.</li>
+<li>Settings and configuration are retained until you change or delete them.</li>
+<li>The local subscription cache is retained until you sign out or delete the account; the
+purchase itself is held by Google Play.</li>
+<li>The activity log is retained until you clear it or delete the account.</li>
+<li><strong>Raw camera frames are processed in memory and are not retained as stored
+media.</strong></li>
+</ul>
+<p>QALQON performs <strong>no automatic inactivity deletion</strong>; data is kept until you
+delete it.</p>
+
+<h2>9. Deletion</h2>
+<p><strong>In-app.</strong> Settings &rarr; Privacy &rarr; delete all data (with a
+confirmation). This removes the account, parent and child profiles, face templates, protected
+apps and policies, schedules, screen-time data, the activity log, requests and notifications,
+plus settings, session and lockout state, and it deletes the Android Keystore encryption key.
+This is a real deletion, not a deactivation.</p>
+<p><strong>External request.</strong> A public account-deletion page is provided at the
+official QALQON domain (<code>/delete-account</code>) explaining the deletion path and how to
+request assistance. Because QALQON stores your data only on your device and there is no server
+copy, deletion is completed on the device (in-app or by uninstalling the app).</p>
+<p class="note">Deleting your QALQON account does <strong>not</strong> automatically cancel a
+Google Play subscription. Manage or cancel the subscription separately in Google Play.</p>
+
+<h2>10. Permissions and why they are needed</h2>
+<ul>
+<li><strong>Camera</strong> &mdash; to detect a face for recognition.</li>
+<li><strong>Usage Access</strong> &mdash; to know which app is in the foreground, so a
+protected app can be detected (protection only).</li>
+<li><strong>Display over other apps (overlay)</strong> &mdash; to show the blocking screen over
+a protected app.</li>
+<li><strong>Accessibility service</strong> &mdash; to detect protected-app window transitions
+and draw the touchable blocking overlay (see section 11).</li>
+<li><strong>Foreground service</strong> &mdash; to keep protection (and the camera session)
+running while QALQON is not on screen.</li>
+<li><strong>Notifications</strong> &mdash; to show the ongoing protection status and parent
+alerts.</li>
+<li><strong>Receive boot completed</strong> &mdash; to restore protection after a restart.</li>
+<li><strong>Biometric/fingerprint (OS)</strong> &mdash; for the optional system unlock of the
+parent UI.</li>
+</ul>
+
+<h2>11. Accessibility service</h2>
+<p>QALQON uses an Android Accessibility service as part of its protection enforcement, not as a
+utility or accessibility tool for the user. Enabling it requires a clear in-app disclosure and
+your explicit consent. The service reads <strong>only the foreground package name</strong>; it
+is configured with <code>canRetrieveWindowContent=false</code>, so screen text, passwords and
+notifications are <strong>never read</strong>. You can disable the service at any time in
+Android Settings.</p>
+
+<h2>12. Usage Access</h2>
+<p>Usage Access is used only to determine which app is currently in the foreground so that a
+protected app can be detected. QALQON does not collect your app content, and it does not send
+usage information to any server (there is no server).</p>
+
+<h2>13. Third-party components</h2>
+<ul>
+<li><strong>Google Play Billing</strong> &mdash; processes the optional Premium subscription
+through Google Play.</li>
+<li><strong>AndroidX / Jetpack (Compose, Navigation, Lifecycle, Room, DataStore, Hilt)</strong>
+&mdash; application framework; they do not collect or transmit your data.</li>
+<li><strong>CameraX</strong> &mdash; camera capture on the device.</li>
+<li><strong>ML Kit face detection</strong> &mdash; face detection; the models are bundled in
+the app and run on the device.</li>
+<li><strong>TensorFlow Lite</strong> &mdash; runs the on-device face-recognition model.</li>
+</ul>
+<p>QALQON contains <strong>no advertising, analytics or crash-reporting SDKs</strong>. The app's
+build removes the network permissions that the ML Kit transport dependency injects through
+manifest merging, so the shipped app keeps no Internet permission.</p>
+
+<h2>14. Billing</h2>
+<p>QALQON Premium is sold as a Google Play subscription (a monthly plan with a 3-day free
+trial). Payment is processed by <strong>Google Play</strong> under Google's terms; QALQON does
+<strong>not</strong> collect or store card or payment details. QALQON stores only a local
+subscription status cache, which it re-verifies against Google Play. Purchases can be restored
+through Google Play. Google Play's own data practices are governed by Google's privacy policy,
+separate from QALQON's.</p>
+
+<h2>15. Security</h2>
+<p>Controls in place include: encrypted face templates (AES-256-GCM, Android Keystore); raw
+camera frames are never persisted; the PIN is stored only as a salted hash; no unnecessary
+network capability; release builds are minified/obfuscated; developer-only screens are excluded
+from release builds; sensitive values are not written to logs. We do not describe these as
+"military grade" or "100% secure".</p>
+
+<h2>16. Backup</h2>
+<p>Android backup and device-to-device transfer of app data are <strong>disabled</strong>
+(<code>allowBackup="false"</code> plus data-extraction rules that exclude every data domain
+from both cloud backup and device transfer), so QALQON's data is not copied to another device.
+The face-template encryption key is device-bound and is not included in any transfer.</p>
+
+<h2>17. Children's privacy</h2>
+<p>QALQON is a parental-control tool used by a parent or guardian. There are no child accounts.
+A child's profile and face template are created and controlled by the parent, stored on the
+device, and deleted when the parent deletes them or the account. The app is not directed to
+children and is not listed as a children's app.</p>
+
+<h2>18. Data sharing</h2>
+<p>QALQON does <strong>not</strong> share personal or sensitive user data with third parties.
+The only external interaction is Google Play Billing, which processes the subscription purchase
+through Google Play.</p>
+
+<h2>19. International users</h2>
+<p>Because processing happens on your device, your data generally stays on your device and is
+not transferred internationally by QALQON. Where you purchase a subscription, Google Play may
+process purchase-related data under Google's terms and in accordance with Google's
+infrastructure. The privacy rights available to you depend on your jurisdiction; to exercise a
+request, contact us. This policy does not claim certification under any specific privacy
+regulation.</p>
+
+<h2>20. Changes to this policy</h2>
+<p>We may update this policy; the version and effective date above will change. Material changes
+will be reflected in the app or its listing.</p>
+
+<h2>21. Contact</h2>
+<p>Support and privacy questions: <a href="mailto:[[SUPPORT_EMAIL]]">[[SUPPORT_EMAIL]]</a>. Support page:
+<code>/support</code> on the official QALQON domain.</p>
+
+</main>
+<footer>QALQON is an on-device parental-control app (package uz.faceguard.app). This document is provided as a pre-publication draft and is not legal advice; it must be reviewed by qualified legal counsel before publication.</footer>
+</body>
+</html>

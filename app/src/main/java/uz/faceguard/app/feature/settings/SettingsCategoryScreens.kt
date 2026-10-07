@@ -58,6 +58,8 @@ import uz.faceguard.app.domain.model.BlockPolicy
 import uz.faceguard.app.domain.model.ChildProfile
 import uz.faceguard.app.domain.model.ScanMode
 import uz.faceguard.app.feature.language.LanguageOptions
+import uz.faceguard.app.feature.legal.LegalDocumentsSection
+import uz.faceguard.app.feature.legal.SupportContactSection
 
 /**
  * UI/UX redesign, Phase 6: the Settings category pages.
@@ -351,6 +353,9 @@ fun PrivacySettingsScreen(
                 onDeleteChildFace = viewModel::deleteChildFace,
                 onResetAll = viewModel::resetAll,
             )
+            // Release Block 2: the public legal resources (Privacy Policy, Terms, external
+            // account deletion). URLs come from the centralized LegalLinks source.
+            LegalDocumentsSection()
         }
     }
 }
@@ -430,6 +435,8 @@ fun SupportSettingsScreen(
                 description = stringResource(R.string.settings_row_help_desc),
                 onClick = onOpenHelp,
             )
+            // Release Block 2: the public support channels (support page + mailbox).
+            SupportContactSection()
         }
     }
 }

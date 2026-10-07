@@ -698,6 +698,12 @@
     <!-- QALQON Children + Child Detail (UI/UX redesign, Phase 4). -->
     <string name="children_overview">Farzandlaringiz</string>
     <string name="children_open_details">%1$s ma\'lumotlarini ochish</string>
+    <string name="children_status_active">Faol</string>
+    <string name="children_status_time_up">Vaqt tugadi</string>
+    <string name="children_status_offline">Oflayn</string>
+    <string name="children_action_settings">Sozlamalar</string>
+    <string name="children_action_schedule">Jadval</string>
+    <string name="children_action_eye_safety">Ko\'z xavfsizligi</string>
     <string name="child_detail_back">Orqaga</string>
     <string name="child_detail_controls_title">Boshqarish</string>
     <string name="child_detail_apps">Ilovalar</string>

@@ -697,6 +697,12 @@
     <!-- QALQON Children + Child Detail (UI/UX redesign, Phase 4). -->
     <string name="children_overview">Ваши дети</string>
     <string name="children_open_details">Открыть данные %1$s</string>
+    <string name="children_status_active">Активен</string>
+    <string name="children_status_time_up">Время вышло</string>
+    <string name="children_status_offline">Офлайн</string>
+    <string name="children_action_settings">Настройки</string>
+    <string name="children_action_schedule">Расписание</string>
+    <string name="children_action_eye_safety">Защита зрения</string>
     <string name="child_detail_back">Назад</string>
     <string name="child_detail_controls_title">Управление</string>
     <string name="child_detail_apps">Приложения</string>

@@ -1,26 +1,37 @@
 package uz.faceguard.app.feature.child
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -35,30 +46,51 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uz.faceguard.app.R
 import uz.faceguard.app.core.theme.QalqonDimens
+import uz.faceguard.app.core.theme.QalqonShapes
+import uz.faceguard.app.core.theme.QalqonTheme
 import uz.faceguard.app.core.ui.UiState
-import uz.faceguard.app.core.ui.qalqon.QalqonChildCard
+import uz.faceguard.app.core.ui.qalqon.QalqonCard
 import uz.faceguard.app.core.ui.qalqon.QalqonEmptyState
 import uz.faceguard.app.core.ui.qalqon.QalqonErrorState
 import uz.faceguard.app.core.ui.qalqon.QalqonLoadingState
 import uz.faceguard.app.core.ui.qalqon.QalqonSectionHeader
+import uz.faceguard.app.core.ui.qalqon.QalqonStatusBadge
+import uz.faceguard.app.core.ui.qalqon.toneColor
 import uz.faceguard.app.domain.model.ChildProfile
 import uz.faceguard.app.domain.model.RestrictionLevel
 import uz.faceguard.app.domain.repository.AccountRepository
 import uz.faceguard.app.domain.repository.ChildProfileRepository
 import uz.faceguard.app.domain.screentime.ScreenTimeActiveChildRepository
+import uz.faceguard.app.domain.screentime.ScreenTimeLimitEvaluation
+import uz.faceguard.app.domain.screentime.ScreenTimeLimitEvaluator
+import uz.faceguard.app.domain.screentime.ScreenTimeLimitRepository
+import uz.faceguard.app.domain.screentime.ScreenTimeUsageRepository
+import uz.faceguard.app.domain.screentime.UsageDateKey
+import uz.faceguard.app.feature.home.durationLabel
 
 data class ChildDialogState(
     val visible: Boolean = false,
@@ -78,16 +110,30 @@ data class DeleteConfirm(
 data class ChildUiState(
     val state: UiState = UiState.Idle,
     val children: List<ChildProfile> = emptyList(),
+    /**
+     * Today's screen-time facts per child id. A child absent here has no readable facts —
+     * an unknown value is never replaced with a fabricated `0 min`.
+     */
+    val screenTime: Map<Long, ChildScreenTime> = emptyMap(),
     val dialog: ChildDialogState = ChildDialogState(),
     val deleteConfirm: DeleteConfirm = DeleteConfirm(),
 )
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class ChildProfilesViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
     private val childRepository: ChildProfileRepository,
     /** Phase 4 Step 1B-8: the screen-time target is cleared with the child it points at. */
     private val screenTimeActiveChildRepository: ScreenTimeActiveChildRepository,
+    /**
+     * The Children list's per-child screen-time facts. The list reuses the same domain
+     * evaluator Home uses, so a limit is compared in exactly one place and the card never
+     * recomputes `used >= limit` itself.
+     */
+    private val screenTimeUsageRepository: ScreenTimeUsageRepository,
+    private val screenTimeLimitRepository: ScreenTimeLimitRepository,
+    private val screenTimeEvaluator: ScreenTimeLimitEvaluator,
 ) : ViewModel() {
 
     private val _ui = MutableStateFlow(ChildUiState(state = UiState.Loading))
@@ -102,11 +148,45 @@ class ChildProfilesViewModel @Inject constructor(
                 _ui.update { it.copy(state = UiState.Error(R.string.error_invalid_credentials)) }
             } else {
                 accountId = account.id
-                childRepository.observeChildren(account.id).collect { children ->
-                    _ui.update { it.copy(state = UiState.Success, children = children) }
-                }
+                childRepository.observeChildren(account.id)
+                    .flatMapLatest { children ->
+                        val dateKey = UsageDateKey.of(System.currentTimeMillis())
+                        screenTimeFacts(account.id, children, dateKey)
+                            .map { facts -> children to facts }
+                    }
+                    .collect { (children, facts) ->
+                        _ui.update {
+                            it.copy(state = UiState.Success, children = children, screenTime = facts)
+                        }
+                    }
             }
         }
+    }
+
+    /**
+     * Observes each child's real usage and configured limits and re-evaluates through
+     * [ScreenTimeLimitEvaluator]. The inner flows are cancelled and rebuilt whenever the
+     * child set changes, so an added or removed child is reflected without polling.
+     */
+    private fun screenTimeFacts(
+        accountId: Long,
+        children: List<ChildProfile>,
+        dateKey: String,
+    ): Flow<Map<Long, ChildScreenTime>> {
+        if (children.isEmpty()) return flowOf(emptyMap())
+
+        val perChild: List<Flow<Pair<Long, ChildScreenTime>?>> = children.map { child ->
+            combine(
+                screenTimeUsageRepository.observeDayUsage(accountId, child.id, dateKey),
+                screenTimeLimitRepository.observeLimits(accountId, child.id),
+            ) { _, _ -> Unit }
+                .map { screenTimeEvaluator.evaluateTotal(accountId, child.id, dateKey).toChildScreenTime() }
+                .map<ChildScreenTime, Pair<Long, ChildScreenTime>?> { facts -> child.id to facts }
+                // A read failure leaves the child without facts rather than claiming zero usage.
+                .catch { emit(null) }
+        }
+
+        return combine(perChild) { results -> results.filterNotNull().toMap() }
     }
 
     fun openAddDialog() = _ui.update { it.copy(dialog = ChildDialogState(visible = true)) }
@@ -166,13 +246,22 @@ class ChildProfilesViewModel @Inject constructor(
     }
 }
 
+/** Copies the evaluator's facts verbatim; the arithmetic stays in the domain. */
+private fun ScreenTimeLimitEvaluation.toChildScreenTime(): ChildScreenTime = ChildScreenTime(
+    usedMs = usedMs,
+    limitMinutes = limitMinutes,
+    exceeded = exceeded,
+    invalidLimit = invalidLimitMinutes != null,
+)
+
 /**
  * UI/UX redesign, Phase 4: the Children top-level destination.
  *
  * A scannable list of the parent's children rather than a per-child settings dump.
- * The card's primary action opens the Child Detail hub, where every child-scoped
- * control lives; edit, delete and face enrollment stay available as secondary actions
- * so no existing capability is lost. Add / edit / delete reuse the existing
+ * Each card carries the child's real state — avatar, status badge, today's screen time
+ * and the child-scoped destinations as action chips — while the card's primary action
+ * opens the Child Detail hub. Edit, delete and face enrollment stay available as
+ * secondary actions, and add / edit / delete reuse the existing
  * [ChildProfilesViewModel] unchanged.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -181,6 +270,8 @@ fun ChildProfilesScreen(
     onBack: () -> Unit,
     onOpenChild: (Long) -> Unit,
     onEnrollChild: (Long) -> Unit,
+    onOpenSchedule: (Long) -> Unit = {},
+    onOpenEyeSafety: (Long) -> Unit = {},
     viewModel: ChildProfilesViewModel = hiltViewModel(),
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
@@ -225,16 +316,12 @@ fun ChildProfilesScreen(
             }
 
             is UiState.Success -> {
-                val overviews = childOverviews(ui.children)
+                val overviews = childOverviews(ui.children, ui.screenTime)
                 if (overviews.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-                        QalqonEmptyState(
-                            title = stringResource(R.string.children_empty),
-                            description = stringResource(R.string.children_empty_hint),
-                            actionLabel = stringResource(R.string.children_add),
-                            onAction = viewModel::openAddDialog,
-                        )
-                    }
+                    EmptyChildren(
+                        modifier = Modifier.fillMaxSize().padding(padding),
+                        onAdd = viewModel::openAddDialog,
+                    )
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize().padding(padding),
@@ -249,12 +336,14 @@ fun ChildProfilesScreen(
                         item { QalqonSectionHeader(title = stringResource(R.string.children_overview)) }
                         items(overviews, key = { it.childId }) { overview ->
                             val child = ui.children.first { it.id == overview.childId }
-                            ChildListRow(
+                            ChildProfileCard(
                                 overview = overview,
                                 menuExpanded = menuChildId == overview.childId,
                                 onOpenMenu = { menuChildId = overview.childId },
                                 onDismissMenu = { menuChildId = null },
                                 onOpenDetail = { onOpenChild(overview.childId) },
+                                onOpenSchedule = { onOpenSchedule(overview.childId) },
+                                onOpenEyeSafety = { onOpenEyeSafety(overview.childId) },
                                 onEnrollFace = {
                                     menuChildId = null
                                     onEnrollChild(overview.childId)
@@ -351,48 +440,97 @@ fun ChildProfilesScreen(
     }
 }
 
+/** The empty list: nothing to scan yet, with a single pill CTA to add the first child. */
+@Composable
+private fun EmptyChildren(modifier: Modifier, onAdd: () -> Unit) {
+    Box(modifier = modifier) {
+        QalqonEmptyState(
+            title = stringResource(R.string.children_empty),
+            description = stringResource(R.string.children_empty_hint),
+            icon = {
+                Icon(
+                    imageVector = Icons.Filled.Person,
+                    contentDescription = null,
+                    modifier = Modifier.size(QalqonDimens.icon.lg),
+                )
+            },
+            actionLabel = stringResource(R.string.children_add),
+            onAction = onAdd,
+            actionShape = QalqonShapes.pillShape,
+        )
+    }
+}
+
 /**
- * One child in the list: a tappable [QalqonChildCard] whose primary action opens the
- * Child Detail hub, plus a secondary overflow holding the existing edit/delete (and
- * face enrollment when the child still needs it).
+ * One child's card: avatar, name, real status badge, today's screen-time progress and the
+ * child-scoped action chips, plus the existing overflow holding edit/delete (and face
+ * enrollment when the child still needs it).
  */
 @Composable
-private fun ChildListRow(
+private fun ChildProfileCard(
     overview: ChildOverview,
     menuExpanded: Boolean,
     onOpenMenu: () -> Unit,
     onDismissMenu: () -> Unit,
     onOpenDetail: () -> Unit,
+    onOpenSchedule: () -> Unit,
+    onOpenEyeSafety: () -> Unit,
     onEnrollFace: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val faceStatus = stringResource(
-        if (overview.faceEnrolled) R.string.children_face_on else R.string.children_face_off,
+    val status = overview.status
+    val statusLabel = stringResource(childCardStatusLabelRes(status))
+    val cardDescription = stringResource(
+        R.string.home_child_content_description,
+        overview.name,
+        statusLabel,
     )
+    val openDetailsLabel = stringResource(R.string.children_open_details, overview.name)
+
     Box {
-        QalqonChildCard(
-            name = overview.name,
-            initial = overview.initial,
-            protectionConfigured = overview.faceEnrolled,
-            faceEnrolled = overview.faceEnrolled,
-            faceStatus = faceStatus,
+        QalqonCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics { contentDescription = cardDescription },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            shape = QalqonShapes.xLargeShape,
             onClick = onOpenDetail,
-            onClickLabel = stringResource(R.string.children_open_details, overview.name),
-            contentDescription = stringResource(
-                R.string.home_child_content_description,
-                overview.name,
-                faceStatus,
-            ),
-            trailing = {
+            onClickLabel = openDetailsLabel,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ChildAvatarContainer(initial = overview.initial, status = status)
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = QalqonDimens.spacing.md),
+                    verticalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.sm),
+                ) {
+                    Text(
+                        text = overview.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    QalqonStatusBadge(
+                        label = statusLabel,
+                        tone = childCardStatusTone(status),
+                    )
+                    ScreenTimeProgress(overview.screenTime, toneColor(childCardStatusTone(status)))
+                }
                 IconButton(onClick = onOpenMenu) {
                     Icon(
                         imageVector = Icons.Filled.MoreVert,
                         contentDescription = stringResource(R.string.home_more_options),
                     )
                 }
-            },
-        )
+            }
+            ChildActionChips(
+                onOpenSettings = onOpenDetail,
+                onOpenSchedule = onOpenSchedule,
+                onOpenEyeSafety = onOpenEyeSafety,
+            )
+        }
         DropdownMenu(expanded = menuExpanded, onDismissRequest = onDismissMenu) {
             if (!overview.faceEnrolled) {
                 DropdownMenuItem(
@@ -409,6 +547,80 @@ private fun ChildListRow(
                 onClick = onDelete,
             )
         }
+    }
+}
+
+/** Circular avatar disc, tinted from the semantic palette by the child's status. */
+@Composable
+private fun ChildAvatarContainer(initial: String, status: ChildCardStatus) {
+    val container = when (status) {
+        ChildCardStatus.ACTIVE -> QalqonTheme.colors.successContainer
+        ChildCardStatus.TIME_UP -> QalqonTheme.colors.warningContainer
+        ChildCardStatus.OFFLINE -> MaterialTheme.colorScheme.surfaceVariant
+    }
+    Box(
+        modifier = Modifier
+            .size(QalqonDimens.sizes.avatar)
+            .background(color = container, shape = CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = initial.take(1).uppercase(),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+/**
+ * Today's screen time: the used amount from real usage data, and a progress bar only when a
+ * valid daily limit exists (an unlimited child has no bar rather than a fabricated one).
+ */
+@Composable
+private fun ScreenTimeProgress(screenTime: ChildScreenTime?, accent: Color) {
+    if (screenTime == null) return
+    Text(
+        text = stringResource(R.string.screentime_app_used, durationLabel(screenTime.usedMs)),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    val progress = screenTime.progress
+    if (progress != null) {
+        LinearProgressIndicator(
+            progress = { progress },
+            modifier = Modifier.fillMaxWidth(),
+            color = accent,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+        )
+    }
+}
+
+/** The child-scoped destinations as action chips; each opens an existing route. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ChildActionChips(
+    onOpenSettings: () -> Unit,
+    onOpenSchedule: () -> Unit,
+    onOpenEyeSafety: () -> Unit,
+) {
+    FlowRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(QalqonDimens.spacing.sm),
+    ) {
+        AssistChip(
+            onClick = onOpenSettings,
+            label = { Text(stringResource(R.string.children_action_settings)) },
+        )
+        AssistChip(
+            onClick = onOpenSchedule,
+            label = { Text(stringResource(R.string.children_action_schedule)) },
+        )
+        AssistChip(
+            onClick = onOpenEyeSafety,
+            label = { Text(stringResource(R.string.children_action_eye_safety)) },
+        )
     }
 }
 

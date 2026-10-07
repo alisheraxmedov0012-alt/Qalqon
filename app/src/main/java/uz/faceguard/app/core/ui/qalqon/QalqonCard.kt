@@ -58,6 +58,12 @@ fun QalqonCard(
      */
     shape: Shape = androidx.compose.foundation.shape.RoundedCornerShape(QalqonDimens.cardCorner),
     onClick: (() -> Unit)? = null,
+    /**
+     * Accessibility label for the card's click action. Defaults to null so existing
+     * callers are unchanged; a clickable card passes a localized description so a screen
+     * reader announces the action instead of only the role.
+     */
+    onClickLabel: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val border = if (bordered) {
@@ -66,7 +72,7 @@ fun QalqonCard(
         null
     }
     val clickModifier = if (onClick != null) {
-        Modifier.clickable(role = Role.Button, onClick = onClick)
+        Modifier.clickable(role = Role.Button, onClickLabel = onClickLabel, onClick = onClick)
     } else {
         Modifier
     }

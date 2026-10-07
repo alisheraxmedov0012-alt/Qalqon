@@ -450,6 +450,8 @@ private fun QalqonNavHost(
                 onEnrollChild = { childId ->
                     navController.navigate(Routes.childFaceEnrollment(childId))
                 },
+                onOpenSchedule = { childId -> navController.navigate(Routes.childSchedules(childId)) },
+                onOpenEyeSafety = { childId -> navController.navigate(Routes.childEyeSafety(childId)) },
             )
         }
         // Phase 4: the Child Detail hub. Every control keeps the child context by

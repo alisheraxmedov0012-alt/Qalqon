@@ -45,9 +45,15 @@ val hasReleaseSigning = listOf(
 
 // Version source of truth. The values below are the defaults; a release pipeline
 // may override them for a single build without editing this file, e.g.
-//   ./gradlew :app:assembleRelease -PqalqonVersionCode=2 -PqalqonVersionName=0.1.1
+//   ./gradlew :app:assembleRelease -PqalqonVersionCode=2 -PqalqonVersionName=1.0.1
+//
+// Stage 12 (Final Device Certification & Release): the version was explicitly chosen
+// for the first production release — versionCode 1 / versionName "1.0.0" — rather than
+// leaving the pre-release "0.1.0" placeholder. This is a reported, deliberate change
+// (see docs/STAGE12_FINAL_DEVICE_CERTIFICATION.md), not an automatic bump. Every
+// subsequent Play upload must increase versionCode.
 val defaultVersionCode = 1
-val defaultVersionName = "0.1.0"
+val defaultVersionName = "1.0.0"
 val resolvedVersionCode = (project.findProperty("qalqonVersionCode") as String?)?.toIntOrNull()
     ?: defaultVersionCode
 val resolvedVersionName = (project.findProperty("qalqonVersionName") as String?)?.takeIf { it.isNotBlank() }

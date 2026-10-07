@@ -748,3 +748,29 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   needs LEGAL REVIEW. "Prepared" is kept distinct from "Submitted"/"Approved" — no Play
   approval is claimed.
 
+- Stage 12 (Final Device Certification & Release, roadmap **12/12 — FINAL**) — release
+  certification. Baseline verified at the Stage 11 HEAD `81368b3`, clean tree. A deliberate,
+  reported version choice was made: production `versionName = "1.0.0"` (versionCode 1,
+  still overridable via `-PqalqonVersionCode`/`-PqalqonVersionName`), replacing the
+  pre-release `0.1.0` placeholder. Final artifacts built and INSPECTED here: release APK
+  (signed with a throwaway `/tmp` key) and release AAB (`:app:bundleRelease`), both with
+  versionName 1.0.0, applicationId `uz.faceguard.app`, targetSdk 36 / minSdk 26, R8 +
+  resource shrinking (`proguard.map`/`r8.json` in the AAB), no `android:debuggable`, and
+  **no INTERNET / ACCESS_NETWORK_STATE / location**; permissions are the expected minimal
+  set; backup/D2D exclusions intact; secrets scan clean. Debug routes are **not reachable**
+  in release (registration is under `if (BuildConfig.DEBUG)`; the surviving
+  `recognition_debug`/`settings_developer` strings come only from the PIN-gate allow-list
+  `PROTECTED_ROUTE_PREFIXES`, which registers no destination). New JVM:
+  `Stage12ReleaseCertificationTest` (5); JVM 2284 -> 2289 (0/0/0). Regression: lint,
+  assembleDebug (incl. instrumented compile), assembleRelease, bundleRelease all pass.
+  **HONEST CERTIFICATION (nothing fabricated):** PHYSICAL DEVICE CERTIFICATION = NOT
+  AVAILABLE (no device/adb; no /dev/kvm so no emulator here); API 26–34/36 NOT TESTED
+  (API 35 = CI emulator only); parent/child/unknown/no-face/multi-face/liveness/enforcement/
+  permissions/OEM/reboot/process-death/background/soak (24/48/72h) all NOT TESTED on
+  device; REAL BILLING = NOT VERIFIED; ANTI-SPOOF = NOT PRODUCTION-CERTIFIED; PRODUCTION
+  SIGNING = NOT VERIFIED. Release blockers: P0 = 0, P1 = 0, P2 = 1 (debug route-name
+  string constants present but unreachable). Decision **PASS WITH LIMITATIONS**; Play
+  readiness kept distinct (technically ready YES / Console verified NO / production signed
+  NO / submitted NO / approved NO). ROADMAP COMPLETE 12/12 — no Stage 13. Docs:
+  `docs/STAGE12_FINAL_DEVICE_CERTIFICATION.md`.
+

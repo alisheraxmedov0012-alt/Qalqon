@@ -78,3 +78,29 @@ server-side deletion, because there is no server. See `docs/playstore/ACCOUNT_DE
 
 These documents are professional drafts but have **not** been reviewed by legal counsel.
 **Legal review is REQUIRED before production publication.**
+
+## Google Play account-deletion conformance (analysis)
+
+Google Play's Account Deletion requirement applies when an app lets users create an account.
+QALQON's account model and the honest conformance position:
+
+| Question | Answer (from the code) |
+|---|---|
+| Does QALQON create a user account? | **Yes** — a local account (name + phone number + PIN). |
+| Local-only or server-backed? | **Local-only.** No QALQON server exists (no INTERNET permission). |
+| What user data exists? | Account, PIN (salted hash), parent/child profiles, encrypted face templates, protected apps/policies/schedules/screen-time/eye-safety, activity log, settings, local subscription cache. |
+| Is there any server-side user data? | **No.** Nothing is transmitted; there is no server copy. |
+| What can the external URL actually delete? | **Nothing remotely** — there is no remote data. It can only explain the on-device deletion path and record a support request. |
+| What does the in-app deletion delete? | All local data **and** the Android Keystore biometric key (`ResetRepositoryImpl.resetAll()`), returning the app to a fresh-install state. |
+| Is subscription cancellation separate? | **Yes** — a Google Play subscription is not cancelled by deleting the QALQON account. |
+| Is the public deletion resource sufficient for this architecture? | The requirement asks for a discoverable external **option to initiate** deletion. Since the data is device-local, the external page can only initiate/guide; the actual deletion is completed on-device. This is documented honestly and is **not** presented as authenticated server-side deletion. |
+
+**Limitation (precise):** Google Play's external-deletion mechanism implicitly assumes
+server-held account data. QALQON is backendless, so the external resource is an
+initiate/instructions page, not an authenticated remote-deletion endpoint. This is a
+**policy-interpretation nuance** to confirm with Google Play review (or with counsel); it is
+**not** a code defect and is **not** worked around by adding a backend (out of scope — §52/§15
+of Block 2 forbid adding a backend just to appear compliant). If Google Play requires
+authenticated remote deletion for this app, that is a product/architecture decision for the
+project owner, not a Block 2 change.
+

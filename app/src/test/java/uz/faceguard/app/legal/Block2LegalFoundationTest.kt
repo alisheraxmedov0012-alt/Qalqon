@@ -136,6 +136,37 @@ class Block2LegalFoundationTest {
     }
 
     @Test
+    fun thePagesCrossLinkToEverySiblingResource() {
+        // Each of the four resources must link to the other three, so a reader can reach
+        // Privacy <-> Terms <-> Delete Account <-> Support from any page.
+        val slugs = listOf("privacy-policy", "terms-of-service", "delete-account", "support")
+        langs.forEach { lang ->
+            slugs.forEach { slug ->
+                val html = read("docs/legal/$lang/$slug.html")
+                val links = Regex("""href="([^"]+)"""").findAll(html).map { it.groupValues[1] }.toSet()
+                slugs.filter { it != slug }.forEach { sibling ->
+                    assertTrue(
+                        "$lang/$slug.html must link to $sibling",
+                        links.contains("$sibling.html"),
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun theSupportPageLinksToTheOtherResourcesAndContact() {
+        langs.forEach { lang ->
+            val support = read("docs/legal/$lang/support.html")
+            listOf("privacy-policy.html", "terms-of-service.html", "delete-account.html")
+                .forEach { target ->
+                    assertTrue("$lang support must link to $target", support.contains("href=\"$target\""))
+                }
+            assertTrue("$lang support must offer a contact path", support.contains("mailto:[[SUPPORT_EMAIL]]"))
+        }
+    }
+
+    @Test
     fun thePagesCarryTitleDescriptionAndEffectiveDate() {
         listOf("privacy-policy", "terms-of-service").forEach { page ->
             val html = read("docs/legal/en/$page.html")

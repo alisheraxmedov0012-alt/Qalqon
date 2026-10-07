@@ -57,7 +57,9 @@ import uz.faceguard.app.domain.model.ParentProfile
 import uz.faceguard.app.domain.model.ScanMode
 import uz.faceguard.app.domain.policy.AppPolicy
 import uz.faceguard.app.domain.protection.ProtectionCapability
+import uz.faceguard.app.domain.protection.ProtectionReadiness
 import uz.faceguard.app.domain.protection.missingProtectionCapabilities
+import uz.faceguard.app.domain.protection.protectionReadiness
 import uz.faceguard.app.domain.policy.ChildAppPolicyRepository
 import uz.faceguard.app.domain.notification.AppNotificationDispatcher
 import uz.faceguard.app.domain.notification.AppNotificationEvent
@@ -203,6 +205,20 @@ data class ProtectionRuntimeState(
 
     /** True when protection is requested but only partially effective. */
     val degraded: Boolean get() = degradedCapabilities.isNotEmpty()
+
+    /**
+     * Stage 8: the honest readiness verdict (OFF / NOT_READY / LIMITED / READY),
+     * derived from real capability health rather than the on/off setting. The UI shows
+     * this so "Protection: ON" can never be mistaken for "fully protecting".
+     */
+    val readiness: ProtectionReadiness
+        get() = protectionReadiness(
+            enabled = enabled,
+            active = active,
+            parentFaceEnrolled = parentFaceEnrolled,
+            protectedAppCount = protectedCount,
+            missingCapabilities = degradedCapabilities,
+        )
 
     /**
      * True after a background (e.g. post-reboot) restore while the camera foreground
@@ -822,6 +838,17 @@ class ProtectionRuntime @Inject constructor(
      */
     fun onScreenOn() {
         cameraSession.onScreenStateChanged(true)
+    }
+
+    /**
+     * Stage 8: the parent's explicit "retry camera" action while recognition is
+     * camera-limited. Idempotent — it resets the bounded recovery counter and re-binds
+     * the single process-scoped session, so repeated taps cannot open a second camera,
+     * analyzer or session. A no-op when protection is not active.
+     */
+    fun retryCameraRecovery() {
+        if (!active) return
+        cameraSession.retryNow()
     }
 
     /**

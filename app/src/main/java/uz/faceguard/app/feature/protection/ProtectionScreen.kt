@@ -63,6 +63,9 @@ import uz.faceguard.app.core.protection.ProtectionRuntime
 import uz.faceguard.app.core.protection.ProtectionRuntimeState
 import uz.faceguard.app.core.protection.ProtectionState
 import uz.faceguard.app.core.security.SecurityState
+import uz.faceguard.app.core.ui.protectionCapabilityWhyRes
+import uz.faceguard.app.core.ui.protectionReadinessHintRes
+import uz.faceguard.app.core.ui.protectionReadinessLabelRes
 import uz.faceguard.app.core.ui.qalqon.ProtectionDegradedBanner
 import uz.faceguard.app.domain.model.AppSettings
 import uz.faceguard.app.domain.model.ScanMode
@@ -139,6 +142,12 @@ class ProtectionViewModel @Inject constructor(
      * in a universal fallback.
      */
     fun oemBackgroundIntents(): List<Intent> = runtime.oemBackgroundIntents()
+
+    /**
+     * Stage 8: the parent's retry after a camera interruption. Idempotent (delegates to
+     * the single process-scoped session), so repeated taps cannot create a second camera.
+     */
+    fun retryCameraRecovery() = runtime.retryCameraRecovery()
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
@@ -214,6 +223,13 @@ fun ProtectionScreen(
             )
 
             StatusCard(state)
+
+            // Stage 8: distinct camera-interruption feedback (recovery in progress /
+            // exhausted), never the same as "no permission".
+            CameraRecoveryCard(
+                recovering = state.cameraRecovering,
+                onRetry = viewModel::retryCameraRecovery,
+            )
 
             RequirementsCard(
                 state = state,
@@ -338,26 +354,12 @@ private fun MasterToggleCard(enabled: Boolean, onToggle: (Boolean) -> Unit) {
 
 @Composable
 private fun StatusCard(state: ProtectionRuntimeState) {
-    val title: String
-    val detail: String
-    when {
-        !state.enabled -> {
-            title = stringResource(R.string.protection_status_inactive)
-            detail = stringResource(R.string.protection_status_inactive_hint)
-        }
-        !state.active -> {
-            title = stringResource(R.string.protection_status_no_account)
-            detail = stringResource(R.string.protection_status_no_account_hint)
-        }
-        !state.ready -> {
-            title = stringResource(R.string.protection_status_setup_needed)
-            detail = stringResource(R.string.protection_status_setup_hint)
-        }
-        else -> {
-            title = stringResource(R.string.protection_status_active)
-            detail = stringResource(R.string.protection_status_active_hint)
-        }
-    }
+    // Stage 8: the verdict comes from the honest readiness model, never the on/off
+    // setting alone, so "Protection: ON" can never be shown while a critical capability
+    // is missing.
+    val readiness = state.readiness
+    val title = stringResource(protectionReadinessLabelRes(readiness))
+    val detail = stringResource(protectionReadinessHintRes(readiness))
 
     val stateLabel = when (state.protectionState) {
         ProtectionState.UNPROTECTED -> stringResource(R.string.protection_state_unprotected)
@@ -368,13 +370,47 @@ private fun StatusCard(state: ProtectionRuntimeState) {
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.protection_toggle_label), style = MaterialTheme.typography.titleLarge)
+            Text(title, style = MaterialTheme.typography.titleMedium)
             Text(detail, style = MaterialTheme.typography.bodyMedium)
             Text(
                 stringResource(R.string.protection_status_state, stateLabel),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+/**
+ * Stage 8: camera-interruption feedback. Shown only while Stage 5's bounded camera
+ * recovery is running, or when it is exhausted — a distinct state from "no camera
+ * permission" and from "camera unavailable". The retry action is idempotent.
+ */
+@Composable
+private fun CameraRecoveryCard(
+    recovering: Boolean,
+    onRetry: () -> Unit,
+) {
+    if (!recovering) return
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                stringResource(R.string.protection_camera_recovery_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                stringResource(R.string.protection_camera_recovery_body),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                stringResource(R.string.protection_camera_recovery_unavailable),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedButton(onClick = onRetry) {
+                Text(stringResource(R.string.protection_camera_recovery_retry))
+            }
         }
     }
 }
@@ -393,39 +429,52 @@ private fun RequirementsCard(
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.protection_requirements_title), style = MaterialTheme.typography.titleMedium)
+            // Stage 8: every row states *why* the capability is needed, in parent
+            // language, before sending the parent to a system settings page.
+            Text(
+                stringResource(R.string.protection_requirements_required_group),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
 
             RequirementRow(
-                label = stringResource(R.string.protection_req_camera),
+                label = stringResource(R.string.protection_capability_camera),
+                why = stringResource(protectionCapabilityWhyRes(ProtectionCapability.CAMERA)),
                 satisfied = cameraGranted,
                 actionLabel = stringResource(R.string.protection_req_grant),
                 onAction = onGrantCamera,
             )
             RequirementRow(
-                label = stringResource(R.string.protection_req_usage),
+                label = stringResource(R.string.protection_capability_usage_access),
+                why = stringResource(protectionCapabilityWhyRes(ProtectionCapability.USAGE_ACCESS)),
                 satisfied = state.usageAccessGranted,
                 actionLabel = stringResource(R.string.protection_req_grant),
                 onAction = onGrantUsage,
             )
             RequirementRow(
-                label = stringResource(R.string.protection_req_overlay),
+                label = stringResource(R.string.protection_capability_overlay),
+                why = stringResource(protectionCapabilityWhyRes(ProtectionCapability.OVERLAY)),
                 satisfied = state.overlayGranted,
                 actionLabel = stringResource(R.string.protection_req_grant),
                 onAction = onGrantOverlay,
             )
             RequirementRow(
-                label = stringResource(R.string.protection_req_accessibility),
+                label = stringResource(R.string.protection_capability_accessibility),
+                why = stringResource(protectionCapabilityWhyRes(ProtectionCapability.ACCESSIBILITY)),
                 satisfied = state.accessibilityEnabled,
                 actionLabel = stringResource(R.string.protection_req_open),
                 onAction = onOpenAccessibility,
             )
             RequirementRow(
                 label = stringResource(R.string.protection_req_parent_face),
+                why = stringResource(R.string.protection_capability_why_camera),
                 satisfied = state.parentFaceEnrolled,
                 actionLabel = stringResource(R.string.protection_req_open),
                 onAction = onOpenParentProfile,
             )
             RequirementRow(
                 label = stringResource(R.string.protection_req_protected_apps),
+                why = stringResource(R.string.protection_capability_why_usage_access),
                 satisfied = state.protectedCount > 0,
                 actionLabel = stringResource(R.string.protection_req_open),
                 onAction = onOpenProtectedApps,
@@ -437,6 +486,7 @@ private fun RequirementsCard(
 @Composable
 private fun RequirementRow(
     label: String,
+    why: String,
     satisfied: Boolean,
     actionLabel: String,
     onAction: () -> Unit,
@@ -447,18 +497,23 @@ private fun RequirementRow(
             color = if (satisfied) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyLarge,
         )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
+        Column(
             modifier = Modifier
                 .weight(1f)
                 .padding(start = 8.dp),
-        )
+        ) {
+            Text(text = label, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = why,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         if (!satisfied) {
             OutlinedButton(onClick = onAction) { Text(actionLabel) }
         } else {
             Text(
-                text = stringResource(R.string.protection_req_ok),
+                text = stringResource(R.string.protection_capability_state_ready),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary,
             )

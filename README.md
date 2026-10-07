@@ -718,6 +718,11 @@ sync; the app remains fully functional with sync disabled or absent.
   relevant settings page (battery optimization / autostart). It cannot read or bypass
   the OEM's own restriction state, and never forces a change. See
   `docs/STAGE6_PERMISSION_OEM_COMPATIBILITY.md`.
+- **The app never claims more than it is doing.** The Protection screen shows an honest
+  readiness verdict (OFF / Setup needed / Partial protection / Protection ready) derived
+  from real capability health, so "Protection: ON" is never presented as full protection
+  while a critical permission is missing; a camera interruption is shown explicitly. See
+  `docs/STAGE8_USER_EXPERIENCE_FAILURE_RECOVERY.md`.
 - **Supported Android range is API 26–36 (Android 8.0–16).** Cross-version decisions
   live in `core/compat/PlatformCompat` and are asserted for every level on the JVM;
   full-screen blocks cover the display cutout (API 28+) and the UI is edge-to-edge on

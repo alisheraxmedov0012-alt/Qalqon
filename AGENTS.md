@@ -657,3 +657,22 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   Docs: `docs/STAGE7_ANDROID_VERSION_COMPATIBILITY.md`. Only API 35 executed; API 26–34
   and 36 NOT TESTED; REAL DEVICE TEST = NO.
 
+- Stage 8 (User Experience & Failure Recovery, roadmap 8/12) — honest state + actionable
+  recovery. Audit found one genuinely broken thing and one missing: (1)
+  `ProtectionRuntimeState.ready` excluded accessibility, so the Protection status card
+  showed "Himoya faol" (active) while the only touch-blocking mechanism was off —
+  contradicting the degraded banner (false success); (2) Stage 5's `cameraRecovering` was
+  set but never surfaced. Additive changes (no recognition/policy/enforcement change):
+  pure `domain/protection/ProtectionReadiness.kt` (`OFF/NOT_READY/LIMITED/READY` from real
+  capability health incl. accessibility) exposed as `ProtectionRuntimeState.readiness`;
+  `ProtectionScreen` status card shows the readiness verdict + hint; a `CameraRecoveryCard`
+  + a `CAMERA_RECOVERING` Home banner (distinct from post-reboot `CAMERA_LIMITED`) with an
+  idempotent `ProtectionRuntime.retryCameraRecovery()` → the single Stage 5 session's
+  `retryNow()`; per-capability plain-language *why* (`protectionCapabilityWhyRes`) + READY
+  state in the requirements card, grouped "Required for full protection"; 21 new strings
+  in uz/en/ru. New JVM: `ProtectionReadinessTest` (14),
+  `Stage8CameraRecoveryBannerTest` (6), `Stage8LocalizationTest` (6),
+  `Stage8RegressionGuardTest` (14); JVM 2181 -> 2221 (0/0/0). All Stage 1–7 invariants
+  intact. Docs: `docs/STAGE8_USER_EXPERIENCE_FAILURE_RECOVERY.md`.
+  REAL DEVICE UX TEST = NO (no device/ADB; emulator not a UX validation).
+

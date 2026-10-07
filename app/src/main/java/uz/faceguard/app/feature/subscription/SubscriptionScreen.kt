@@ -1,6 +1,5 @@
 package uz.faceguard.app.feature.subscription
 
-import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -52,6 +51,7 @@ import uz.faceguard.app.domain.billing.ProductCatalog
 @Composable
 fun SubscriptionScreen(
     onBack: () -> Unit,
+    onStartTrial: () -> Unit,
     viewModel: SubscriptionViewModel = hiltViewModel(),
 ) {
     val entitlement by viewModel.entitlement.collectAsStateWithLifecycle()
@@ -120,6 +120,7 @@ fun SubscriptionScreen(
                     Text(stringResource(R.string.subscription_billing_frequency), style = MaterialTheme.typography.bodyMedium)
                     Text(stringResource(R.string.subscription_auto_renew_notice), style = MaterialTheme.typography.bodySmall)
                     Text(stringResource(R.string.subscription_cancel_notice), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.subscription_billing_google_play), style = MaterialTheme.typography.bodySmall)
                 }
             }
 
@@ -153,15 +154,21 @@ fun SubscriptionScreen(
                     Text(stringResource(R.string.subscription_manage))
                 }
             } else {
+                // Block 1: the offer never launches billing directly. It opens the single
+                // Important Information / Consent screen, which starts the purchase only
+                // after affirmative consent and with a real price on screen.
                 Button(
-                    onClick = {
-                        (context as? Activity)?.let { viewModel.subscribe(it) }
-                    },
-                    enabled = !ui.loading && product != null,
+                    onClick = onStartTrial,
+                    enabled = !ui.loading && SubscriptionConsent.hasDisclosablePrice(product),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(stringResource(R.string.subscription_start_trial))
                 }
+                Text(
+                    stringResource(R.string.subscription_important_info_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             Row(

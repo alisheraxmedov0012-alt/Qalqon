@@ -152,8 +152,11 @@ class GooglePlayBillingGateway @Inject constructor(
             }
             ?: return BillingError.ITEM_UNAVAILABLE
 
-        val offerToken = productDetails.subscriptionOfferDetails?.firstOrNull()?.offerToken
-            ?: details.offerToken
+        val offers = productDetails.subscriptionOfferDetails
+        val selectedOffer = offers?.getOrNull(
+            SubscriptionOfferSelection.indexOfPreferredOffer(offers.map { it.offerId }),
+        )
+        val offerToken = selectedOffer?.offerToken ?: details.offerToken
 
         val params = BillingFlowParams.newBuilder()
             .setProductDetailsParamsList(
@@ -215,7 +218,12 @@ class GooglePlayBillingGateway @Inject constructor(
     }
 
     private fun ProductDetails.toDto(): BillingProductDetails? {
-        val offer = subscriptionOfferDetails?.firstOrNull() ?: return null
+        // A base plan can expose several offers; the advertised price and the offer that is
+        // launched must be the same offer, so the trial offer is preferred over "the first".
+        val offers = subscriptionOfferDetails ?: return null
+        val offer = offers.getOrNull(
+            SubscriptionOfferSelection.indexOfPreferredOffer(offers.map { it.offerId }),
+        ) ?: return null
         val phases = offer.pricingPhases.pricingPhaseList
         val firstPhase = phases.firstOrNull()
         val paidPhase = phases.lastOrNull()

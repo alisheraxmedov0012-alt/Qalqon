@@ -933,4 +933,25 @@
     <string name="subscription_error_pending">Ожидается оплата.</string>
     <string name="subscription_error_unexpected">Произошла непредвиденная ошибка. Попробуйте позже.</string>
     <string name="subscription_manage_open_failed">Не удалось открыть страницу управления подпиской.</string>
+    <string name="subscription_consent_back">Назад</string>
+    <string name="subscription_billing_google_play">Оплата проходит через Google Play.</string>
+    <string name="subscription_important_info_hint">Перед продолжением ознакомьтесь с важной информацией.</string>
+    <string name="subscription_consent_title">Важная информация</string>
+    <string name="subscription_consent_subtitle">Кратко об условиях подписки и оплате после пробного периода.</string>
+    <string name="subscription_consent_section_subscription">Условия подписки</string>
+    <string name="subscription_consent_section_trial">После пробного периода</string>
+    <string name="subscription_consent_section_cancel">Отмена</string>
+    <string name="subscription_consent_section_limits">Технические ограничения</string>
+    <string name="subscription_consent_section_legal">Правовая информация</string>
+    <string name="subscription_consent_trial_conversion">По окончании 3-дневного бесплатного пробного периода подписка автоматически станет месячной и будет продлеваться ежемесячно, если не отменить.</string>
+    <string name="subscription_consent_cancel_how">Отменить можно в любой момент в подписках Google Play. Это отличается от удаления приложения или удаления аккаунта.</string>
+    <string name="subscription_consent_google_play">Оплату обрабатывает Google Play. Qalqon не собирает данные карты или платежей.</string>
+    <string name="subscription_limit_accessibility">Защита зависит от службы доступности Android и на некоторых устройствах может быть ограничена.</string>
+    <string name="subscription_limit_overlay">На некоторых устройствах фоновые и батарейные ограничения могут временно приостанавливать защиту.</string>
+    <string name="subscription_limit_system">Qalqon не может полностью контролировать некоторые системные действия, например Home, Recents или Power.</string>
+    <string name="subscription_limit_recognition">Распознавание лица и liveness зависят от освещения, перекрытия и угла.</string>
+    <string name="subscription_consent_privacy_policy">Политика конфиденциальности</string>
+    <string name="subscription_consent_terms_of_service">Условия использования</string>
+    <string name="subscription_consent_legal_unavailable">Документ пока недоступен.</string>
+    <string name="subscription_consent_agree">Я согласен с условиями подписки, оплатой после пробного периода и автоматическим продлением.</string>
 </resources>

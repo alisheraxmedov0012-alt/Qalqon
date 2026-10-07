@@ -933,4 +933,25 @@
     <string name="subscription_error_pending">Payment pending.</string>
     <string name="subscription_error_unexpected">Something went wrong. Try again later.</string>
     <string name="subscription_manage_open_failed">Could not open the subscription management page.</string>
+    <string name="subscription_consent_back">Back</string>
+    <string name="subscription_billing_google_play">Payment is processed by Google Play.</string>
+    <string name="subscription_important_info_hint">Review the important information before continuing.</string>
+    <string name="subscription_consent_title">Important information</string>
+    <string name="subscription_consent_subtitle">A short summary of the subscription terms and the charge after the trial.</string>
+    <string name="subscription_consent_section_subscription">Subscription terms</string>
+    <string name="subscription_consent_section_trial">After the trial</string>
+    <string name="subscription_consent_section_cancel">Cancellation</string>
+    <string name="subscription_consent_section_limits">Technical limitations</string>
+    <string name="subscription_consent_section_legal">Legal</string>
+    <string name="subscription_consent_trial_conversion">When the 3-day free trial ends, your monthly subscription starts automatically and renews monthly unless you cancel.</string>
+    <string name="subscription_consent_cancel_how">You can cancel anytime in Google Play subscriptions. This is different from uninstalling the app or deleting your account.</string>
+    <string name="subscription_consent_google_play">Google Play processes the payment. Qalqon does not collect card or payment details.</string>
+    <string name="subscription_limit_accessibility">Protection depends on the Android Accessibility service and may be limited on some devices.</string>
+    <string name="subscription_limit_overlay">On some devices, background and battery restrictions may pause protection temporarily.</string>
+    <string name="subscription_limit_system">Qalqon cannot fully control some system actions such as Home, Recents or Power.</string>
+    <string name="subscription_limit_recognition">Face recognition and liveness depend on lighting, occlusion and angle.</string>
+    <string name="subscription_consent_privacy_policy">Privacy Policy</string>
+    <string name="subscription_consent_terms_of_service">Terms of Service</string>
+    <string name="subscription_consent_legal_unavailable">This document is not available yet.</string>
+    <string name="subscription_consent_agree">I agree to the subscription terms, the charge after the trial and automatic renewal.</string>
 </resources>

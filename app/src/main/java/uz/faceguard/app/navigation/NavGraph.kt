@@ -35,6 +35,7 @@ import uz.faceguard.app.feature.privacy.PrivacyScreen
 import uz.faceguard.app.feature.parent.ParentProfileScreen
 import uz.faceguard.app.feature.policy.ChildPolicyScreen
 import uz.faceguard.app.feature.protection.ProtectionScreen
+import uz.faceguard.app.feature.subscription.SubscriptionConsentScreen
 import uz.faceguard.app.feature.subscription.SubscriptionScreen
 import uz.faceguard.app.feature.schedule.ScheduleArgs
 import uz.faceguard.app.feature.schedule.ScheduleEditorScreen
@@ -85,6 +86,12 @@ object Routes {
     const val SETTINGS_SUPPORT = "settings_support"
     /** Stage 7: the subscription / 3-day trial management screen. */
     const val SETTINGS_SUBSCRIPTION = "settings_subscription"
+
+    /**
+     * Release Block 1: the Important Information / Consent screen that sits between the
+     * Premium Offer and Google Play Billing.
+     */
+    const val SUBSCRIPTION_CONSENT = "subscription_consent"
     const val SETTINGS_DEVELOPER = "settings_developer"
     const val RECOGNITION_DEBUG = "recognition_debug"
     const val PROTECTION = "protection"
@@ -175,6 +182,7 @@ private val PROTECTED_ROUTE_PREFIXES = listOf(
     Routes.SETTINGS_PRIVACY,
     Routes.SETTINGS_SUPPORT,
     Routes.SETTINGS_SUBSCRIPTION,
+    Routes.SUBSCRIPTION_CONSENT,
     Routes.SETTINGS_DEVELOPER,
     Routes.PROTECTION,
     Routes.PRIVACY,
@@ -631,7 +639,16 @@ private fun QalqonNavHost(
             )
         }
         composable(Routes.SETTINGS_SUBSCRIPTION) {
-            SubscriptionScreen(onBack = { navController.popBackStack() })
+            SubscriptionScreen(
+                onBack = { navController.popBackStack() },
+                onStartTrial = { navController.navigate(Routes.SUBSCRIPTION_CONSENT) },
+            )
+        }
+        // Release Block 1: the single Important Information / Consent screen. Billing is
+        // launched from here (not from the offer), only after affirmative consent. Back
+        // simply pops and never starts a purchase.
+        composable(Routes.SUBSCRIPTION_CONSENT) {
+            SubscriptionConsentScreen(onBack = { navController.popBackStack() })
         }
         if (DebugFlags.DEBUG_SCREENS_ENABLED) {
             composable(Routes.SETTINGS_DEVELOPER) {

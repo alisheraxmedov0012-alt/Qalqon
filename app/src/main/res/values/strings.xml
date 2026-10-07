@@ -934,4 +934,25 @@
     <string name="subscription_error_pending">To‘lov kutilmoqda.</string>
     <string name="subscription_error_unexpected">Kutilmagan xatolik. Keyinroq urinib ko‘ring.</string>
     <string name="subscription_manage_open_failed">Obunani boshqarish sahifasini ochib bo‘lmadi.</string>
+    <string name="subscription_consent_back">Orqaga</string>
+    <string name="subscription_billing_google_play">To‘lov Google Play orqali amalga oshiriladi.</string>
+    <string name="subscription_important_info_hint">Davom etishdan oldin muhim ma’lumotlarni ko‘rib chiqing.</string>
+    <string name="subscription_consent_title">Muhim ma’lumot</string>
+    <string name="subscription_consent_subtitle">Obuna shartlari va sinovdan keyingi to‘lov haqida qisqacha ma’lumot.</string>
+    <string name="subscription_consent_section_subscription">Obuna shartlari</string>
+    <string name="subscription_consent_section_trial">Sinovdan keyin</string>
+    <string name="subscription_consent_section_cancel">Bekor qilish</string>
+    <string name="subscription_consent_section_limits">Texnik cheklovlar</string>
+    <string name="subscription_consent_section_legal">Huquqiy hujjatlar</string>
+    <string name="subscription_consent_trial_conversion">3 kunlik bepul sinov tugagach, bekor qilmasangiz, oylik obuna avtomatik boshlanadi va har oy yangilanadi.</string>
+    <string name="subscription_consent_cancel_how">Obunani Google Play’dagi “Obunalar” bo‘limida istalgan vaqtda bekor qilishingiz mumkin. Bu ilovani o‘chirish yoki akkauntni o‘chirishdan farq qiladi.</string>
+    <string name="subscription_consent_google_play">To‘lovni Google Play amalga oshiradi. Qalqon karta yoki to‘lov ma’lumotlarini yig‘maydi.</string>
+    <string name="subscription_limit_accessibility">Himoya Android Accessibility xizmatiga bog‘liq; ayrim qurilmalarda cheklangan bo‘lishi mumkin.</string>
+    <string name="subscription_limit_overlay">Ayrim qurilmalarda fon va batareya cheklovlari himoyani vaqtincha to‘xtatishi mumkin.</string>
+    <string name="subscription_limit_system">Qalqon Home, Recents yoki Power kabi ba’zi tizim harakatlarini to‘liq nazorat qila olmaydi.</string>
+    <string name="subscription_limit_recognition">Yuzni tanish va liveness yorug‘lik, to‘siq va burchakka bog‘liq.</string>
+    <string name="subscription_consent_privacy_policy">Maxfiylik siyosati</string>
+    <string name="subscription_consent_terms_of_service">Foydalanish shartlari</string>
+    <string name="subscription_consent_legal_unavailable">Hujjat hozircha mavjud emas.</string>
+    <string name="subscription_consent_agree">Obuna shartlari, sinovdan keyingi to‘lov va avtomatik yangilanishga roziman.</string>
 </resources>

@@ -716,4 +716,12 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   new hard invariants. Docs: `docs/STAGE10_PRIVACY_SECURITY_HARDENING.md`.
   Room/DataStore remain plaintext at rest (documented, mitigated by template encryption +
   backup exclusion); no SQLCipher/anti-tamper added (non-goal).
+  Stage 10 deep audit (asset inventory, Room/DataStore tables, deletion lifecycle, release
+  APK attack surface, findings F-1..F-6 with severity) is in
+  `docs/STAGE10_PRIVACY_SECURITY_AUDIT.md`. Additional tripwires added:
+  `Stage10DataLifecycleAndSurfaceTest` (12: template only written via the cipher, no
+  plaintext fallback, full reset deletes the Keystore key, per-subject face-delete, no
+  global biometric cache, debug flag is BuildConfig.DEBUG, no entitlement/debug bypass,
+  debug routes guarded, no ContentProvider/FileProvider/URI/clipboard, DataStore has no
+  secret-bearing key, PendingIntents immutable). JVM 2256 -> 2268 (0/0/0).
 

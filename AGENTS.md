@@ -725,3 +725,26 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   debug routes guarded, no ContentProvider/FileProvider/URI/clipboard, DataStore has no
   secret-bearing key, PendingIntents immutable). JVM 2256 -> 2268 (0/0/0).
 
+- Stage 11 (Play Store & International Launch Readiness, roadmap 11/12) — launch
+  readiness. Policy facts were verified ONLINE from official Google pages (2026-10-07):
+  target API 36 for new apps/updates (deadline 2026-08-31, extension to 2026-11-01,
+  support.google.com/googleplay/android-developer/answer/11926878); Data safety "Collect"
+  means transmitting data off the device (…/answer/10787469); account deletion must be
+  available both in-app AND externally via a web resource (…/answer/10144311); an app that
+  is NOT an accessibility tool using the AccessibilityService API must complete an
+  in-Play-Console accessibility declaration (…/answer/10964491). Deliverables: a
+  `docs/playstore/` artifact set (PRIVACY_POLICY, DATA_SAFETY, STORE_LISTING,
+  PERMISSION_DISCLOSURES, SUBSCRIPTION_DISCLOSURE, ACCOUNT_DELETION, SUPPORT,
+  SCREENSHOTS_PLAN, THIRD_PARTY_LICENSES, PLAY_CONSOLE_CHECKLIST, README) plus
+  `docs/STAGE11_PLAY_STORE_LAUNCH_READINESS.md`. Release artifact: `:app:bundleRelease`
+  builds an AAB (36 MB) with the expected permissions and NO INTERNET/network/location;
+  R8 applied. VERSION: versionCode 1 / versionName 0.1.0, both overridable via
+  `-PqalqonVersionCode`/`-PqalqonVersionName`. Permission set is already minimal (no
+  unused permission; nothing added for the form). New JVM: `Stage11LaunchReadinessTest`
+  (12); JVM 2268 -> 2284 (0/0/0). HONEST STATUS: PRIVACY POLICY PUBLIC URL = NOT VERIFIED
+  (text ready, not hosted); SUPPORT CONTACT = MISSING; store graphics MISSING; release/
+  upload signing NOT VERIFIED; Play Console access = NO, submission = NO, review = NO;
+  trial/price/license tester NOT VERIFIED; Terms of Service MISSING; OSS attribution
+  needs LEGAL REVIEW. "Prepared" is kept distinct from "Submitted"/"Approved" — no Play
+  approval is claimed.
+

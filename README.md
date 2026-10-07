@@ -734,6 +734,12 @@ sync; the app remains fully functional with sync disabled or absent.
   or hardcoded. Room/DataStore themselves remain plaintext at rest (documented
   limitation, mitigated by template encryption and backup exclusion). See
   `docs/STAGE10_PRIVACY_SECURITY_HARDENING.md` and `SECURITY.md`.
+- **Play Store readiness: technically prepared, not submitted.** Launch artifacts
+  (privacy policy, Data safety, store listing, permission/subscription disclosures,
+  account-deletion content, Play Console checklist) are in `docs/playstore/`. The release
+  AAB builds. Still required before submission: public HTTPS privacy/support URLs, store
+  graphics, release/upload signing, Play Console declarations, and a real purchase test.
+  No Play approval is claimed. See `docs/STAGE11_PLAY_STORE_LAUNCH_READINESS.md`.
 - **Supported Android range is API 26–36 (Android 8.0–16).** Cross-version decisions
   live in `core/compat/PlatformCompat` and are asserted for every level on the JVM;
   full-screen blocks cover the display cutout (API 28+) and the UI is edge-to-edge on

@@ -10,7 +10,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
@@ -31,6 +30,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import uz.faceguard.app.R
+import uz.faceguard.app.core.compat.PlatformCompat
 
 /**
  * Background protection foundation and — since Phase 7.1 — the owner of the
@@ -164,8 +164,12 @@ class ProtectionForegroundService : Service() {
             addAction(Intent.ACTION_SCREEN_ON)
             addAction(Intent.ACTION_USER_PRESENT)
         }
+        // Stage 7: these are protected *system* broadcasts only, so RECEIVER_NOT_EXPORTED
+        // is correct and explicit. ContextCompat passes the export flag where the
+        // platform requires it (Android 14 / API 34+) and omits it below, so the same
+        // call is valid across API 26–36.
         screenStateReceiver = runCatching {
-            registerReceiver(receiver, filter)
+            ContextCompat.registerReceiver(this, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
             receiver
         }.getOrNull()
     }
@@ -236,20 +240,14 @@ class ProtectionForegroundService : Service() {
     }
 
     /**
-     * The runtime type bitmask. `specialUse` is only a real type from API 34; the
-     * camera type from API 30. Below those the corresponding bit is omitted so the
-     * platform is never handed a type it does not define.
+     * The runtime type bitmask. Delegated to the pure [PlatformCompat] matrix, so
+     * every supported API level (26–36) is asserted on the JVM: `specialUse` is only
+     * a real type from API 34 and `camera` from API 30, and below those the
+     * corresponding bit is omitted so the platform is never handed a type it does
+     * not define.
      */
-    private fun foregroundTypes(includeCamera: Boolean): Int {
-        var types = 0
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-        }
-        if (includeCamera && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
-        }
-        return types
-    }
+    private fun foregroundTypes(includeCamera: Boolean): Int =
+        PlatformCompat.foregroundServiceTypes(Build.VERSION.SDK_INT, includeCamera)
 
     private fun ensureChannel() {
         val manager = getSystemService(NotificationManager::class.java) ?: return

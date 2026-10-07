@@ -3,6 +3,7 @@ package uz.faceguard.app.core.accessibility
 import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.os.Build
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
@@ -11,6 +12,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import uz.faceguard.app.R
+import uz.faceguard.app.core.compat.PlatformCompat
 
 /**
  * Phase 7.2: the real `TYPE_ACCESSIBILITY_OVERLAY` blocking window.
@@ -117,17 +119,27 @@ class AccessibilityOverlayWindow(
          * touchable, non-focusable accessibility-overlay contract is asserted by
          * the instrumented test without needing a bound service.
          */
-        fun layoutParams(): WindowManager.LayoutParams = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            // Touchable (no FLAG_NOT_TOUCHABLE); not focusable so IME/keys/BACK are
-            // not captured. FLAG_LAYOUT_IN_SCREEN gives full-screen coverage, and
-            // FLAG_SECURE keeps the blocking window out of screenshots/Recents.
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_SECURE,
-            PixelFormat.TRANSLUCENT,
-        )
+        fun layoutParams(): WindowManager.LayoutParams {
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                // Touchable (no FLAG_NOT_TOUCHABLE); not focusable so IME/keys/BACK are
+                // not captured. FLAG_LAYOUT_IN_SCREEN gives full-screen coverage, and
+                // FLAG_SECURE keeps the blocking window out of screenshots/Recents.
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_SECURE,
+                PixelFormat.TRANSLUCENT,
+            )
+            // Stage 7: FLAG_LAYOUT_IN_SCREEN alone does not cover the display cutout
+            // area on API 28+; without this a notched device would show a strip of the
+            // protected app above the block. The mode is a pure PlatformCompat decision.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                params.layoutInDisplayCutoutMode =
+                    PlatformCompat.fullscreenOverlayCutoutMode(Build.VERSION.SDK_INT)
+            }
+            return params
+        }
     }
 }

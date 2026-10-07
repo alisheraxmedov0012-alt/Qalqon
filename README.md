@@ -718,6 +718,11 @@ sync; the app remains fully functional with sync disabled or absent.
   relevant settings page (battery optimization / autostart). It cannot read or bypass
   the OEM's own restriction state, and never forces a change. See
   `docs/STAGE6_PERMISSION_OEM_COMPATIBILITY.md`.
+- **Supported Android range is API 26–36 (Android 8.0–16).** Cross-version decisions
+  live in `core/compat/PlatformCompat` and are asserted for every level on the JVM;
+  full-screen blocks cover the display cutout (API 28+) and the UI is edge-to-edge on
+  every version (Android 15 enforces it). Only API 35 is executed in CI; other levels
+  are not device-verified. See `docs/STAGE7_ANDROID_VERSION_COMPATIBILITY.md`.
 - **Migrations are explicit.** Room is at schema v10 with an additive
   migration chain (v3 → v10); a destructive fallback is not used, so a release
   build must keep adding a migration for every schema change.

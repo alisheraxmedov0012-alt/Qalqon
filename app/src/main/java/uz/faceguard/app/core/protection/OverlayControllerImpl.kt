@@ -41,6 +41,7 @@ import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import uz.faceguard.app.R
 import uz.faceguard.app.core.accessibility.AccessibilityOverlayRegistry
+import uz.faceguard.app.core.compat.PlatformCompat
 import uz.faceguard.app.core.i18n.AppLanguage
 import uz.faceguard.app.core.i18n.LocalizedApp
 
@@ -147,6 +148,12 @@ class OverlayControllerImpl(
                 WindowManager.LayoutParams.FLAG_SECURE,
             PixelFormat.TRANSLUCENT,
         ).apply { gravity = Gravity.TOP or Gravity.START }
+        // Stage 7: cover the display-cutout area too (API 28+), so a notched device
+        // shows no strip of the protected app above the visual fallback.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            params.layoutInDisplayCutoutMode =
+                PlatformCompat.fullscreenOverlayCutoutMode(Build.VERSION.SDK_INT)
+        }
         owner.create()
         // A WindowManager failure (an invalid window token after a process/overlay
         // reconnect, or a window already gone) must never crash the caller and must

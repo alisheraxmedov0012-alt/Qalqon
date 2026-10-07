@@ -633,3 +633,27 @@ recognition yet (roadmap in README). Phase 1 foundation was auth-scaffold; Phase
   no emulator here). Docs: `docs/STAGE6_PERMISSION_OEM_COMPATIBILITY.md`. ALL OEMs
   NOT TESTED on real hardware; REAL DEVICE TEST = NO.
 
+- Stage 7 (Android Version Compatibility, roadmap 7/12) — API 26–36 behaviour
+  normalisation. Audit found no crash-prone version bug; the gaps were (a) full-screen
+  blocking overlays not covering the display cutout (API 28+) and (b) edge-to-edge being
+  unhandled while targetSdk=36 enforces it from Android 15/API 35, plus the FGS/cutout
+  matrices being untestable per API. Additive changes: `core/compat/PlatformCompat.kt`
+  (pure, Android-free matrix — `foregroundServiceTypes` camera from 30 / specialUse from
+  34, `fullscreenOverlayCutoutMode` default<28 / shortEdges 28–29 / always 30+, the
+  notification ≥33 gate, `supportsUnsafeCheckOp` ≥29); `ProtectionForegroundService`
+  delegates its type mask to it; both full-screen overlays (`AccessibilityOverlayWindow`,
+  legacy `OverlayControllerImpl`) set `layoutInDisplayCutoutMode` behind
+  `SDK_INT >= P`; the two runtime receivers (screen on/off/user-present, system
+  broadcasts) moved to `ContextCompat.registerReceiver(..., RECEIVER_NOT_EXPORTED)`
+  (API 34 export-flag requirement handled by the compat call); `MainActivity` calls
+  `enableEdgeToEdge()` so bar behaviour is uniform 26–36; `RequestsScreen`'s
+  `NOTIFICATION_PERMISSION_SDK` now re-exports `PlatformCompat.NOTIFICATION_PERMISSION_API`.
+  No recognition/policy/enforcement change; no new permission; INTERNET still removed.
+  New JVM: `PlatformCompatTest` (13), `Stage7ManifestAuditTest` (12),
+  `Stage7DataAndSecurityCompatTest` (9), `Stage7VersionGateHygieneTest` (7),
+  `Stage7PermissionGateTest` (9), `Stage7RegressionGuardTest` (7); JVM 2126 -> 2181
+  (0/0/0). Instrumented `Stage7VersionCompatInstrumentedTest` (6) — platform
+  constant-drift guard + cutout check; executed in CI on the API 35 emulator only.
+  Docs: `docs/STAGE7_ANDROID_VERSION_COMPATIBILITY.md`. Only API 35 executed; API 26–34
+  and 36 NOT TESTED; REAL DEVICE TEST = NO.
+

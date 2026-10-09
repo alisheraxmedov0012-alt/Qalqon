@@ -31,6 +31,8 @@ class Block2LegalFoundationTest {
     private val privacyScreen by lazy { read("app/src/main/java/uz/faceguard/app/feature/privacy/PrivacyScreen.kt") }
     private val consentScreen by lazy { read("app/src/main/java/uz/faceguard/app/feature/subscription/SubscriptionConsentScreen.kt") }
     private val protectionScreen by lazy { read("app/src/main/java/uz/faceguard/app/feature/protection/ProtectionScreen.kt") }
+    // Release Block 3 (ACC-03): the accessibility disclosure now lives in one shared gate.
+    private val accessibilityGate by lazy { read("app/src/main/java/uz/faceguard/app/core/ui/qalqon/AccessibilityConsentGate.kt") }
 
     // ------------------------------------------------------ centralized source
 
@@ -281,8 +283,11 @@ class Block2LegalFoundationTest {
     @Test
     fun theAccessibilityConsentRemainsItsOwnFlow() {
         // The subscription/legal consent must not swallow the AccessibilityService consent.
-        assertTrue(protectionScreen.contains("accessibility_disclosure_title"))
-        assertTrue(protectionScreen.contains("accessibility_disclosure_agree"))
+        // The disclosure wording now lives in the single shared gate (ACC-03), which the
+        // Protection screen renders; the subscription consent still never references it.
+        assertTrue(accessibilityGate.contains("accessibility_disclosure_title"))
+        assertTrue(accessibilityGate.contains("accessibility_disclosure_agree"))
+        assertTrue(protectionScreen.contains("AccessibilityDisclosureDialog("))
         assertFalse(consentScreen.contains("accessibility_disclosure"))
         assertFalse(section.contains("accessibility_disclosure"))
     }

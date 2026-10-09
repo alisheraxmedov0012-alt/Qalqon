@@ -72,3 +72,20 @@ fun Set<ProtectionCapability>.highestPriorityMissing(): ProtectionCapability? =
  */
 fun Set<ProtectionCapability>.degradationKey(): String =
     PROTECTION_CAPABILITY_PRIORITY.filter { it in this }.joinToString(",") { it.name }
+
+/**
+ * Release Block 3 (ACC-03): whether opening the settings page that fixes [this] capability
+ * must first pass through the Accessibility prominent-disclosure / affirmative-consent gate.
+ *
+ * Only [ProtectionCapability.ACCESSIBILITY] does: Google Play's Accessibility API policy
+ * requires a clear in-app disclosure plus affirmative consent before the user is sent to
+ * enable the service. Camera, Usage Access and Overlay are ordinary permission/special-access
+ * flows with their own existing explanations, so they must **not** be routed through the
+ * Accessibility disclosure.
+ *
+ * Pure and Android-free, so "which capability is gated" is unit-testable and every entry
+ * point (requirements row, degraded banner, any future caller) can consult one rule instead
+ * of re-implementing the decision.
+ */
+fun ProtectionCapability.requiresAccessibilityDisclosure(): Boolean =
+    this == ProtectionCapability.ACCESSIBILITY

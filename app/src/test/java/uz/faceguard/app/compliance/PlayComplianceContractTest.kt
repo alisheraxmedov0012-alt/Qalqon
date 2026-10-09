@@ -27,6 +27,10 @@ class PlayComplianceContractTest {
     private val ru by lazy { read("app/src/main/res/values-ru/strings.xml") }
     private val appGradle by lazy { read("app/build.gradle.kts") }
     private val protection by lazy { read("app/src/main/java/uz/faceguard/app/feature/protection/ProtectionScreen.kt") }
+    // Release Block 3 (ACC-03): the disclosure wording/dialog is centralized in one gate.
+    private val accessibilityGate by lazy {
+        read("app/src/main/java/uz/faceguard/app/core/ui/qalqon/AccessibilityConsentGate.kt")
+    }
     private val manifest by lazy { read("app/src/main/AndroidManifest.xml") }
     private val accessibilityConfig by lazy { read("app/src/main/res/xml/accessibility_service_config.xml") }
     private val inventory by lazy { read("gradle/libs.versions.toml") }
@@ -84,9 +88,14 @@ class PlayComplianceContractTest {
             protection.contains("onOpenAccessibility = { showAccessibilityDisclosure = true }"),
         )
         assertTrue(
+            "the screen must render the shared disclosure gate",
+            protection.contains("AccessibilityDisclosureDialog("),
+        )
+        // The affirmative-consent wording lives in the single shared gate (ACC-03).
+        assertTrue(
             "the disclosure must be an affirmative-consent dialog",
-            protection.contains("R.string.accessibility_disclosure_body") &&
-                protection.contains("R.string.accessibility_disclosure_agree"),
+            accessibilityGate.contains("R.string.accessibility_disclosure_body") &&
+                accessibilityGate.contains("R.string.accessibility_disclosure_agree"),
         )
         assertTrue(
             "settings are opened only after consent",

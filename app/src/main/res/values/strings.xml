@@ -5,7 +5,7 @@
     <!-- Stage 8: Google Play User Data policy requires a clear in-app disclosure and
          affirmative consent before enabling the AccessibilityService API. -->
     <string name="accessibility_disclosure_title">Fondagi ilovalarni kuzatish xizmati</string>
-    <string name="accessibility_disclosure_body">Qalqon himoyalangan ilova ochilganini aniqlash uchun maxsus imkoniyatlar xizmatidan foydalanadi. Xizmat faqat qaysi ilova ekranda ekanini (paket nomini) biladi; ekran matni, parollar yoki bildirishnomalar hech qachon o\'qilmaydi. Bu ma\'lumot faqat shu qurilmada, ota-ona nazorati uchun ishlatiladi va hech qayerga yuborilmaydi.</string>
+    <string name="accessibility_disclosure_body">Qalqon himoyalangan ilova ochilganini aniqlash va tanlagan cheklovlaringizni qo\'llash uchun maxsus imkoniyatlar xizmatidan foydalanadi. Xizmat faqat old plandagi ilovaning paket nomini biladi; ekran matni, xabarlar, parollar yoki ekran mazmuni hech qachon o\'qilmaydi va hech qanday ma\'lumot bu qurilmadan tashqariga yuborilmaydi. Ushbu ruxsat bo\'lmasa, Qalqonning ilovalarni bloklash himoyasi mo\'ljallanganidek ishlamaydi. Qalqonning maxsus imkoniyatlar ruxsatini istalgan vaqtda Android Sozlamalar → Maxsus imkoniyatlar → Qalqon bo\'limida o\'chirib qo\'yishingiz mumkin; bu himoyani kamaytiradi yoki to\'xtatadi.</string>
     <string name="accessibility_disclosure_agree">Roziman — sozlamalarni ochish</string>
     <string name="accessibility_disclosure_decline">Bekor qilish</string>
     <string name="protection_req_accessibility">Fondagi ilovalarni kuzatish xizmati</string>

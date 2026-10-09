@@ -5,7 +5,7 @@
     <!-- Stage 8: Google Play User Data policy requires a clear in-app disclosure and
          affirmative consent before enabling the AccessibilityService API. -->
     <string name="accessibility_disclosure_title">Служба фонового мониторинга приложений</string>
-    <string name="accessibility_disclosure_body">Qalqon использует службу спец. возможностей, чтобы определять, когда открыто защищённое приложение. Служба узнаёт только имя пакета приложения на экране; текст экрана, пароли и уведомления никогда не читаются. Эти данные используются только на этом устройстве для родительского контроля и никуда не отправляются.</string>
+    <string name="accessibility_disclosure_body">Qalqon использует службу спец. возможностей, чтобы определять, какое приложение находится на экране, и применять выбранные вами ограничения для защищённых приложений. Служба узнаёт только имя пакета приложения на экране; текст экрана, сообщения, пароли и содержимое экрана никогда не читаются, и никакие данные не отправляются с этого устройства. Без этого разрешения блокировка приложений в Qalqon не может работать так, как задумано. Отключить доступ Qalqon к спец. возможностям можно в любой момент в Настройки Android → Спец. возможности → Qalqon; это снизит или остановит защиту.</string>
     <string name="accessibility_disclosure_agree">Согласен — открыть настройки</string>
     <string name="accessibility_disclosure_decline">Отмена</string>
     <string name="protection_req_accessibility">Служба фонового мониторинга приложений</string>

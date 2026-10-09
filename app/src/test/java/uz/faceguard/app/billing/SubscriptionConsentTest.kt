@@ -36,6 +36,10 @@ class SubscriptionConsentTest {
     private val protectionScreen by lazy {
         read("app/src/main/java/uz/faceguard/app/feature/protection/ProtectionScreen.kt")
     }
+    // Release Block 3 (ACC-03): the accessibility disclosure lives in one shared gate.
+    private val accessibilityGate by lazy {
+        read("app/src/main/java/uz/faceguard/app/core/ui/qalqon/AccessibilityConsentGate.kt")
+    }
     private val uz by lazy { read("app/src/main/res/values/strings.xml") }
     private val en by lazy { read("app/src/main/res/values-en/strings.xml") }
     private val ru by lazy { read("app/src/main/res/values-ru/strings.xml") }
@@ -162,9 +166,11 @@ class SubscriptionConsentTest {
         )
         // The consent is subscription-specific, not a generic "I agree" covering everything.
         assertTrue(consentScreen.contains("subscription_consent_agree"))
-        // The accessibility disclosure remains its own flow.
-        assertTrue(protectionScreen.contains("accessibility_disclosure_title"))
-        assertTrue(protectionScreen.contains("accessibility_disclosure_agree"))
+        // The accessibility disclosure remains its own flow (now centralized in the shared
+        // gate, ACC-03), rendered by the Protection screen.
+        assertTrue(accessibilityGate.contains("accessibility_disclosure_title"))
+        assertTrue(accessibilityGate.contains("accessibility_disclosure_agree"))
+        assertTrue(protectionScreen.contains("AccessibilityDisclosureDialog("))
     }
 
     // ------------------------------------------------------------- localization

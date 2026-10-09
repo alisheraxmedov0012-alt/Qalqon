@@ -1,12 +1,12 @@
-# QALQON — Legal & Support pages (deploy-ready)
+# QALQON — Legal & Support pages (published)
 
-> **Status: PREPARED — NOT PUBLISHED. Public hosting is the remaining Release Block 2 blocker.**
-> These pages are complete and code-accurate, but **no official QALQON domain or hosting
-> exists yet**, so they are not live. Do not invent a domain or claim they are published.
+> **Status: PUBLISHED on the official QALQON domain `https://qalqon.win`** (Cloudflare Pages).
+> The four resources are live over HTTPS in all three languages, with the real support mailbox
+> `alisheraxmedov0012@gmail.com` set on every page. Legal-counsel review remains outstanding
+> (see "Legal review" below).
 
 This directory holds the app's public legal and support pages as self-contained, mobile-friendly
-static HTML (no JavaScript, no tracking, no login). They are ready to drop onto any static host
-or CMS.
+static HTML (no JavaScript, no tracking, no login). Cloudflare Pages serves them from this folder.
 
 ## Files
 
@@ -23,22 +23,22 @@ docs/legal/
 English is the **authoritative** version. The `uz` and `ru` pages are translations provided for
 the app's three supported languages; they are **not certified legal translations**.
 
-## Target URLs (once hosted)
+## Live URLs (verified over HTTPS)
 
-Play Console requires public HTTPS pages. The app links to them through the single source of
-truth `uz.faceguard.app.core.legal.LegalLinks`, which currently returns `null` (nothing is hosted),
-so the app shows an honest "not available yet" state.
+| Purpose | Live URL |
+|---|---|
+| Privacy Policy | `https://qalqon.win/en/privacy-policy` (`/uz/…`, `/ru/…`) |
+| Terms of Service | `https://qalqon.win/en/terms-of-service` (`/uz/…`, `/ru/…`) |
+| Account deletion | `https://qalqon.win/en/delete-account` (`/uz/…`, `/ru/…`) |
+| Support | `https://qalqon.win/en/support` (`/uz/…`, `/ru/…`) |
 
-| Purpose | App path (`LegalLinks`) | Target URL |
-|---|---|---|
-| Privacy Policy | `/privacy` | `https://<official-qalqon-domain>/privacy` |
-| Terms of Service | `/terms` | `https://<official-qalqon-domain>/terms` |
-| Account deletion | `/delete-account` | `https://<official-qalqon-domain>/delete-account` |
-| Support | `/support` | `https://<official-qalqon-domain>/support` |
+Cloudflare Pages normalises the `*.html` URLs to the extensionless form (308 → 200), so the
+canonical URLs above are the ones the app and Play Console use. The app links to them through the
+single source of truth `uz.faceguard.app.core.legal.LegalLinks` (`BASE_URL = "https://qalqon.win"`).
+The app links to the **English (authoritative)** pages.
 
-Suggested host mapping: serve `en/privacy-policy.html` at `/privacy`, `en/terms-of-service.html`
-at `/terms`, `en/delete-account.html` at `/delete-account`, `en/support.html` at `/support`, and
-the `uz/` and `ru/` trees under `/uz/` and `/ru/`.
+Support email (published on every page and in `LegalLinks.SUPPORT_EMAIL`):
+**alisheraxmedov0012@gmail.com**.
 
 ## Requirements (Play policy)
 
@@ -48,24 +48,15 @@ the `uz/` and `ru/` trees under `/uz/` and `/ru/`.
 4. Mobile-friendly and readable.
 5. Contact information on every page.
 
-## Two substitutions required before publishing
+## Deployment
 
-These pages contain **no fabricated domain and no fabricated email**. Before publishing, replace:
+Hosted on **Cloudflare Pages** (project owner's infrastructure), building this `docs/legal`
+folder. The production Git branch is `feature/phase4-screen-time-complete`; the build output
+directory is `docs/legal`. No repository or Cloudflare settings were changed by this task.
 
-1. `[[SUPPORT_EMAIL]]` — the real, monitored support mailbox (every page + in-app
-   `LegalLinks.SUPPORT_EMAIL`).
-2. The official QALQON domain — set `LegalLinks.BASE_URL` in the app once the site is live.
+To update content: edit the HTML here and push; Cloudflare Pages rebuilds. Keep `LegalLinks.BASE_URL`
+and the paths in the app in sync with the paths above.
 
-## Deployment (developer action) — currently PENDING
-
-No hosting credentials, DNS, or domain exist in this repository, and no deployment was performed.
-Enabling a host (reusing an existing website/CMS, a static host such as GitHub Pages / Netlify /
-Cloudflare Pages / S3+CloudFront, etc.) is a project-owner decision that this task does not take
-unilaterally, and it does **not** produce the required `<official-qalqon-domain>` URL on its own.
-
-**Exact remaining external action:** choose and configure a host for the official QALQON domain,
-publish these pages at the paths above, then set `LegalLinks.BASE_URL` (and `SUPPORT_EMAIL`) and
-enter the URLs in Play Console (App content → Privacy policy and Account deletion).
 
 ## Account deletion semantics (honest)
 

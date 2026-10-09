@@ -1,10 +1,10 @@
 # QALQON — Account Deletion (in-app + external resource)
 
 > **Canonical published page (Release Block 2): `docs/legal/en/delete-account.html`** (with `uz`/`ru`
-> translations). The app links to it through the centralized `LegalLinks` source and reports
-> honestly that it is not available until hosting exists.
+> translations), **live at `https://qalqon.win/en/delete-account`**. The app links to it
+> through the centralized `LegalLinks` source.
 >
-> **Status: In-app deletion IMPLEMENTED; external web resource NOT PUBLISHED.**
+> **Status: In-app deletion IMPLEMENTED; external web resource PUBLISHED (live over HTTPS).**
 > Play's Account Deletion Requirement needs **both**.
 
 **Official requirement (verbatim, verified 2026-10-07):**
@@ -37,16 +37,17 @@ session).
 **Biometric residue:** deleting a *single child profile* removes that child's row and its
 encrypted template; per-child config rows are cleared on full account reset. (Documented.)
 
-## B. External web resource — NOT PUBLISHED (manual)
+## B. External web resource — PUBLISHED (live)
+
 Because QALQON is **backendless / client-only** (no server, no Internet), the external
 resource is a **request/instructions page** that explains the on-device deletion path and
 how to request help. **Do not claim server-side deletion — there is none.**
 
-Required page: `[ACCOUNT DELETION URL]` (public HTTPS). Suggested content:
+Live page: `https://qalqon.win/en/delete-account` (public HTTPS). Content:
 - What QALQON stores and that it is on the user's device only.
 - Steps to delete in-app (Settings → Privacy → delete all data).
-- A contact path (`[SUPPORT EMAIL]`) to request assistance.
+- A contact path (`alisheraxmedov0012@gmail.com`) to request assistance.
 - Scope: account, parent/child profiles, face templates, settings, activity, logs.
 
-**Play Console:** enter the URL in App content → **Account deletion** once hosted.
-**Status: NOT VERIFIED** (no URL, no Play Console access).
+**Play Console:** enter the URL in App content → **Account deletion** (the URL is live; the
+Console entry itself is a Block 7 action).

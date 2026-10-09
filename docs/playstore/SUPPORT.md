@@ -1,24 +1,25 @@
 # QALQON — Support & Contact
 
 > **Canonical published pages (Release Block 2): `docs/legal/en/support.html` and
-> `docs/legal/en/delete-account.html`.** The app now links to these through the centralized
-> `LegalLinks` source (wired into Settings → Privacy and Settings → Support), showing an honest
-> "not available yet" state until hosting exists.
+> `docs/legal/en/delete-account.html`.** The app links to these through the centralized
+> `LegalLinks` source (wired into Settings → Privacy and Settings → Support).
 
-> **Status: PREPARED — NOT PUBLISHED.** Real contact details are **MISSING** in this
-> repository; placeholders must be filled and a public support page hosted before
-> submission. Do not invent an email or domain.
+> **Status: PUBLISHED.** Support email and the legal/support URLs are live on
+> `https://qalqon.win`.
 
-## Required (fill before submission)
+## Contact (live)
+
 | Item | Value | Status |
 |---|---|---|
-| Support email | `[SUPPORT EMAIL]` | **MISSING** — provide a real, monitored address |
-| Support website | `[SUPPORT URL]` | **MISSING** — optional but recommended |
-| Privacy policy URL | `[PRIVACY POLICY URL]` | **MISSING** — public HTTPS required |
-| Account-deletion URL | `[ACCOUNT DELETION URL]` | **MISSING** — public HTTPS required |
-| Developer/legal entity | `[DEVELOPER NAME, ADDRESS]` | **MISSING** |
+| Support email | `alisheraxmedov0012@gmail.com` | **LIVE** — real, monitored address |
+| Support website | `https://qalqon.win/en/support` | **LIVE** |
+| Privacy policy URL | `https://qalqon.win/en/privacy-policy` | **LIVE** |
+| Terms of service URL | `https://qalqon.win/en/terms-of-service` | **LIVE** |
+| Account-deletion URL | `https://qalqon.win/en/delete-account` | **LIVE** |
+| Developer/legal entity | `[DEVELOPER NAME, ADDRESS]` | **MISSING** — provide before submission |
 
-> **SUPPORT CONTACT = MISSING.** No real email/URL exists in the repo; none is invented.
+> **SUPPORT CONTACT = LIVE.** The support email and the legal/support pages above were verified
+> live over HTTPS. The developer/legal-entity postal details are still outstanding (not invented).
 
 ## In-app help (already implemented)
 QALQON ships an offline Help Center (`feature/help`) with a local knowledge base, search,

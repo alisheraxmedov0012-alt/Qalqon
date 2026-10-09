@@ -1,14 +1,14 @@
-# QALQON — Privacy Policy (final text, ready to host)
+# QALQON — Privacy Policy (published)
 
 > **Canonical published page (Release Block 2): `docs/legal/en/privacy-policy.html`** — the
-> deploy-ready HTML version of this policy (English authoritative; `uz`/`ru` translations
-> alongside). This Markdown file remains the working draft. Public hosting is still pending.
+> HTML version of this policy (English authoritative; `uz`/`ru` translations alongside),
+> **live at `https://qalqon.win/en/privacy-policy`**. This Markdown file is the working draft.
 
-> **Status: PREPARED — NOT PUBLISHED.** This text matches QALQON's real behavior
-> (verified in Stages 4–10). It is **not legal advice**; a lawyer should review before
-> publication. **PRIVACY POLICY PUBLIC URL = NOT VERIFIED** (no public HTTPS host exists
-> in this repository). Placeholders are marked `[…]` — replace them; do not invent a
-> domain. This is not a claim of GDPR/COPPA certification or Play approval.
+> **Status: PUBLISHED.** This text matches QALQON's real behavior (verified in Stages 4–10).
+> It is **not legal advice**; a lawyer should review before production publication.
+> **PRIVACY POLICY PUBLIC URL = `https://qalqon.win/en/privacy-policy`** (live over HTTPS).
+> The only remaining `[…]` placeholder is the developer/legal-entity postal details (kept
+> unset deliberately). This is not a claim of GDPR/COPPA certification or Play approval.
 
 ---
 
@@ -18,7 +18,7 @@ _Last updated: [DATE]_
 
 Qalqon ("the app", "we") is an on-device parental-control application for Android
 (package `uz.faceguard.app`). This policy explains what data the app handles and how.
-Contact: `[SUPPORT EMAIL]`. Developer: `[DEVELOPER / LEGAL ENTITY, ADDRESS]`.
+Contact: `alisheraxmedov0012@gmail.com`. Developer: `[DEVELOPER / LEGAL ENTITY, ADDRESS]`.
 
 ## 1. Summary
 - Qalqon works **fully offline**. It has **no Internet permission** and cannot transmit
@@ -106,4 +106,4 @@ We may update this policy; the "Last updated" date will change. Continued use af
 update means you accept the revised policy.
 
 ## 11. Contact
-Questions: `[SUPPORT EMAIL]`.
+Questions: `alisheraxmedov0012@gmail.com`.

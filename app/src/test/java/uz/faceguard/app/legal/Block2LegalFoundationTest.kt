@@ -35,35 +35,38 @@ class Block2LegalFoundationTest {
     // ------------------------------------------------------ centralized source
 
     @Test
-    fun thePathsAreTheStablePublicPaths() {
-        assertEquals("/privacy", LegalLinks.PATH_PRIVACY_POLICY)
-        assertEquals("/terms", LegalLinks.PATH_TERMS_OF_SERVICE)
-        assertEquals("/delete-account", LegalLinks.PATH_DELETE_ACCOUNT)
-        assertEquals("/support", LegalLinks.PATH_SUPPORT)
+    fun thePathsAreTheStablePublishedPaths() {
+        // Cloudflare Pages serves the extensionless English (authoritative) paths.
+        assertEquals("/en/privacy-policy", LegalLinks.PATH_PRIVACY_POLICY)
+        assertEquals("/en/terms-of-service", LegalLinks.PATH_TERMS_OF_SERVICE)
+        assertEquals("/en/delete-account", LegalLinks.PATH_DELETE_ACCOUNT)
+        assertEquals("/en/support", LegalLinks.PATH_SUPPORT)
     }
 
     @Test
-    fun noProductionUrlOrEmailIsFabricated() {
-        // Hosting is pending: nothing is published, so every configured value is null.
-        assertNull("no domain is configured yet", LegalLinks.BASE_URL)
-        assertNull("no privacy URL without a domain", LegalLinks.PRIVACY_POLICY_URL)
-        assertNull("no terms URL without a domain", LegalLinks.TERMS_OF_SERVICE_URL)
-        assertNull("no deletion URL without a domain", LegalLinks.DELETE_ACCOUNT_URL)
-        assertNull("no support URL without a domain", LegalLinks.SUPPORT_URL)
-        assertNull("no support email is invented", LegalLinks.SUPPORT_EMAIL)
-        assertNull("no mailto without an email", LegalLinks.supportEmailUri())
-        assertFalse(LegalLinks.legalSiteConfigured)
-        assertFalse(LegalLinks.supportEmailConfigured)
+    fun theProductionDomainAndSupportEmailAreTheVerifiedOnes() {
+        // Release Block 2 finalization: the official domain + real support mailbox.
+        assertEquals("https://qalqon.win", LegalLinks.BASE_URL)
+        assertEquals("alisheraxmedov0012@gmail.com", LegalLinks.SUPPORT_EMAIL)
+        assertEquals("mailto:alisheraxmedov0012@gmail.com", LegalLinks.supportEmailUri())
+        assertTrue(LegalLinks.legalSiteConfigured)
+        assertTrue(LegalLinks.supportEmailConfigured)
+
+        // The four built URLs are exactly the verified public resources.
+        assertEquals("https://qalqon.win/en/privacy-policy", LegalLinks.PRIVACY_POLICY_URL)
+        assertEquals("https://qalqon.win/en/terms-of-service", LegalLinks.TERMS_OF_SERVICE_URL)
+        assertEquals("https://qalqon.win/en/delete-account", LegalLinks.DELETE_ACCOUNT_URL)
+        assertEquals("https://qalqon.win/en/support", LegalLinks.SUPPORT_URL)
     }
 
     @Test
     fun urlConstructionIsVerifiableAndOverridable() {
         // A configured base yields the exact stable URLs (the override/verification seam).
         val base = "https://example.test"
-        assertEquals("https://example.test/privacy", LegalLinks.urlFor(LegalLinks.PATH_PRIVACY_POLICY, base))
-        assertEquals("https://example.test/terms", LegalLinks.urlFor(LegalLinks.PATH_TERMS_OF_SERVICE, base))
-        assertEquals("https://example.test/delete-account", LegalLinks.urlFor(LegalLinks.PATH_DELETE_ACCOUNT, base))
-        assertEquals("https://example.test/support", LegalLinks.urlFor(LegalLinks.PATH_SUPPORT, base))
+        assertEquals("https://example.test/en/privacy-policy", LegalLinks.urlFor(LegalLinks.PATH_PRIVACY_POLICY, base))
+        assertEquals("https://example.test/en/terms-of-service", LegalLinks.urlFor(LegalLinks.PATH_TERMS_OF_SERVICE, base))
+        assertEquals("https://example.test/en/delete-account", LegalLinks.urlFor(LegalLinks.PATH_DELETE_ACCOUNT, base))
+        assertEquals("https://example.test/en/support", LegalLinks.urlFor(LegalLinks.PATH_SUPPORT, base))
         // Trailing slashes and surrounding whitespace are normalised.
         assertEquals("https://example.test/privacy", LegalLinks.urlFor("/privacy", "https://example.test/ "))
         assertEquals("https://example.test/privacy", LegalLinks.urlFor("privacy", "https://example.test"))
@@ -82,9 +85,16 @@ class Block2LegalFoundationTest {
     }
 
     @Test
-    fun theCentralSourceHardcodesNoUrlOfItsOwn() {
-        assertFalse("LegalLinks must not embed a URL", links.contains("http://") || links.contains("https://"))
-        assertFalse("LegalLinks must not embed an email", Regex("""[\w.]+@[\w.]+""").containsMatchIn(links))
+    fun theDomainIsDefinedOnceInTheCentralSource() {
+        // The host is declared exactly once, as an assigned string literal (BASE_URL); the
+        // path constants are separate, so no other class has to repeat the domain. KDoc
+        // mentions of the domain are documentation, not a second definition.
+        val assignedUrlLiterals = Regex("""=\s*"https?://[^"]*"""").findAll(links).count()
+        assertEquals("exactly one URL literal must be assigned (BASE_URL)", 1, assignedUrlLiterals)
+        assertTrue(
+            "BASE_URL must hold the only scheme+host",
+            links.contains("val BASE_URL: String? = \"https://qalqon.win\""),
+        )
     }
 
     // ------------------------------------------------------- in-app navigation
@@ -162,7 +172,7 @@ class Block2LegalFoundationTest {
                 .forEach { target ->
                     assertTrue("$lang support must link to $target", support.contains("href=\"$target\""))
                 }
-            assertTrue("$lang support must offer a contact path", support.contains("mailto:[[SUPPORT_EMAIL]]"))
+            assertTrue("$lang support must offer a contact path", support.contains("mailto:alisheraxmedov0012@gmail.com"))
         }
     }
 
@@ -224,26 +234,38 @@ class Block2LegalFoundationTest {
         assertTrue("must describe the in-app deletion", page.contains("settings"))
         assertTrue("must explain the deletion is real", page.contains("real deletion") || page.contains("permanently deletes"))
         assertTrue("must address the subscription separately", page.contains("subscription"))
-        // The contact token is explicit, never a fabricated email.
-        assertFalse("no fabricated email", Regex("""[\w.]+@[\w.]+\.[a-z]{2,}""").containsMatchIn(page))
+        // The contact is the real authorized mailbox, and the page must not claim remote deletion.
+        assertTrue("must publish the real support address", page.contains("alisheraxmedov0012@gmail.com"))
+        assertTrue("must not claim remote deletion", page.contains("we cannot delete it remotely"))
     }
 
     @Test
-    fun thePagesEmbedNoDomainOrFabricatedEmail() {
-        // Every page must be free of an absolute URL or a real-looking email; the only
-        // contact is the documented substitution token.
+    fun everyPagePublishesTheAuthorizedSupportEmailAndNoPlaceholder() {
+        // Every published page carries the real mailbox and no leftover token / fake address.
+        val email = "alisheraxmedov0012@gmail.com"
         (langs.flatMap { lang -> pages.map { "$lang/$it" } } + listOf("../index")).forEach { rel ->
             val path = if (rel == "../index") "docs/legal/index.html" else "docs/legal/$rel.html"
             val html = read(path)
-            assertFalse("$path must not embed a domain", html.contains("http://") || html.contains("https://"))
+            assertTrue("$path must publish the authorized support email", html.contains(email))
+            assertFalse("$path must not contain the old placeholder token", html.contains("[[SUPPORT_EMAIL]]"))
             assertFalse(
-                "$path must not embed a fabricated email",
-                Regex("""[\w.]+@[\w.]+\.[a-z]{2,}""").containsMatchIn(html),
+                "$path must not contain a placeholder/example domain",
+                html.contains("example.com") || html.contains("official-qalqon-domain") || html.contains("your-real-domain"),
             )
         }
-        // The substitution token is what the deployer replaces.
-        assertTrue(read("docs/legal/en/support.html").contains("[[SUPPORT_EMAIL]]"))
-        assertTrue(read("docs/legal/README.md").contains("[[SUPPORT_EMAIL]]"))
+        // The README no longer carries the token either.
+        assertFalse(read("docs/legal/README.md").contains("[[SUPPORT_EMAIL]]"))
+    }
+
+    @Test
+    fun thePagesContainNoAbsoluteUrlSoTheyStayRelocatable() {
+        // Navigation between pages stays relative (Cloudflare Pages resolves it); the pages
+        // deliberately embed no absolute http(s) URL.
+        (langs.flatMap { lang -> pages.map { "$lang/$it" } } + listOf("../index")).forEach { rel ->
+            val path = if (rel == "../index") "docs/legal/index.html" else "docs/legal/$rel.html"
+            val html = read(path)
+            assertFalse("$path must not embed an absolute URL", html.contains("http://") || html.contains("https://"))
+        }
     }
 
     // -------------------------------------------------- Block 1 integration

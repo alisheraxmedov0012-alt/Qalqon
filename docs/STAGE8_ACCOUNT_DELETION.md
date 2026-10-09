@@ -1,5 +1,9 @@
 # QALQON — Account Deletion (In-App + External Web Resource)
 
+> **SUPERSEDED (Release Block 2 finalization): the external resource is now live** at
+> `https://qalqon.win/en/delete-account`. The canonical content is
+> `docs/legal/en/delete-account.html`. This Stage 8 record is retained for history.
+
 > Stage 8 remediation. Google Play's **Account Deletion Requirement** (User Data
 > policy) applies because QALQON allows account creation.
 

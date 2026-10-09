@@ -1,5 +1,11 @@
 # QALQON — Hosting Requirements (Privacy Policy + Account Deletion)
 
+> **SUPERSEDED (Release Block 2 finalization): the pages are now live.** The hosting
+> requirement below was fulfilled on the official domain `https://qalqon.win`
+> (`/en/privacy-policy`, `/en/terms-of-service`, `/en/delete-account`, `/en/support`, plus
+> `uz`/`ru`). See `docs/legal/README.md` and `docs/legal/`. This Stage 8 record is kept for
+> history; its `<your-real-domain>` placeholders are no longer the current state.
+
 > Stage 8 remediation. QALQON needs **two public HTTPS pages** before Play submission.
 > Neither exists yet. **Do not invent a domain.** Placeholders use `<your-real-domain>`.
 

@@ -1,5 +1,10 @@
 # QALQON — Privacy Policy (Final Text) + Hosting Requirements
 
+> **SUPERSEDED (Release Block 2 finalization): this policy is now published** at
+> `https://qalqon.win/en/privacy-policy` (plus `/uz/` and `/ru/`). The canonical, maintained
+> text is `docs/legal/en/privacy-policy.html`. The policy text below is retained as the
+> Stage 8 copy.
+
 > Stage 8 remediation deliverable. This is the **final privacy-policy text** QALQON
 > must publish. It describes the app's **real behavior** (verified in Stages 4–8),
 > not intended or aspirational behavior. It is **not legal advice**; a lawyer should
@@ -16,7 +21,7 @@ _Last updated: [DATE]_
 
 Qalqon ("the app", "we") is an on-device parental-control application for Android
 (package `uz.faceguard.app`). This policy explains what data the app handles and how.
-Contact: [SUPPORT EMAIL]. Developer: [DEVELOPER / LEGAL ENTITY, ADDRESS].
+Contact: alisheraxmedov0012@gmail.com. Developer: [DEVELOPER / LEGAL ENTITY, ADDRESS].
 
 ### 1. Summary
 - Qalqon works **fully offline**. It has **no Internet permission** and cannot
@@ -114,7 +119,7 @@ We may update this policy; the "Last updated" date will change and the current v
 will always be available at [PRIVACY POLICY URL].
 
 ### 12. Contact
-Questions or requests: [SUPPORT EMAIL].
+Questions or requests: alisheraxmedov0012@gmail.com.
 
 ---
 

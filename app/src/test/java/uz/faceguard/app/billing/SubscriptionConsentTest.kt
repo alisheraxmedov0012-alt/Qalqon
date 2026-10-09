@@ -3,12 +3,11 @@ package uz.faceguard.app.billing
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import uz.faceguard.app.core.billing.BillingProductDetails
-import uz.faceguard.app.domain.billing.ProductCatalog
 import uz.faceguard.app.core.legal.LegalLinks
+import uz.faceguard.app.domain.billing.ProductCatalog
 import uz.faceguard.app.feature.subscription.SubscriptionConsent
 
 /**
@@ -137,13 +136,13 @@ class SubscriptionConsentTest {
     }
 
     @Test
-    fun noLegalUrlIsFabricated() {
-        // Block 1 must not invent a production URL; the links are wired to a single source
-        // that Block 2 fills in.
+    fun theLegalLinksAreWiredToTheCentralSourceNotHardcoded() {
+        // Block 1 never hardcodes a URL; it resolves the published links from the single
+        // LegalLinks source (which Block 2 finalized with the verified production URLs).
         assertFalse("no URL literal in the consent screen", consentScreen.contains("http://"))
         assertFalse("no URL literal in the consent screen", consentScreen.contains("https://"))
-        assertNull("Privacy Policy URL is a Block 2 dependency", LegalLinks.PRIVACY_POLICY_URL)
-        assertNull("Terms of Service URL is a Block 2 dependency", LegalLinks.TERMS_OF_SERVICE_URL)
+        assertEquals("https://qalqon.win/en/privacy-policy", LegalLinks.PRIVACY_POLICY_URL)
+        assertEquals("https://qalqon.win/en/terms-of-service", LegalLinks.TERMS_OF_SERVICE_URL)
         assertTrue(
             "the links must be wired to LegalLinks, not hardcoded",
             consentScreen.contains("LegalLinks.PRIVACY_POLICY_URL") &&

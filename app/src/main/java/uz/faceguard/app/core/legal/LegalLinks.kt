@@ -5,45 +5,45 @@ package uz.faceguard.app.core.legal
  *
  * Every screen (the Premium consent flow, Settings) links through this object, so a
  * public URL is defined once and can never drift between screens. The document text
- * itself lives in the repository under `docs/legal/` (deploy-ready) and
- * `docs/playstore/` (working drafts).
+ * itself lives in the repository under `docs/legal/` and is published on the official
+ * domain `https://qalqon.win` (Cloudflare Pages) — see `docs/legal/README.md`.
  *
- * **No URL is fabricated.** [BASE_URL] and [SUPPORT_EMAIL] are `null` until the official
- * QALQON domain and a real, monitored mailbox exist. While they are `null` every derived
- * URL is `null`, and the UI shows an honest "not available yet" state instead of opening a
- * broken or invented link. Publishing the pages and setting [BASE_URL] is the only change
- * needed to switch the whole app over — see `docs/legal/README.md`.
+ * All four resources below were verified live over HTTPS (HTTP 200, valid certificate) in
+ * the three supported languages. The app links to the **English (authoritative)** pages;
+ * the `/uz/…` and `/ru/…` equivalents are published alongside them.
  *
- * The URL builder takes the base as a parameter (defaulting to [BASE_URL]) so the
- * construction is unit-testable and overridable without shipping a fake production URL.
+ * The URL builder still takes the base as a parameter (defaulting to [BASE_URL]) so the
+ * construction stays unit-testable and overridable.
  */
 object LegalLinks {
 
-    /** Path of the Privacy Policy page, relative to [BASE_URL]. */
-    const val PATH_PRIVACY_POLICY = "/privacy"
+    /**
+     * Path of the Privacy Policy page, relative to [BASE_URL]. English is the
+     * authoritative version published by Cloudflare Pages; the `.html` form is normalised
+     * to this extensionless path, which is the canonical URL.
+     */
+    const val PATH_PRIVACY_POLICY = "/en/privacy-policy"
 
     /** Path of the Terms of Service page, relative to [BASE_URL]. */
-    const val PATH_TERMS_OF_SERVICE = "/terms"
+    const val PATH_TERMS_OF_SERVICE = "/en/terms-of-service"
 
     /** Path of the external account-deletion page, relative to [BASE_URL]. */
-    const val PATH_DELETE_ACCOUNT = "/delete-account"
+    const val PATH_DELETE_ACCOUNT = "/en/delete-account"
 
     /** Path of the support page, relative to [BASE_URL]. */
-    const val PATH_SUPPORT = "/support"
+    const val PATH_SUPPORT = "/en/support"
 
     /**
-     * The official QALQON domain (its production host), or `null`.
-     *
-     * `null` = **public hosting pending** (Release Block 2). Do not set a placeholder or a
-     * guessed value; supply the real domain once the legal pages are hosted.
+     * The official QALQON production domain. Verified: HTTPS with a valid certificate,
+     * `http://` 301-redirects to `https://`.
      */
-    val BASE_URL: String? = null
+    val BASE_URL: String? = "https://qalqon.win"
 
     /**
-     * The public support mailbox. `null` until a real, monitored address is provided —
-     * never invent an email.
+     * The public support mailbox, published on every legal/support page. This is the
+     * project owner's real, monitored address — never replace it with an invented one.
      */
-    val SUPPORT_EMAIL: String? = null
+    val SUPPORT_EMAIL: String? = "alisheraxmedov0012@gmail.com"
 
     /**
      * Builds an absolute URL for [path] on [base], or `null` when no base is configured.
@@ -58,16 +58,16 @@ object LegalLinks {
         return cleanBase.trimEnd('/') + "/" + path.trimStart('/')
     }
 
-    /** The configured Privacy Policy URL, or `null` while hosting is pending. */
+    /** The published Privacy Policy URL. */
     val PRIVACY_POLICY_URL: String? get() = urlFor(PATH_PRIVACY_POLICY)
 
-    /** The configured Terms of Service URL, or `null` while hosting is pending. */
+    /** The published Terms of Service URL. */
     val TERMS_OF_SERVICE_URL: String? get() = urlFor(PATH_TERMS_OF_SERVICE)
 
-    /** The configured external account-deletion URL, or `null` while hosting is pending. */
+    /** The published external account-deletion URL. */
     val DELETE_ACCOUNT_URL: String? get() = urlFor(PATH_DELETE_ACCOUNT)
 
-    /** The configured support page URL, or `null` while hosting is pending. */
+    /** The published support page URL. */
     val SUPPORT_URL: String? get() = urlFor(PATH_SUPPORT)
 
     /** True when [url] is a usable public link. */

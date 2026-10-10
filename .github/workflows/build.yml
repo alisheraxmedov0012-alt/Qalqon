@@ -35,13 +35,20 @@ jobs:
       run: ./gradlew :app:testDebugUnitTest --no-daemon
 
     - name: Build Debug APK
-      run: ./gradlew assembleDebug --no-daemon
+      run: ./gradlew :app:assembleDebug --no-daemon
 
-    - name: Upload APK
+    # Block 3 device-test prep: publish the debug APK as a downloadable artifact so it
+    # can be installed on a physical device. `if-no-files-found: error` makes a missing
+    # APK a red build instead of a silent skip, so this run can never be green without
+    # producing the exact artifact that is handed to device testing. Nothing sensitive is
+    # uploaded — only the debug APK file (never local.properties, .git or the workspace).
+    - name: Upload debug APK
       uses: actions/upload-artifact@v4
       with:
-        name: app-debug
+        name: qalqon-debug-apk
         path: app/build/outputs/apk/debug/app-debug.apk
+        if-no-files-found: error
+        retention-days: 30
 
   # Instrumented (Android) tests on a real emulator.
   # `assembleDebugAndroidTest` only proves the test sources compile; this job is

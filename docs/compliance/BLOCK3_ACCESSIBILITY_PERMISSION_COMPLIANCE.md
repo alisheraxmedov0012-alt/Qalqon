@@ -235,6 +235,9 @@ any external-storage permission, `RECORD_AUDIO`, exact-alarm permissions.
 | D-17 | Protection on | Reboot device | Restore path runs; camera limited until app opened | — | recording | NOT RUN |
 | D-18 | Xiaomi/HyperOS device | Repeat D-02..D-09 | Same honest behaviour; OEM settings labels may differ | — | recording | NOT RUN |
 | D-19 | Samsung / Pixel / OPPO / Vivo (if available) | Repeat D-02..D-09 | Best-effort compatibility | — | recording | NOT RUN |
+| D-20 | Sideload install of a CI debug APK on Redmi Note 14 / HyperOS / Android 16 | Install via browser/messaging/file manager | Record the exact Play Protect dialog and whether it is the hard "App blocked to protect your device" screen or a soft scan prompt | — | screenshot + verbatim text | NOT RUN |
+| D-21 | Two consecutive CI debug APKs | Install the older, then try to update with the newer | A debug-key rotation makes in-place update fail (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`); uninstall then install | — | `adb install` output | NOT RUN |
+| D-22 | HyperOS install flow | Compare an install from a browser vs `adb install` vs Play internal testing | Only the Internet-sideloading source is subject to the sensitive-permission auto-block | — | recording | NOT RUN |
 
 Device evidence required before Block 3 compliance can be considered complete:
 at least one clean device run of D-02..D-09 (the disclosure/enforcement core) plus one
@@ -244,5 +247,159 @@ Xiaomi/HyperOS run. Full OEM certification remains Block 6.
 
 ## Part 7 — Revision of record
 
-Recorded against `feature/phase4-screen-time-complete`, Block 3 Phase C. The exact commit is
-stated in the Block 3 Phase C report; update this line if the docs are edited again.
+| Field | Value |
+|---|---|
+| Branch | `feature/phase4-screen-time-complete` |
+| Audit performed at commit | `f3591688749bff83cdd8d0418ff3f247d2ce0421` |
+| Documentation revision | this file's edit commit (see Part 8 §8.1 for the audit commit) |
+| Date | 2026-10-10 |
+| Status | PREPARED — NOT SUBMITTED. No Play Console declaration submitted; no device test run. |
+
+Update this table if the docs are edited again.
+
+---
+
+## Part 8 — Block 3 final audit (this revision)
+
+### 8.1 Repository state
+
+| Field | Value |
+|---|---|
+| Branch | `feature/phase4-screen-time-complete` |
+| HEAD at audit | `f3591688749bff83cdd8d0418ff3f247d2ce0421` |
+| Worktree | clean (`git status` = nothing to commit) |
+| Remote | `github.com/alisheraxmedov0012-alt/Qalqon` |
+
+### 8.2 Requirement status matrix
+
+Legend: **PASS** = verified by a code/test artefact in this repo · **FAIL** = proven defect ·
+**NOT RUN** = cannot be verified in this environment (no device) · **BLOCKED** = needs Play
+Console / Google.
+
+| # | Requirement | Status | Evidence |
+|---|---|---|---|
+| A1 | AccessibilityService declared, system-bound only | PASS | `AndroidManifest.xml`; `AccessibilityServiceContractTest` (8/8) |
+| A2 | `isAccessibilityTool` not set anywhere | PASS | config + manifest; byte-scan of the built APK (absent) |
+| A3 | `canRetrieveWindowContent="false"`, no node-tree API | PASS | `accessibility_service_config.xml`; `AccessibilityServiceContractTest` |
+| A4 | Only `TYPE_WINDOW_STATE_CHANGED` / `TYPE_WINDOWS_CHANGED` | PASS | `AccessibilityEventFilter.kt`; contract test |
+| A5 | Only the foreground package name is read | PASS | `ProtectionAccessibilityService.kt`; contract test |
+| A6 | No off-device transmission | PASS | merged **release** manifest has **0** active `INTERNET`; no okhttp/retrofit/firebase/ktor; contract test |
+| A7 | Every path to Accessibility settings is gated by the disclosure | PASS | `AccessibilityConsentGateTest` (13/13) |
+| A8 | Launch happens only from the affirmative action | PASS | `AccessibilityConsentGateTest`; `AccessibilityConsentGate.kt` |
+| A9 | Revocation / disabled state is reported honestly (LIMITED) | PASS | `ProtectionReadiness` + degraded banner; `ProtectionReadinessTest` |
+| B1 | In-app prominent disclosure before the permission | PASS | `AccessibilityDisclosureDialog` (shared gate) |
+| B2 | Affirmative action required; decline opens nothing | PASS | `AccessibilityConsentGateTest` |
+| B3 | Disclosure covers purpose / data / use / off-device / revoke (uz·en·ru) | PASS | `strings.xml` ×3; `AccessibilityConsentGateTest` |
+| C1 | Camera: rationale before the system prompt | PASS | `protection_capability_why_camera`; `RequirementsCard` |
+| C2 | Camera denial/recovery handled; no leftover frames | PASS | `CameraRecoveryCard`; `CameraRecoveryBackoffTest`; `ProtectionBootCameraTest` |
+| D1 | Usage Access: explained, user-initiated, re-checked on resume | PASS | `AndroidUsageAccess`; `ProtectionScreen` ON_RESUME refresh |
+| E1 | Overlay: purpose explained; accessibility vs visual fallback separated | PASS | `AccessibilityOverlayWindow` (touchable) vs `OverlayControllerImpl.showLegacy()` (`FLAG_NOT_TOUCHABLE`); contract test |
+| F1 | FGS types correct per API; no illegal background start | PASS | `PlatformCompat.foregroundServiceTypes`; `ProtectionServicePolicyTest`; `ProtectionServiceLaunch...` tests |
+| G1 | Notifications requested only on explicit action; denial harmless | PASS | `RequestsScreen` (explicit tap); `ProtectionRuntime` |
+| H1 | Transitive permissions identified & justified | PASS | merged release manifest + merger report (PERM-03) |
+| I1 | Google Play Console Accessibility declaration submitted | BLOCKED | requires Play Console (Part 9) |
+| I2 | Data safety form submitted | BLOCKED | requires Play Console (Part 9) |
+| I3 | FGS declaration submitted | BLOCKED | requires Play Console (Part 9) |
+| I4 | Privacy policy URL / account-deletion URL hosted & entered | BLOCKED | Block 2 deliverables, hosting pending |
+| J1 | Real-device disclosure/enforcement run (D-02..D-09) | NOT RUN | no device; matrix Part 6 |
+| J2 | Xiaomi/HyperOS run (D-18, D-20..D-22) | NOT RUN | no device; matrix Part 6 |
+| J3 | Instrumented/emulator suite green | NOT RUN | CI emulator job has failed historically; see Part 8 §3 |
+
+**No FAIL row and no proven code defect was found.** No source, manifest, permission, resource,
+signing or workflow change was required. Block 3 cannot be *closed* while I1–I4 are BLOCKED and
+J1–J2 are NOT RUN.
+
+### 8.3 Test / build results (this revision)
+
+| Check | Command | Result |
+|---|---|---|
+| JVM unit tests | `./gradlew :app:testDebugUnitTest --rerun-tasks` | BUILD SUCCESSFUL — **2368 tests, 0 failures, 0 errors, 0 skipped** |
+| Compliance contracts | (subset) | `AccessibilityServiceContractTest` 8 · `AccessibilityConsentGateTest` 13 · `PlayComplianceContractTest` 14 · `ReleaseSigningGuardContractTest` 6 — all pass |
+| Lint | `./gradlew :app:lintDebug` | **0 errors**, 168 pre-existing warnings |
+| Release R8 | `./gradlew :app:minifyReleaseWithR8` | BUILD SUCCESSFUL (R8 ran on the release variant) |
+| Merged release manifest | `:app:processReleaseMainManifest` | 13 permissions, **no** INTERNET/ACCESS_NETWORK_STATE/QUERY_ALL_PACKAGES/location/SMS/audio/storage |
+| Instrumented (emulator) | `:app:connectedDebugAndroidTest` | **NOT RUN** here (no emulator); CI emulator job must be re-checked |
+
+### 8.4 Play Protect observation (recorded, not resolved)
+
+On the reporter's Redmi Note 14 (HyperOS / Android 16) both older and current CI debug APKs are
+blocked by Play Protect, currently with the hard "App blocked to protect your device" screen
+rather than a "Details / install anyway" prompt. **Recorded as an open observation.**
+- The hard-block category in Google's guidance is the *sensitive-permission Internet-sideloading*
+  block, which lists `ACCESSIBILITY` among the guarded permissions; QALQON declares an
+  `AccessibilityService`.
+- The fact that a byte-identical older file now behaves differently points to a **server-side**
+  Play Protect classification/enforcement change, not to an app change — but this is a
+  **hypothesis, not a proven cause**. No Google/Xiaomi defect is asserted.
+- Do **not** disable Play Protect, hide permissions, add `isAccessibilityTool`, remove the
+  AccessibilityService, or add any bypass. Any appeal is a separate decision and is **not**
+  claimed to have succeeded.
+- Debug signing-key rotation across CI runs is a documented fact (each run signs with a different
+  auto-generated debug key) and would explain *update* failures, but is **not** claimed as the
+  cause of the classification block.
+
+---
+
+## Part 9 — Play Console declaration / Data safety preparation
+
+> Everything below is **PREPARED, NOT SUBMITTED**. Console access is out of scope for this task.
+
+### 9.1 Accessibility declaration — ready answers (with code evidence)
+
+| Prompt (typical) | Answer | Evidence |
+|---|---|---|
+| Why does your app need the AccessibilityService API? | **App functionality** (parental-control app blocking) | Part 1 §1–2; `ProtectionAccessibilityService` |
+| Do you collect and/or share personal or sensitive data using the accessibility capabilities? | **No** | Only `event.packageName` is read; nothing transmitted (no INTERNET) |
+| Is your app an accessibility tool (`isAccessibilityTool=true`)? | **No** | flag absent; `AccessibilityServiceContractTest` |
+| Provide a short video of the prominent disclosure | attach the demo video | Part 2 shot list |
+
+### 9.2 Data safety — questions to answer from the real data handling
+
+Answer these from the code, not by assumption (`docs/STAGE8_DATA_SAFETY_ANSWER_SHEET.md`):
+1. Is any data collected or shared off-device? (code says **no** — no INTERNET permission.)
+2. Is the foreground package name / activity log ever transmitted? (**no** — local DB only.)
+3. Is the face template / biometric data transmitted? (**no** — AES-GCM, key in Android Keystore.)
+4. Does Google Play Billing data need declaring? (payment processed by Play, app never accesses
+   card data — per Play's Data safety FAQ.)
+5. Is data encrypted in transit? (not applicable — nothing is transmitted.)
+6. Is data deletion available? (in-app `ResetRepository` + external web resource — Block 2.)
+
+### 9.3 Foreground service — questions to answer
+
+1. Which FGS types and why: `camera` (on-device recognition) + `specialUse`
+   (subtype `parental_control_protection_state`); evidence `AndroidManifest.xml`.
+2. Is the user told why the service runs? (persistent notification; `AndroidNotifications`.)
+3. Is `camera` ever started from a boot context? (**no** — boot restores `specialUse` only).
+
+### 9.4 Demo video — reproducible scenario
+
+Use the Part 2 shot list verbatim (12 shots). The video must show the disclosure **before**
+Settings, the affirmative tap, the manual enable, a blocked protected app, revocation, and the
+honest LIMITED state. It must **not** be edited to hide the disclosure or the manual enable step.
+**Status: NOT CREATED — MANUAL ACTION REQUIRED** (no device).
+
+---
+
+## Part 10 — Remaining work and next step
+
+### 10.1 Manual Play Console actions (all BLOCKED on Console access)
+
+- [ ] App content → **Accessibility** declaration (answers in Part 9.1) + demo video.
+- [ ] App content → **Data safety** (answers in Part 9.2).
+- [ ] App content → **Foreground service** declaration (Part 9.3).
+- [ ] Privacy policy URL + account-deletion URL (Block 2 hosting).
+- [ ] Target audience / content rating (adults; not Designed for Families).
+- [ ] Retain the raw demo video + screenshots as evidence.
+
+### 10.2 Device testing actions (BLOCKED on a device)
+
+- [ ] D-02..D-09 on a clean non-Xiaomi device.
+- [ ] D-18 and D-20..D-22 on Redmi Note 14 / HyperOS / Android 16.
+- [ ] Re-check the CI emulator job (`connectedDebugAndroidTest`) log for the real root cause.
+
+### 10.3 Next most important step
+
+**Record one clean real-device run of D-02..D-09** (the disclosure → consent → enable → block →
+revoke core) with a screen recording, and file the Accessibility declaration. Those two items are
+the Block 3 closure gate; everything else is either already PASS at the code level or a Console
+hosting task.

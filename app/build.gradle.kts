@@ -185,18 +185,37 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
 }
 
-// A release APK must never be produced unsigned and then distributed as if it
-// were a production build. When no signing identity is available the release
-// packaging fails with an actionable message instead. Debug builds, JVM tests
-// and lint are unaffected, so a machine without the secrets still works.
-tasks.matching { it.name == "assembleRelease" || it.name == "packageRelease" }.configureEach {
+// A release artifact (APK or AAB) must never be produced unsigned and then
+// distributed as if it were a production build. When no signing identity is
+// available the release packaging fails with an actionable message instead.
+// Debug builds, JVM tests and lint are unaffected, so a machine without the
+// secrets still works.
+//
+// The packaging tasks are the backstop: their doFirst runs before the artifact
+// file is written, so a failed guard leaves no uploadable artifact behind.
+// `packageRelease` packages the APK and `packageReleaseBundle` packages the AAB
+// — the latter is the path that previously slipped through. The lifecycle tasks
+// (`assembleRelease`, `bundleRelease`) are guarded as well, so an invocation
+// fails with a clearly-named release task.
+//
+// Names are matched exactly, never by prefix: sibling tasks such as
+// `packageReleaseResources` / `packageReleaseAssets` share the `packageRelease`
+// prefix but produce no installable artifact and must not be guarded.
+val guardedReleaseTaskNames = setOf(
+    "assembleRelease",
+    "packageRelease",
+    "bundleRelease",
+    "packageReleaseBundle",
+)
+tasks.matching { it.name in guardedReleaseTaskNames }.configureEach {
     doFirst {
         if (!hasReleaseSigning) {
             throw GradleException(
-                "Release signing is not configured, so no release APK can be produced. " +
-                    "Provide QALQON_RELEASE_STORE_FILE, QALQON_RELEASE_STORE_PASSWORD, " +
-                    "QALQON_RELEASE_KEY_ALIAS and QALQON_RELEASE_KEY_PASSWORD as environment " +
-                    "variables, or set the equivalent qalqon.* keys in local.properties.",
+                "Release signing is not configured, so no release artifact (APK or AAB) can " +
+                    "be produced. Provide QALQON_RELEASE_STORE_FILE, " +
+                    "QALQON_RELEASE_STORE_PASSWORD, QALQON_RELEASE_KEY_ALIAS and " +
+                    "QALQON_RELEASE_KEY_PASSWORD as environment variables, or set the " +
+                    "equivalent qalqon.* keys in local.properties.",
             )
         }
     }

@@ -243,6 +243,10 @@ Device evidence required before Block 3 compliance can be considered complete:
 at least one clean device run of D-02..D-09 (the disclosure/enforcement core) plus one
 Xiaomi/HyperOS run. Full OEM certification remains Block 6.
 
+> The **step-by-step procedure** for every row above, plus the Xiaomi/HyperOS section and the
+> artifact identity, is in **`docs/compliance/BLOCK3_REAL_DEVICE_TEST_GUIDE.md`**. Every row
+> remains `NOT RUN` until evidence is recorded on a real device.
+
 ---
 
 ## Part 7 — Revision of record

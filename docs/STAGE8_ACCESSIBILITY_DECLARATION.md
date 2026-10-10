@@ -1,5 +1,11 @@
 # QALQON — Accessibility API Declaration Pack
 
+> **SUPERSEDED (Release Block 3, Phase C): see
+> `docs/compliance/BLOCK3_ACCESSIBILITY_PERMISSION_COMPLIANCE.md`** for the reviewer-ready
+> package (declaration draft, demo-video script, submission checklist, sensitive-permission
+> audit and the device test matrix). This Stage 8 pack is retained for history; its code
+> facts remain accurate, but the Block 3 package is the current source of truth.
+>
 > Stage 8 remediation. QALQON includes `ProtectionAccessibilityService`. Per Google
 > Play it is **not** an accessibility tool, so it must complete an accessibility
 > declaration, show a clear in-app disclosure, and obtain affirmative consent.

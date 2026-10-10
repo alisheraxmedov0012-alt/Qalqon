@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.Build
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
@@ -65,7 +66,14 @@ class AccessibilityOverlayWindow(
         isClickable = true
         isFocusable = false
         // Consume every touch: the protected app underneath must receive nothing.
-        setOnTouchListener { _, _ -> true }
+        // Block 3 (ClickableViewAccessibility): a touch listener that returns true is
+        // still expected to surface a click to accessibility services, so a completed
+        // touch (ACTION_UP) also calls performClick(). The listener keeps returning true,
+        // so the touch is still consumed and the protected app still receives nothing.
+        setOnTouchListener { view, event ->
+            if (event.action == MotionEvent.ACTION_UP) view.performClick()
+            true
+        }
 
         addView(
             buildContent(),

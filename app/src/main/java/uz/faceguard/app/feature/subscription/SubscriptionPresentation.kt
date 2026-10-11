@@ -2,6 +2,7 @@ package uz.faceguard.app.feature.subscription
 
 import androidx.annotation.StringRes
 import uz.faceguard.app.R
+import uz.faceguard.app.core.billing.BillingProductDetails
 import uz.faceguard.app.domain.billing.BillingError
 import uz.faceguard.app.domain.billing.EntitlementState
 
@@ -11,6 +12,27 @@ import uz.faceguard.app.domain.billing.EntitlementState
  * enum-to-string mapping.
  */
 object SubscriptionPresentation {
+
+    /**
+     * Release Block 4 (trial truthfulness): whether the free-trial wording may be shown.
+     *
+     * The trial is a Google Play **offer**, so the app must never promise one it has not
+     * seen. [BillingProductDetails.isFreeTrial] is derived from the *preferred offer's*
+     * first pricing phase (`GooglePlayBillingGateway.toDto`), so the trial badge/CTA are
+     * shown only when Play actually returned an offer with a free first phase. A null
+     * (not-yet-loaded / unconfigured) product discloses nothing about a trial.
+     */
+    fun showsFreeTrial(product: BillingProductDetails?): Boolean = product?.isFreeTrial == true
+
+    /**
+     * The primary call-to-action label: the trial wording only when a free trial was
+     * actually offered by Play, otherwise a neutral "subscribe" label. This keeps the CTA
+     * from promising a trial the user may be ineligible for (Play enforces eligibility
+     * server-side; the app cannot know it).
+     */
+    @StringRes
+    fun startCtaLabelRes(product: BillingProductDetails?): Int =
+        if (showsFreeTrial(product)) R.string.subscription_start_trial else R.string.subscription_start_subscribe
 
     /** The localized label for the current entitlement state. */
     @StringRes

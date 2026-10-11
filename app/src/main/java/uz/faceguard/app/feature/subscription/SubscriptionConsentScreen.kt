@@ -104,10 +104,13 @@ fun SubscriptionConsentScreen(
             // Subscription terms: trial, dynamic localized price, monthly billing, renewal.
             QalqonCard(modifier = Modifier.fillMaxWidth()) {
                 QalqonSectionHeader(title = stringResource(R.string.subscription_consent_section_subscription))
-                Text(
-                    text = stringResource(R.string.subscription_trial_badge),
-                    style = MaterialTheme.typography.titleLarge,
-                )
+                // Block 4: show the free-trial wording only when Play offered a free trial.
+                if (SubscriptionPresentation.showsFreeTrial(product)) {
+                    Text(
+                        text = stringResource(R.string.subscription_trial_badge),
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                }
                 Text(
                     text = product?.formattedPrice?.let {
                         stringResource(R.string.subscription_price_after_trial, it)
@@ -252,7 +255,7 @@ fun SubscriptionConsentScreen(
                 enabled = canStart && !ui.loading,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(stringResource(R.string.subscription_start_trial))
+                Text(stringResource(SubscriptionPresentation.startCtaLabelRes(product)))
             }
 
             // The price and billing frequency sit with the CTA, so the terms are visible

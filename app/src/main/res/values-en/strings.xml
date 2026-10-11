@@ -911,6 +911,7 @@
     <string name="subscription_auto_renew_notice">After the trial it starts automatically and renews monthly.</string>
     <string name="subscription_cancel_notice">Cancel anytime; premium stays active until the end of the current period.</string>
     <string name="subscription_start_trial">Start 3-day free trial</string>
+    <string name="subscription_start_subscribe">Subscribe now</string>
     <string name="subscription_manage">Manage subscription</string>
     <string name="subscription_restore">Restore purchase</string>
     <string name="subscription_refresh">Refresh</string>

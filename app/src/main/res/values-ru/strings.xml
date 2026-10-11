@@ -911,6 +911,7 @@
     <string name="subscription_auto_renew_notice">После пробного периода подписка запускается автоматически и продлевается ежемесячно.</string>
     <string name="subscription_cancel_notice">Отменить можно в любое время; премиум сохраняется до конца текущего периода.</string>
     <string name="subscription_start_trial">Начать 3-дневный бесплатный период</string>
+    <string name="subscription_start_subscribe">Оформить подписку</string>
     <string name="subscription_manage">Управлять подпиской</string>
     <string name="subscription_restore">Восстановить покупку</string>
     <string name="subscription_refresh">Обновить</string>

@@ -104,10 +104,15 @@ class SubscriptionConsentTest {
             "subscription_consent_privacy_policy",
             "subscription_consent_terms_of_service",
             "subscription_consent_agree",
-            "subscription_start_trial",
         ).forEach { key ->
             assertTrue("the consent screen must render $key", consentScreen.contains("R.string.$key"))
         }
+        // Block 4: the CTA wording is gated on the Play offer (trial vs. plain subscribe),
+        // so the screen never hardcodes a "free trial" promise the user may not get.
+        assertTrue(
+            "the consent screen must label the CTA from the offer",
+            consentScreen.contains("SubscriptionPresentation.startCtaLabelRes(product)"),
+        )
     }
 
     @Test

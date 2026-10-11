@@ -912,6 +912,7 @@
     <string name="subscription_auto_renew_notice">Sinovdan so‘ng obuna avtomatik boshlanadi va har oy yangilanadi.</string>
     <string name="subscription_cancel_notice">Istalgan vaqtda bekor qilishingiz mumkin; joriy davr oxirigacha premium saqlanadi.</string>
     <string name="subscription_start_trial">3 kunlik bepul sinovni boshlash</string>
+    <string name="subscription_start_subscribe">Obuna bo\'lish</string>
     <string name="subscription_manage">Obunani boshqarish</string>
     <string name="subscription_restore">Xaridni tiklash</string>
     <string name="subscription_refresh">Yangilash</string>

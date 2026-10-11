@@ -5,7 +5,7 @@
     <!-- Stage 8: Google Play User Data policy requires a clear in-app disclosure and
          affirmative consent before enabling the AccessibilityService API. -->
     <string name="accessibility_disclosure_title">Служба фонового мониторинга приложений</string>
-    <string name="accessibility_disclosure_body">Qalqon использует службу спец. возможностей, чтобы определять, когда открыто защищённое приложение. Служба узнаёт только имя пакета приложения на экране; текст экрана, пароли и уведомления никогда не читаются. Эти данные используются только на этом устройстве для родительского контроля и никуда не отправляются.</string>
+    <string name="accessibility_disclosure_body">Qalqon использует службу спец. возможностей, чтобы определять, какое приложение находится на экране, и применять выбранные вами ограничения для защищённых приложений. Служба узнаёт только имя пакета приложения на экране; текст экрана, сообщения, пароли и содержимое экрана никогда не читаются, и никакие данные не отправляются с этого устройства. Без этого разрешения блокировка приложений в Qalqon не может работать так, как задумано. Отключить доступ Qalqon к спец. возможностям можно в любой момент в Настройки Android → Спец. возможности → Qalqon; это снизит или остановит защиту.</string>
     <string name="accessibility_disclosure_agree">Согласен — открыть настройки</string>
     <string name="accessibility_disclosure_decline">Отмена</string>
     <string name="protection_req_accessibility">Служба фонового мониторинга приложений</string>
@@ -177,6 +177,17 @@
     <string name="privacy_point_no_upload">Фото лица никуда не загружаются и не хранятся; сохраняется только математический шаблон.</string>
     <string name="privacy_point_battery">Камера включается ненадолго и только при необходимости.</string>
     <string name="privacy_reset_hint">Все данные можно удалить в Настройки → Данные.</string>
+    <string name="legal_section_title">Правовая информация и поддержка</string>
+    <string name="legal_section_subtitle">Политика конфиденциальности, условия использования и поддержка</string>
+    <string name="legal_privacy_policy">Политика конфиденциальности</string>
+    <string name="legal_terms_of_service">Условия использования</string>
+    <string name="legal_delete_account">Удалить аккаунт</string>
+    <string name="legal_delete_account_note">Удаление аккаунта не отменяет автоматически подписку Google Play. Управляйте подпиской через Google Play.</string>
+    <string name="legal_support_title">Поддержка</string>
+    <string name="legal_support_page">Страница поддержки</string>
+    <string name="legal_contact_support">Связаться с поддержкой</string>
+    <string name="legal_contact_support_unavailable">Контактный адрес пока недоступен</string>
+    <string name="legal_link_unavailable">Документ пока недоступен</string>
     <string name="help_title">Помощь</string>
     <string name="help_version">%1$s — демо-версия MVP</string>
     <string name="activity_title">Журнал активности</string>
@@ -697,6 +708,12 @@
     <!-- QALQON Children + Child Detail (UI/UX redesign, Phase 4). -->
     <string name="children_overview">Ваши дети</string>
     <string name="children_open_details">Открыть данные %1$s</string>
+    <string name="children_status_active">Активен</string>
+    <string name="children_status_time_up">Время вышло</string>
+    <string name="children_status_offline">Офлайн</string>
+    <string name="children_action_settings">Настройки</string>
+    <string name="children_action_schedule">Расписание</string>
+    <string name="children_action_eye_safety">Защита зрения</string>
     <string name="child_detail_back">Назад</string>
     <string name="child_detail_controls_title">Управление</string>
     <string name="child_detail_apps">Приложения</string>
@@ -894,6 +911,7 @@
     <string name="subscription_auto_renew_notice">После пробного периода подписка запускается автоматически и продлевается ежемесячно.</string>
     <string name="subscription_cancel_notice">Отменить можно в любое время; премиум сохраняется до конца текущего периода.</string>
     <string name="subscription_start_trial">Начать 3-дневный бесплатный период</string>
+    <string name="subscription_start_subscribe">Оформить подписку</string>
     <string name="subscription_manage">Управлять подпиской</string>
     <string name="subscription_restore">Восстановить покупку</string>
     <string name="subscription_refresh">Обновить</string>
@@ -927,4 +945,25 @@
     <string name="subscription_error_pending">Ожидается оплата.</string>
     <string name="subscription_error_unexpected">Произошла непредвиденная ошибка. Попробуйте позже.</string>
     <string name="subscription_manage_open_failed">Не удалось открыть страницу управления подпиской.</string>
+    <string name="subscription_consent_back">Назад</string>
+    <string name="subscription_billing_google_play">Оплата проходит через Google Play.</string>
+    <string name="subscription_important_info_hint">Перед продолжением ознакомьтесь с важной информацией.</string>
+    <string name="subscription_consent_title">Важная информация</string>
+    <string name="subscription_consent_subtitle">Кратко об условиях подписки и оплате после пробного периода.</string>
+    <string name="subscription_consent_section_subscription">Условия подписки</string>
+    <string name="subscription_consent_section_trial">После пробного периода</string>
+    <string name="subscription_consent_section_cancel">Отмена</string>
+    <string name="subscription_consent_section_limits">Технические ограничения</string>
+    <string name="subscription_consent_section_legal">Правовая информация</string>
+    <string name="subscription_consent_trial_conversion">По окончании 3-дневного бесплатного пробного периода подписка автоматически станет месячной и будет продлеваться ежемесячно, если не отменить.</string>
+    <string name="subscription_consent_cancel_how">Отменить можно в любой момент в подписках Google Play. Это отличается от удаления приложения или удаления аккаунта.</string>
+    <string name="subscription_consent_google_play">Оплату обрабатывает Google Play. Qalqon не собирает данные карты или платежей.</string>
+    <string name="subscription_limit_accessibility">Защита зависит от службы доступности Android и на некоторых устройствах может быть ограничена.</string>
+    <string name="subscription_limit_overlay">На некоторых устройствах фоновые и батарейные ограничения могут временно приостанавливать защиту.</string>
+    <string name="subscription_limit_system">Qalqon не может полностью контролировать некоторые системные действия, например Home, Recents или Power.</string>
+    <string name="subscription_limit_recognition">Распознавание лица и liveness зависят от освещения, перекрытия и угла.</string>
+    <string name="subscription_consent_privacy_policy">Политика конфиденциальности</string>
+    <string name="subscription_consent_terms_of_service">Условия использования</string>
+    <string name="subscription_consent_legal_unavailable">Документ пока недоступен.</string>
+    <string name="subscription_consent_agree">Я согласен с условиями подписки, оплатой после пробного периода и автоматическим продлением.</string>
 </resources>

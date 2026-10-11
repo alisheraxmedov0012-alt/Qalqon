@@ -65,7 +65,7 @@ applies the protection rules you set.
 - Behaviour can vary by device manufacturer; broad Android compatibility, individual
   results may differ.
 
-**Support:** `[SUPPORT EMAIL]`
+**Support:** `alisheraxmedov0012@gmail.com`
 
 ---
 

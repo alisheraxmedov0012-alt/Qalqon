@@ -15,7 +15,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -23,7 +22,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -66,10 +64,12 @@ import uz.faceguard.app.core.security.SecurityState
 import uz.faceguard.app.core.ui.protectionCapabilityWhyRes
 import uz.faceguard.app.core.ui.protectionReadinessHintRes
 import uz.faceguard.app.core.ui.protectionReadinessLabelRes
+import uz.faceguard.app.core.ui.qalqon.AccessibilityDisclosureDialog
 import uz.faceguard.app.core.ui.qalqon.ProtectionDegradedBanner
 import uz.faceguard.app.domain.model.AppSettings
 import uz.faceguard.app.domain.model.ScanMode
 import uz.faceguard.app.domain.protection.ProtectionCapability
+import uz.faceguard.app.domain.protection.requiresAccessibilityDisclosure
 import uz.faceguard.app.domain.repository.SettingsRepository
 import uz.faceguard.app.domain.security.PinVerification
 import uz.faceguard.app.domain.security.formatLockoutRemaining
@@ -214,10 +214,17 @@ fun ProtectionScreen(
             )
 
             // Persistent degraded warning with a one-tap jump to the right settings page.
+            // ACC-03: the accessibility fix must pass through the prominent-disclosure /
+            // affirmative-consent gate, exactly like the requirements row below — a
+            // shortcut must never open Accessibility settings directly.
             ProtectionDegradedBanner(
                 missing = state.degradedCapabilities,
                 onFix = { capability ->
-                    context.openSettingsOrFallback(viewModel.capabilitySettingsIntent(capability))
+                    if (capability.requiresAccessibilityDisclosure()) {
+                        showAccessibilityDisclosure = true
+                    } else {
+                        context.openSettingsOrFallback(viewModel.capabilitySettingsIntent(capability))
+                    }
                 },
                 cameraLimitedAfterBoot = state.cameraLimitedAfterBoot,
             )
@@ -308,26 +315,17 @@ fun ProtectionScreen(
     }
 
     // Google Play User Data policy (Accessibility API): clear in-app disclosure +
-    // affirmative consent before enabling the service. The disclosure states what the
-    // service does and which data it accesses; consent is the explicit confirm action.
+    // affirmative consent before enabling the service. ACC-03: this is the single gate —
+    // the requirements row and the degraded-banner fix both set `showAccessibilityDisclosure`,
+    // and only the affirmative confirm action (below) launches Accessibility settings.
+    // The dialog itself is the shared component, so its wording cannot drift.
     if (showAccessibilityDisclosure) {
-        AlertDialog(
-            onDismissRequest = { showAccessibilityDisclosure = false },
-            title = { Text(stringResource(R.string.accessibility_disclosure_title)) },
-            text = { Text(stringResource(R.string.accessibility_disclosure_body)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    showAccessibilityDisclosure = false
-                    context.openSettingsOrFallback(viewModel.accessibilitySettingsIntent())
-                }) {
-                    Text(stringResource(R.string.accessibility_disclosure_agree))
-                }
+        AccessibilityDisclosureDialog(
+            onConfirm = {
+                showAccessibilityDisclosure = false
+                context.openSettingsOrFallback(viewModel.accessibilitySettingsIntent())
             },
-            dismissButton = {
-                TextButton(onClick = { showAccessibilityDisclosure = false }) {
-                    Text(stringResource(R.string.accessibility_disclosure_decline))
-                }
-            },
+            onDismiss = { showAccessibilityDisclosure = false },
         )
     }
 }

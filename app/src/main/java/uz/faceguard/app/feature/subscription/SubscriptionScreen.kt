@@ -1,6 +1,5 @@
 package uz.faceguard.app.feature.subscription
 
-import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -52,6 +51,7 @@ import uz.faceguard.app.domain.billing.ProductCatalog
 @Composable
 fun SubscriptionScreen(
     onBack: () -> Unit,
+    onStartTrial: () -> Unit,
     viewModel: SubscriptionViewModel = hiltViewModel(),
 ) {
     val entitlement by viewModel.entitlement.collectAsStateWithLifecycle()
@@ -110,7 +110,11 @@ fun SubscriptionScreen(
             // Trial + pricing disclosure (Google Play policy), all dynamic from Play.
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(stringResource(R.string.subscription_trial_badge), style = MaterialTheme.typography.titleLarge)
+                    // Block 4: the trial wording is shown only when Play actually returned a
+                    // free-trial offer, so a trial is never promised that the user cannot get.
+                    if (SubscriptionPresentation.showsFreeTrial(product)) {
+                        Text(stringResource(R.string.subscription_trial_badge), style = MaterialTheme.typography.titleLarge)
+                    }
                     Text(
                         text = product?.formattedPrice?.let {
                             stringResource(R.string.subscription_price_after_trial, it)
@@ -120,6 +124,7 @@ fun SubscriptionScreen(
                     Text(stringResource(R.string.subscription_billing_frequency), style = MaterialTheme.typography.bodyMedium)
                     Text(stringResource(R.string.subscription_auto_renew_notice), style = MaterialTheme.typography.bodySmall)
                     Text(stringResource(R.string.subscription_cancel_notice), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.subscription_billing_google_play), style = MaterialTheme.typography.bodySmall)
                 }
             }
 
@@ -153,15 +158,22 @@ fun SubscriptionScreen(
                     Text(stringResource(R.string.subscription_manage))
                 }
             } else {
+                // Block 1: the offer never launches billing directly. It opens the single
+                // Important Information / Consent screen, which starts the purchase only
+                // after affirmative consent and with a real price on screen.
                 Button(
-                    onClick = {
-                        (context as? Activity)?.let { viewModel.subscribe(it) }
-                    },
-                    enabled = !ui.loading && product != null,
+                    onClick = onStartTrial,
+                    enabled = !ui.loading && SubscriptionConsent.hasDisclosablePrice(product),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(stringResource(R.string.subscription_start_trial))
+                    // Block 4: the CTA only says "free trial" when Play offered one.
+                    Text(stringResource(SubscriptionPresentation.startCtaLabelRes(product)))
                 }
+                Text(
+                    stringResource(R.string.subscription_important_info_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             Row(

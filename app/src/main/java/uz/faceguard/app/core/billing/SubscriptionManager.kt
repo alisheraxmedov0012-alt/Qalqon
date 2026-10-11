@@ -2,6 +2,7 @@ package uz.faceguard.app.core.billing
 
 import android.app.Activity
 import android.util.Log
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -57,6 +58,7 @@ class SubscriptionManager @Inject constructor(
     val product: StateFlow<BillingProductDetails?> = _product.asStateFlow()
 
     private var started = false
+    @Volatile
     private var accountId: Long? = null
     private var purchaseJob: Job? = null
 
@@ -64,8 +66,15 @@ class SubscriptionManager @Inject constructor(
     @Volatile
     private var everEntitled = false
 
-    /** Purchase tokens acknowledged during this session, so a duplicate never re-acks. */
-    private val acknowledgedTokens = mutableSetOf<String>()
+    /**
+     * Purchase tokens acknowledged during this session, so a duplicate never re-acks.
+     *
+     * `refresh()` (UI/Main) and the account/purchase-update collectors
+     * (`Dispatchers.Default`) can drive `applyVerified` concurrently, so this must be a
+     * thread-safe set: a plain `mutableSetOf` could throw `ConcurrentModificationException`
+     * or lose an add.
+     */
+    private val acknowledgedTokens: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     fun start() {
         if (started) return

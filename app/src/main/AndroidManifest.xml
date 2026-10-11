@@ -115,7 +115,21 @@
         <!-- Phase 14: remove the telemetry backend ML Kit's transitive datatransport
              dependency contributes. QALQON never calls datatransport (nothing binds or
              starts these), so removing them shrinks the attack surface and leaves no
-             upload service registered in the release build. -->
+             upload service registered in the release build.
+
+             Block 3 / PERM-03 (documentation only, no behaviour change): the ML Kit
+             GenAI dependency (`com.google.mlkit:genai-prompt`) additionally merges two
+             entries into the manifest that are NOT declared here:
+               - `com.google.android.apps.aicore.service.BIND_SERVICE` (a signature-level
+                 permission for binding to the on-device AICore service), and
+               - `<queries><package android:name="com.google.android.aicore" /></queries>`.
+             They are required only for the existing Phase-A1 *capability detection* of
+             on-device Gemini Nano (`feature/help/ai/GeminiNanoCapability.kt`, which opens
+             no model and sends no data). They are left in place rather than stripped:
+             removing them would only disable a detection query, and the permission is
+             signature-level, so it can never be granted to a third-party app on its own
+             and grants no user-data access. See
+             `docs/compliance/BLOCK3_ACCESSIBILITY_PERMISSION_COMPLIANCE.md` (PERM-03). -->
         <service
             android:name="com.google.android.datatransport.runtime.backends.TransportBackendDiscovery"
             tools:node="remove" />

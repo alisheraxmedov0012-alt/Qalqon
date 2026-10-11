@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -13,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -64,6 +66,12 @@ fun QalqonEmptyState(
     icon: (@Composable () -> Unit)? = null,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
+    /**
+     * Corner shape of the action button. Defaults to Material's standard button shape,
+     * so existing callers are unchanged; a screen may pass a pill
+     * ([uz.faceguard.app.core.theme.QalqonShapes.pillShape]) for a rounder CTA.
+     */
+    actionShape: Shape = ButtonDefaults.shape,
 ) {
     Column(
         modifier = modifier
@@ -91,6 +99,7 @@ fun QalqonEmptyState(
         if (actionLabel != null && onAction != null) {
             OutlinedButton(
                 onClick = onAction,
+                shape = actionShape,
                 modifier = Modifier.padding(top = QalqonDimens.spacing.sm),
             ) {
                 Text(actionLabel)

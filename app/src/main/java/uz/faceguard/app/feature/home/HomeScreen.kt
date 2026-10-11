@@ -98,6 +98,7 @@ import uz.faceguard.app.core.protection.ProtectionRuntimeState
 import uz.faceguard.app.core.theme.QalqonDimens
 import uz.faceguard.app.core.theme.QalqonShapes
 import uz.faceguard.app.core.theme.QalqonTheme
+import uz.faceguard.app.core.ui.qalqon.AccessibilityDisclosureDialog
 import uz.faceguard.app.core.ui.qalqon.QalqonAlertRow
 import uz.faceguard.app.core.ui.qalqon.QalqonAlertSeverity
 import uz.faceguard.app.core.ui.qalqon.QalqonCard
@@ -120,6 +121,7 @@ import uz.faceguard.app.core.ui.protectionCapabilityLabelRes
 import uz.faceguard.app.core.ui.qalqon.QalqonStatusBanner
 import uz.faceguard.app.domain.protection.PROTECTION_CAPABILITY_PRIORITY
 import uz.faceguard.app.domain.protection.ProtectionCapability
+import uz.faceguard.app.domain.protection.requiresAccessibilityDisclosure
 import uz.faceguard.app.domain.protection.highestPriorityMissing
 import uz.faceguard.app.domain.repository.AccountRepository
 import uz.faceguard.app.domain.repository.ActivityLogRepository
@@ -333,6 +335,11 @@ fun HomeScreen(
     val parentProfile by viewModel.parentProfile.collectAsStateWithLifecycle()
     val protectionState by viewModel.protectionState.collectAsStateWithLifecycle()
 
+    // ACC-03: the degraded-banner "fix" for the accessibility capability must pass through
+    // the same prominent-disclosure / affirmative-consent gate as the Protection screen — a
+    // banner shortcut must never open Accessibility settings directly.
+    var showAccessibilityDisclosure by remember { mutableStateOf(false) }
+
     // "Ekran vaqti" opens the selected child's screen-time (via the child hub); with no
     // child selected it opens the Children screen so the parent can add one first.
     val screenTimeAction: () -> Unit = {
@@ -451,7 +458,13 @@ fun HomeScreen(
                         ),
                         degradedCapabilities = protectionState.degradedCapabilities,
                         onFixCapability = { capability ->
-                            context.openSettingsOrFallback(viewModel.capabilitySettingsIntent(capability))
+                            // ACC-03: only the accessibility fix is gated; every other
+                            // capability keeps its own existing settings flow.
+                            if (capability.requiresAccessibilityDisclosure()) {
+                                showAccessibilityDisclosure = true
+                            } else {
+                                context.openSettingsOrFallback(viewModel.capabilitySettingsIntent(capability))
+                            }
                         },
                         onEnableNotifications = { context.openSettingsOrFallback(notificationSettingsIntent(context)) },
                         onOpenRequests = onOpenRequests,
@@ -473,6 +486,20 @@ fun HomeScreen(
                 }
             }
         }
+    }
+
+    // ACC-03: the single accessibility disclosure gate. Only the explicit affirmative
+    // confirm action launches Accessibility settings; declining or dismissing opens nothing.
+    if (showAccessibilityDisclosure) {
+        AccessibilityDisclosureDialog(
+            onConfirm = {
+                showAccessibilityDisclosure = false
+                context.openSettingsOrFallback(
+                    viewModel.capabilitySettingsIntent(ProtectionCapability.ACCESSIBILITY),
+                )
+            },
+            onDismiss = { showAccessibilityDisclosure = false },
+        )
     }
 }
 
